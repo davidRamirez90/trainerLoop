@@ -17,6 +17,14 @@
 - Session notes: store coach feedback and user responses locally.
 - Export: CSV (session summary + coach notes).
 
+## Progress
+
+- Completed: Vite + React + TypeScript scaffold at repo root.
+- Completed: First workout screen layout aligned to UI draft.
+- Completed: uPlot timeline chart with target ranges and live power trace.
+- Completed: Simulated telemetry stream (power, cadence, HR).
+- Completed: Mock workout plan data + interval progress display.
+
 ## Phased Delivery
 
 ### Phase 0 - Foundation
