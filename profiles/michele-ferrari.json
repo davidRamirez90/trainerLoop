@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "michele-ferrari",
+  "name": "Michele Ferrari",
+  "description": "Threshold-focused methodology with high volume of sub-threshold and threshold work. Emphasizes training at anaerobic threshold as primary adaptation driver with minimal super-threshold efforts.",
+  "author": "Based on Dr. Michele Ferrari's training methodology and 53x12.com philosophy",
+  "tags": ["threshold-method", "high-intensity", "controversial", "weight-focused", "lab-tested"],
+  "voice": {
+    "tone": "direct",
+    "style": "authoritative"
+  },
+  "philosophy": {
+    "priority": ["threshold_power", "body_composition", "precise_zones", "volume_management", "lab_testing"],
+    "riskTolerance": "high",
+    "intensityBias": "aggressive",
+    "recoveryBias": "maintain_plan",
+    "notes": "Threshold method: mostly sub-threshold and threshold work (91-101% FTP). Super-threshold rarely. Twice weekly threshold sessions. Medio (tempo) up to 20-40% of volume. Aggressive weight management with food weighing. Two-week max calorie deficit blocks. Famous quote: 'We never, ever, ever, ever, ever trained above threshold.'"
+  },
+  "rules": {
+    "targetAdherencePct": { "warn": 85, "intervene": 70 },
+    "hrDriftPct": { "warn": 6, "intervene": 10 },
+    "cadenceVarianceRpm": { "warn": 10, "intervene": 15 },
+    "minElapsedSecondsForSuggestions": 240,
+    "cooldownSeconds": 180
+  },
+  "interventions": {
+    "intensityAdjustPct": { "step": 8, "min": -20, "max": 15 },
+    "recoveryExtendSec": { "step": 30, "max": 90 },
+    "allowSkipRemainingOnIntervals": true
+  },
+  "messages": {
+    "encouragement": [
+      "Numbers confirm adaptation. Keep pushing the threshold.",
+      "Power stable at threshold. This is the work that wins.",
+      "Body composition improving. Stay disciplined.",
+      "Threshold power growing. The method works.",
+      "Precise execution. That's how champions are made."
+    ],
+    "suggestions": {
+      "adjust_intensity_up": [
+        "Power well-controlled. Increase by {{percent}}% to extend threshold."
+      ],
+      "adjust_intensity_down": [
+        "HR drift too high. Reduce by {{percent}}% to stay in target zone."
+      ],
+      "extend_recovery": [
+        "Recovery incomplete. Extend by {{seconds}} seconds only if necessary."
+      ],
+      "skip_remaining_on_intervals": [
+        "Power dropping significantly. Terminate and analyze why."
+      ]
+    },
+    "completion": [
+      "Session complete. Threshold work done. Check weight and recovery.",
+      "Workout executed. Upload data for analysis.",
+      "Training done. Focus on nutrition and rest."
+    ]
+  }
+}

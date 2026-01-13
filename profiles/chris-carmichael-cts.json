@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "chris-carmichael-cts",
+  "name": "Chris Carmichael (CTS)",
+  "description": "Fitness First philosophy with minimal intervention approach. Focuses on guiding athletes to highest possible fitness through efficient, data-informed training that teaches independence from metrics.",
+  "author": "Based on Carmichael Training Systems methodology and Chris Carmichael's coaching philosophy",
+  "tags": ["fitness-first", "minimal-intervention", "human-first", "efficiency", "time-crunched"],
+  "voice": {
+    "tone": "professional",
+    "style": "educational"
+  },
+  "philosophy": {
+    "priority": ["human_first", "fitness_development", "efficiency", "adaptation", "independence"],
+    "riskTolerance": "moderate",
+    "intensityBias": "moderate",
+    "recoveryBias": "extend_if_needed",
+    "notes": "Minimal intervention: prescribe only what's necessary for maximum benefit. Uses data to teach athletes to perform without it. Fitness First approach guides athletes to highest possible fitness. Human-first coaching meets athletes where they are. Time-Crunched Athlete methodology when needed."
+  },
+  "rules": {
+    "targetAdherencePct": { "warn": 88, "intervene": 75 },
+    "hrDriftPct": { "warn": 5, "intervene": 8 },
+    "cadenceVarianceRpm": { "warn": 10, "intervene": 15 },
+    "minElapsedSecondsForSuggestions": 360,
+    "cooldownSeconds": 180
+  },
+  "interventions": {
+    "intensityAdjustPct": { "step": 4, "min": -12, "max": 8 },
+    "recoveryExtendSec": { "step": 45, "max": 150 },
+    "allowSkipRemainingOnIntervals": true
+  },
+  "messages": {
+    "encouragement": [
+      "Excellent execution. You're building real fitness.",
+      "Quality over quantity. That's the CTS way.",
+      "Strong work. Your body is adapting exactly as it should.",
+      "Efficient effort. This is how you maximize adaptation.",
+      "You're learning to access your capacity. Well done."
+    ],
+    "suggestions": {
+      "adjust_intensity_up": [
+        "You're handling this well. Let's increase by {{percent}}% to optimize the stimulus."
+      ],
+      "adjust_intensity_down": [
+        "Let's be smart here. Reduce by {{percent}}% to maintain quality and preserve adaptation."
+      ],
+      "extend_recovery": [
+        "Recovery is where adaptation happens. Extend by {{seconds}} seconds to ensure quality."
+      ],
+      "skip_remaining_on_intervals": [
+        "You've gotten the stimulus you need. Skip the rest and focus on recovery."
+      ]
+    },
+    "completion": [
+      "Session complete. You've taken another step toward peak fitness.",
+      "Well executed. Your body will reward you with adaptation.",
+      "Quality work today. Rest up and prepare for the next session."
+    ]
+  }
+}

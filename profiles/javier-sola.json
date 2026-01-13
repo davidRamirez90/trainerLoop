@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "javier-sola",
+  "name": "Javier Sola",
+  "description": "UAE Team Emirates performance coach and Tadej Pogačar's personal coach. Emphasizes doing the basics exceptionally well with strength training as central, not accessory. Uses progressive, data-informed approach with minimal intervention when things work.",
+  "author": "Based on UAE Team Emirates coaching philosophy and interviews with Javier Sola",
+  "tags": ["strength-central", "minimal-intervention", "basics-first", "progressive", "data-informed", "anti-doping"],
+  "voice": {
+    "tone": "professional",
+    "style": "educational"
+  },
+  "philosophy": {
+    "priority": ["strength_foundation", "progressive_adaptation", "basics_mastery", "minimal_intervention", "clean_sport"],
+    "riskTolerance": "low",
+    "intensityBias": "moderate",
+    "recoveryBias": "extend_if_needed",
+    "notes": "Strength training central (on/off bike). High-intensity intervals (30-15s, 40-20s, 2x2min). Heat and hypoxic training. When something works, don't touch it. Focus on body composition and lean mass. Anti-doping commitment. Progressive overload with patience."
+  },
+  "rules": {
+    "targetAdherencePct": { "warn": 92, "intervene": 85 },
+    "hrDriftPct": { "warn": 4, "intervene": 7 },
+    "cadenceVarianceRpm": { "warn": 6, "intervene": 10 },
+    "minElapsedSecondsForSuggestions": 420,
+    "cooldownSeconds": 300
+  },
+  "interventions": {
+    "intensityAdjustPct": { "step": 3, "min": -10, "max": 6 },
+    "recoveryExtendSec": { "step": 45, "max": 180 },
+    "allowSkipRemainingOnIntervals": false
+  },
+  "messages": {
+    "encouragement": [
+      "Excellent execution. The basics done well.",
+      "Strength foundation looks solid. This is the work that matters.",
+      "Progressive adaptation in action. Keep building.",
+      "Quality over complexity. Well done.",
+      "Your body is adapting exactly as it should. Trust the process."
+    ],
+    "suggestions": {
+      "adjust_intensity_up": [
+        "Power stable and form looks good. Increase by {{percent}}% to progress gradually."
+      ],
+      "adjust_intensity_down": [
+        "Let's be smart. Reduce by {{percent}}% to maintain quality and preserve adaptation."
+      ],
+      "extend_recovery": [
+        "Recovery is where adaptation happens. Extend by {{seconds}} seconds to ensure quality."
+      ],
+      "skip_remaining_on_intervals": [
+        "You've gotten the stimulus. Terminate properly and focus on recovery for tomorrow."
+      ]
+    },
+    "completion": [
+      "Session complete. Basics executed exceptionally well.",
+      "Quality work today. Rest and adapt.",
+      "Another step forward. The foundation grows stronger."
+    ]
+  }
+}

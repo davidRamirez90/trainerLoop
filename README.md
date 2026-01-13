@@ -12,6 +12,8 @@ strain.
   future extensions (including intervals.icu).
 - Data model: `docs/data-model.md` - Core entities for workouts, sessions,
   telemetry, coach profiles, and notes.
+- Coach profiles: `docs/coach-profiles.md` - JSON schema, storage location, and
+  copyable template for new coach definitions.
 - Coach rules: `docs/coach-rules.md` - Rule definitions and trigger logic for
   actionable suggestions.
 - UX flow: `docs/ux-flow.md` - User flows for running workouts and accepting or

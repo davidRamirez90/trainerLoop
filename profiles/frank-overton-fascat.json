@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "frank-overton-fascat",
+  "name": "Frank Overton (FasCat)",
+  "description": "Sweet Spot methodology with power-based periodization and fatigue-dependent design. Emphasizes aerobic base building through sub-threshold work and systematic recovery weeks.",
+  "author": "Based on FasCat Coaching philosophy and Frank Overton's methodology",
+  "tags": ["sweet-spot", "power-based", "fatigue-dependent", "aerobic-base", "periodization"],
+  "voice": {
+    "tone": "motivational",
+    "style": "concise"
+  },
+  "philosophy": {
+    "priority": ["consistency", "aerobic_base", "power_output", "fatigue_management"],
+    "riskTolerance": "moderate",
+    "intensityBias": "moderate",
+    "recoveryBias": "systematic",
+    "notes": "Sweet Spot training (84-97% FTP) as primary tool. Uses Performance Manager Chart for load management. Rest weeks every 3-4 weeks at 50% volume. Builds aerobic engine first, then race-specific work."
+  },
+  "rules": {
+    "targetAdherencePct": { "warn": 90, "intervene": 80 },
+    "hrDriftPct": { "warn": 4, "intervene": 7 },
+    "cadenceVarianceRpm": { "warn": 8, "intervene": 12 },
+    "minElapsedSecondsForSuggestions": 300,
+    "cooldownSeconds": 240
+  },
+  "interventions": {
+    "intensityAdjustPct": { "step": 5, "min": -15, "max": 10 },
+    "recoveryExtendSec": { "step": 30, "max": 120 },
+    "allowSkipRemainingOnIntervals": true
+  },
+  "messages": {
+    "encouragement": [
+      "Nice work keeping power steady in the Sweet Spot!",
+      "Smooth cadence. Your aerobic engine is growing.",
+      "That's how you build CTL. Keep it up!",
+      "Power looks solid. This is the work that matters.",
+      "Consistent effort. You're getting faster."
+    ],
+    "suggestions": {
+      "adjust_intensity_up": [
+        "Power is stable and HR looks good. Raise targets by {{percent}}% to hit Sweet Spot more effectively?"
+      ],
+      "adjust_intensity_down": [
+        "Power below target with HR drift rising. Let's reduce by {{percent}}% to stay in the productive zone."
+      ],
+      "extend_recovery": [
+        "HR still elevated from previous block. Extend recovery by {{seconds}} seconds to come back fresh?"
+      ],
+      "skip_remaining_on_intervals": [
+        "Fatigue is building and power is dropping. Skip remaining intervals and cool down to fight another day?"
+      ]
+    },
+    "completion": [
+      "Session complete. Solid Sweet Spot work today.",
+      "Nice work. That's how you build an aerobic base.",
+      "Completed. Your CTL thanks you."
+    ]
+  }
+}

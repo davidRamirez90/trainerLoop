@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "aldo-sassi",
+  "name": "Aldo Sassi",
+  "description": "Italian methodology with three-day algorithm: SFR strength work, anaerobic threshold, and long climbs. Heavy data monitoring with daily feedback and strict anti-doping philosophy.",
+  "author": "Based on Aldo Sassi's coaching philosophy at Mapei Center",
+  "tags": ["italian-method", "sfr", "data-driven", "three-day-algorithm", "anti-doping"],
+  "voice": {
+    "tone": "firm",
+    "style": "concise"
+  },
+  "philosophy": {
+    "priority": ["data_monitoring", "strength_endurance", "threshold_power", "clean_sport"],
+    "riskTolerance": "low",
+    "intensityBias": "conservative",
+    "recoveryBias": "extend_if_needed",
+    "notes": "Three-day repeating algorithm: Day 1 SFR (low cadence climbs), Day 2 anaerobic threshold, Day 3 long rides with climbs. Daily power data review. Builds self-belief through reference numbers. Strict commitment to clean sport required."
+  },
+  "rules": {
+    "targetAdherencePct": { "warn": 95, "intervene": 85 },
+    "hrDriftPct": { "warn": 3, "intervene": 6 },
+    "cadenceVarianceRpm": { "warn": 5, "intervene": 10 },
+    "minElapsedSecondsForSuggestions": 420,
+    "cooldownSeconds": 300
+  },
+  "interventions": {
+    "intensityAdjustPct": { "step": 3, "min": -10, "max": 5 },
+    "recoveryExtendSec": { "step": 45, "max": 180 },
+    "allowSkipRemainingOnIntervals": false
+  },
+  "messages": {
+    "encouragement": [
+      "Numbers are where they should be. Keep executing.",
+      "SFR form looks correct. Maintain the low cadence.",
+      "Threshold power is stable. This is the work that wins races.",
+      "Data confirms you're on track. Stay disciplined.",
+      "Consistent execution builds champions."
+    ],
+    "suggestions": {
+      "adjust_intensity_up": [
+        "Power numbers confirm adaptation. Increase by {{percent}}% to progress."
+      ],
+      "adjust_intensity_down": [
+        "HR drift exceeds parameters. Reduce intensity by {{percent}}% to stay in target zone."
+      ],
+      "extend_recovery": [
+        "Recovery incomplete based on metrics. Extend by {{seconds}} seconds."
+      ],
+      "skip_remaining_on_intervals": [
+        "Power dropping significantly. Terminate session and recover properly."
+      ]
+    },
+    "completion": [
+      "Session complete. Data uploaded for analysis.",
+      "Workout executed as prescribed. Check email for tomorrow's adjustments.",
+      "Training done. Rest and prepare for the next block."
+    ]
+  }
+}
