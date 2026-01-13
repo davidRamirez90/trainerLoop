@@ -5,11 +5,14 @@ import { getTotalDurationSec } from '../utils/workout';
 
 type WorkoutClock = {
   elapsedSec: number;
+  activeSec: number;
   totalDurationSec: number;
   isRunning: boolean;
   isComplete: boolean;
+  isSessionActive: boolean;
   sessionId: number;
   start: () => void;
+  startSession: () => void;
   pause: () => void;
   stop: () => void;
 };
@@ -19,32 +22,56 @@ const TICK_MS = 500;
 export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
   const totalDurationSec = useMemo(() => getTotalDurationSec(segments), [segments]);
   const [elapsedSec, setElapsedSec] = useState(0);
+  const [activeSec, setActiveSec] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [isSessionActive, setIsSessionActive] = useState(false);
   const [sessionId, setSessionId] = useState(0);
 
-  const startRef = useRef<number | null>(null);
+  const sessionStartRef = useRef<number | null>(null);
+  const activeStartRef = useRef<number | null>(null);
   const accumulatedRef = useRef(0);
+
+  useEffect(() => {
+    if (!isSessionActive) {
+      return undefined;
+    }
+
+    if (sessionStartRef.current === null) {
+      sessionStartRef.current = Date.now();
+    }
+    const intervalId = window.setInterval(() => {
+      if (sessionStartRef.current === null) {
+        return;
+      }
+      const now = Date.now();
+      const nextElapsed = Math.floor((now - sessionStartRef.current) / 1000);
+      setElapsedSec(nextElapsed);
+    }, TICK_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [isSessionActive]);
 
   useEffect(() => {
     if (!isRunning) {
       return undefined;
     }
 
-    startRef.current = Date.now();
+    activeStartRef.current = Date.now();
     const intervalId = window.setInterval(() => {
-      if (startRef.current === null) {
+      if (activeStartRef.current === null) {
         return;
       }
       const now = Date.now();
-      const nextElapsed = Math.min(
-        Math.floor((now - startRef.current) / 1000) + accumulatedRef.current,
+      const nextActive = Math.min(
+        Math.floor((now - activeStartRef.current) / 1000) + accumulatedRef.current,
         totalDurationSec
       );
-      setElapsedSec(nextElapsed);
-      if (nextElapsed >= totalDurationSec) {
+      setActiveSec(nextActive);
+      if (nextActive >= totalDurationSec) {
         accumulatedRef.current = totalDurationSec;
         setIsRunning(false);
+        setIsSessionActive(false);
         setIsComplete(true);
       }
     }, TICK_MS);
@@ -54,10 +81,13 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
 
   const stop = useCallback(() => {
     setIsRunning(false);
+    setIsSessionActive(false);
     setIsComplete(false);
     setElapsedSec(0);
+    setActiveSec(0);
     accumulatedRef.current = 0;
-    startRef.current = null;
+    sessionStartRef.current = null;
+    activeStartRef.current = null;
     setSessionId((prev) => prev + 1);
   }, []);
 
@@ -68,28 +98,49 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
     if (isComplete) {
       stop();
     }
+    if (!isSessionActive) {
+      setIsSessionActive(true);
+      if (sessionStartRef.current === null) {
+        sessionStartRef.current = Date.now();
+      }
+    }
     setIsRunning(true);
-  }, [isComplete, isRunning, stop]);
+  }, [isComplete, isRunning, isSessionActive, stop]);
+
+  const startSession = useCallback(() => {
+    if (isComplete) {
+      stop();
+    }
+    if (isSessionActive) {
+      return;
+    }
+    setIsSessionActive(true);
+    sessionStartRef.current = Date.now();
+  }, [isComplete, isSessionActive, stop]);
 
   const pause = useCallback(() => {
     if (!isRunning) {
       return;
     }
-    accumulatedRef.current = elapsedSec;
+    accumulatedRef.current = activeSec;
     setIsRunning(false);
-  }, [elapsedSec, isRunning]);
+  }, [activeSec, isRunning]);
 
   useEffect(() => {
-    setElapsedSec((prev) => Math.min(prev, totalDurationSec));
+    setActiveSec((prev) => Math.min(prev, totalDurationSec));
+    accumulatedRef.current = Math.min(accumulatedRef.current, totalDurationSec);
   }, [totalDurationSec]);
 
   return {
     elapsedSec,
+    activeSec,
     totalDurationSec,
     isRunning,
     isComplete,
+    isSessionActive,
     sessionId,
     start,
+    startSession,
     pause,
     stop,
   };

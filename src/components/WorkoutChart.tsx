@@ -8,14 +8,47 @@ import { getTotalDurationSec } from '../utils/workout';
 
 import 'uplot/dist/uPlot.min.css';
 
-const TARGET_COLORS = {
-  work: 'rgba(244, 150, 62, 0.35)',
-  workStroke: 'rgba(244, 150, 62, 0.7)',
-  recovery: 'rgba(79, 132, 185, 0.25)',
-  recoveryStroke: 'rgba(79, 132, 185, 0.5)',
+const ACTUAL_STROKE = '#65c7ff';
+const HR_STROKE = '#D64541';
+const ZONE_STOPS = [
+  { max: 0.55, color: '#6C7A89' },
+  { max: 0.75, color: '#3B8EA5' },
+  { max: 0.88, color: '#5FAF5F' },
+  { max: 0.94, color: '#C9A227' },
+  { max: 1.05, color: '#E57A1F' },
+  { max: 1.2, color: '#D64541' },
+  { max: Number.POSITIVE_INFINITY, color: '#8C2A2A' },
+];
+const POLYGON_ALPHA = 0.18;
+const RANGE_FILL_ALPHA = 0.45;
+const RANGE_STROKE_ALPHA = 0.75;
+const LINE_STROKE_ALPHA = 0.85;
+
+const hexToRgba = (value: string, alpha: number) => {
+  const hex = value.replace('#', '');
+  const normalized = hex.length === 3
+    ? hex
+        .split('')
+        .map((char) => char + char)
+        .join('')
+    : hex;
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 };
 
-const ACTUAL_STROKE = '#65c7ff';
+const getZoneColor = (ratio: number) =>
+  (ZONE_STOPS.find((stop) => ratio <= stop.max) ?? ZONE_STOPS[ZONE_STOPS.length - 1])
+    .color;
+
+const getSegmentTargetWatts = (segment: WorkoutSegment) => {
+  const start = segment.targetRange;
+  const end = segment.rampToRange ?? segment.targetRange;
+  const startMid = (start.low + start.high) / 2;
+  const endMid = (end.low + end.high) / 2;
+  return (startMid + endMid) / 2;
+};
 
 const useChartSize = (ref: React.RefObject<HTMLDivElement>) => {
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -50,31 +83,84 @@ type WorkoutChartProps = {
   segments: WorkoutSegment[];
   samples: TelemetrySample[];
   elapsedSec: number;
+  ftpWatts: number;
+  isRecording: boolean;
 };
 
-export const WorkoutChart = ({ segments, samples, elapsedSec }: WorkoutChartProps) => {
+export const WorkoutChart = ({
+  segments,
+  samples,
+  elapsedSec,
+  ftpWatts,
+  isRecording,
+}: WorkoutChartProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
   const segmentsRef = useRef(segments);
   const elapsedRef = useRef(elapsedSec);
   const size = useChartSize(containerRef);
+  const ftpScale = Math.max(ftpWatts, 1);
+  const hasHrData = useMemo(
+    () => samples.some((sample) => sample.hrBpm > 0),
+    [samples]
+  );
+  const showHeartRate = isRecording && hasHrData;
 
   const totalDurationSec = useMemo(() => getTotalDurationSec(segments), [segments]);
-  const maxTarget = useMemo(() => {
-    const peakTargets = segments.map((segment) =>
-      Math.max(
-        segment.targetRange.high,
-        segment.rampToRange?.high ?? segment.targetRange.high
-      )
-    );
-    return Math.max(...peakTargets) + 40;
+  const { yMin, yMax } = useMemo(() => {
+    if (segments.length === 0) {
+      return { yMin: 50, yMax: 300 };
+    }
+    const lows: number[] = [];
+    const highs: number[] = [];
+    segments.forEach((segment) => {
+      const start = segment.targetRange;
+      const end = segment.rampToRange ?? segment.targetRange;
+      lows.push(start.low, end.low);
+      highs.push(start.high, end.high);
+    });
+    const minTarget = Math.min(...lows);
+    const maxTarget = Math.max(...highs);
+    const span = Math.max(1, maxTarget - minTarget);
+    const paddedMin = Math.max(50, minTarget - span * 0.25);
+    const paddedMax = maxTarget + span * 0.2;
+    return {
+      yMin: Math.floor(paddedMin),
+      yMax: Math.ceil(paddedMax),
+    };
   }, [segments]);
+
+  const hrValues = useMemo(() => {
+    if (!showHeartRate) {
+      return samples.map(() => null);
+    }
+    return samples.map((sample) => (sample.hrBpm > 0 ? sample.hrBpm : null));
+  }, [samples, showHeartRate]);
+
+  const { hrMin, hrMax } = useMemo(() => {
+    if (!showHeartRate) {
+      return { hrMin: 80, hrMax: 180 };
+    }
+    const values = hrValues.filter((value): value is number => value !== null);
+    if (!values.length) {
+      return { hrMin: 80, hrMax: 180 };
+    }
+    const minHr = Math.min(...values);
+    const maxHr = Math.max(...values);
+    const span = Math.max(1, maxHr - minHr);
+    const paddedMin = Math.max(40, minHr - span * 0.1);
+    const paddedMax = Math.min(220, maxHr + span * 0.1);
+    return {
+      hrMin: Math.floor(paddedMin),
+      hrMax: Math.ceil(paddedMax),
+    };
+  }, [hrValues, showHeartRate]);
 
   const data = useMemo(() => {
     const times = samples.map((sample) => sample.timeSec);
     const power = samples.map((sample) => sample.powerWatts);
-    return [times, power] as uPlot.AlignedData;
-  }, [samples]);
+    return [times, power, hrValues] as uPlot.AlignedData;
+  }, [hrValues, samples]);
 
   useEffect(() => {
     segmentsRef.current = segments;
@@ -101,6 +187,7 @@ export const WorkoutChart = ({ segments, samples, elapsedSec }: WorkoutChartProp
       const ctx = u.ctx;
       const currentSegments = segmentsRef.current;
       let cursor = 0;
+      const yBottom = u.valToPos(yMin, 'y', true);
 
       ctx.save();
       currentSegments.forEach((segment) => {
@@ -114,24 +201,46 @@ export const WorkoutChart = ({ segments, samples, elapsedSec }: WorkoutChartProp
         const yHighStart = u.valToPos(highStart, 'y', true);
         const yLowEnd = u.valToPos(lowEnd, 'y', true);
         const yHighEnd = u.valToPos(highEnd, 'y', true);
+        const targetWatts = getSegmentTargetWatts(segment);
+        const zoneColor = getZoneColor(targetWatts / ftpScale);
+        const zoneFill = hexToRgba(zoneColor, POLYGON_ALPHA);
+        const rangeFill = hexToRgba(zoneColor, RANGE_FILL_ALPHA);
+        const rangeStroke = hexToRgba(zoneColor, RANGE_STROKE_ALPHA);
+        const lineStroke = hexToRgba(zoneColor, LINE_STROKE_ALPHA);
+        const isRange =
+          segment.targetRange.low !== segment.targetRange.high ||
+          (segment.rampToRange &&
+            segment.rampToRange.low !== segment.rampToRange.high);
 
-        if (segment.isWork) {
-          ctx.fillStyle = TARGET_COLORS.work;
-          ctx.strokeStyle = TARGET_COLORS.workStroke;
-        } else {
-          ctx.fillStyle = TARGET_COLORS.recovery;
-          ctx.strokeStyle = TARGET_COLORS.recoveryStroke;
-        }
-
-        ctx.lineWidth = 1;
+        ctx.fillStyle = zoneFill;
         ctx.beginPath();
-        ctx.moveTo(x0, yLowStart);
-        ctx.lineTo(x1, yLowEnd);
+        ctx.moveTo(x0, yBottom);
+        ctx.lineTo(x1, yBottom);
         ctx.lineTo(x1, yHighEnd);
         ctx.lineTo(x0, yHighStart);
         ctx.closePath();
         ctx.fill();
-        ctx.stroke();
+
+        if (isRange) {
+          ctx.fillStyle = rangeFill;
+          ctx.strokeStyle = rangeStroke;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(x0, yLowStart);
+          ctx.lineTo(x1, yLowEnd);
+          ctx.lineTo(x1, yHighEnd);
+          ctx.lineTo(x0, yHighStart);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.strokeStyle = lineStroke;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x0, yHighStart);
+          ctx.lineTo(x1, yHighEnd);
+          ctx.stroke();
+        }
 
         cursor = end;
       });
@@ -165,7 +274,10 @@ export const WorkoutChart = ({ segments, samples, elapsedSec }: WorkoutChartProp
           range: [0, totalDurationSec],
         },
         y: {
-          range: [0, maxTarget],
+          range: [yMin, yMax],
+        },
+        hr: {
+          range: [hrMin, hrMax],
         },
       },
       axes: [
@@ -180,6 +292,15 @@ export const WorkoutChart = ({ segments, samples, elapsedSec }: WorkoutChartProp
           grid: { stroke: 'rgba(91, 109, 132, 0.25)' },
           ticks: { stroke: 'rgba(91, 109, 132, 0.4)' },
         },
+        {
+          scale: 'hr',
+          side: 1,
+          show: showHeartRate,
+          stroke: HR_STROKE,
+          grid: { show: false },
+          ticks: { stroke: 'rgba(214, 69, 65, 0.45)' },
+          values: (_, ticks) => ticks.map((tick) => `${Math.round(tick)}`),
+        },
       ],
       series: [
         {
@@ -189,6 +310,13 @@ export const WorkoutChart = ({ segments, samples, elapsedSec }: WorkoutChartProp
           label: 'Actual',
           stroke: ACTUAL_STROKE,
           width: 2,
+        },
+        {
+          label: 'HR',
+          scale: 'hr',
+          stroke: HR_STROKE,
+          width: 2,
+          show: showHeartRate,
         },
       ],
       legend: {
@@ -205,7 +333,18 @@ export const WorkoutChart = ({ segments, samples, elapsedSec }: WorkoutChartProp
       plotRef.current?.destroy();
       plotRef.current = null;
     };
-  }, [data, maxTarget, size.height, size.width, totalDurationSec]);
+  }, [
+    data,
+    ftpScale,
+    hrMax,
+    hrMin,
+    showHeartRate,
+    size.height,
+    size.width,
+    totalDurationSec,
+    yMax,
+    yMin,
+  ]);
 
   useEffect(() => {
     if (plotRef.current) {

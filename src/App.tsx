@@ -1,5 +1,5 @@
 import type { ChangeEvent, CSSProperties } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import './App.css';
 import { WorkoutChart } from './components/WorkoutChart';
@@ -21,6 +21,8 @@ const IDLE_SEGMENT: WorkoutSegment = {
   phase: 'warmup',
   isWork: false,
 };
+
+const AUTO_PAUSE_THRESHOLD_SEC = 5;
 
 const buildPhaseProgress = (segments: WorkoutSegment[], elapsedSec: number) => {
   const totals = { warmup: 0, intervals: 0, cooldown: 0 };
@@ -73,6 +75,12 @@ function App() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importName, setImportName] = useState<string | null>(null);
   const [ergEnabled, setErgEnabled] = useState(true);
+  const [autoResumeOnWork, setAutoResumeOnWork] = useState(false);
+  const [autoPauseArmed, setAutoPauseArmed] = useState(true);
+  const [showResumeOverlay, setShowResumeOverlay] = useState(false);
+  const lastWorkRef = useRef<number | null>(null);
+  const resumeTimeoutRef = useRef<number | null>(null);
+  const prevRunningRef = useRef(false);
   const hasPlan = !!activePlan && activePlan.segments.length > 0;
   const activeSegments = hasPlan ? activePlan.segments : [];
   const clockSegments = activeSegments;
@@ -93,31 +101,34 @@ function App() {
   const bluetoothTelemetry = useBluetoothTelemetry({
     trainerDevice,
     hrDevice,
-    elapsedSec: clock.elapsedSec,
+    elapsedSec: clock.activeSec,
     isRecording: clock.isRunning,
     sessionId: clock.sessionId,
   });
   const simulation = useTelemetrySimulation(
     clockSegments,
-    clock.elapsedSec,
+    clock.activeSec,
     clock.isRunning,
     clock.sessionId
   );
   const telemetrySamples = bluetoothTelemetry.samples.length
     ? bluetoothTelemetry.samples
     : simulation.samples;
-  const elapsedSec = clock.elapsedSec;
+  const sessionElapsedSec = clock.elapsedSec;
+  const activeSec = clock.activeSec;
   const totalDurationSec = clock.totalDurationSec;
   const isRunning = clock.isRunning;
   const isComplete = clock.isComplete;
-  const hasStarted = isRunning || elapsedSec > 0;
+  const isSessionActive = clock.isSessionActive;
+  const hasStarted = isSessionActive || activeSec > 0;
+  const isPaused = hasPlan && hasStarted && !isRunning && !isComplete;
   const liveStatus = !hasPlan
     ? 'NO WORKOUT'
     : isRunning
       ? 'LIVE'
       : isComplete
         ? 'DONE'
-        : elapsedSec > 0
+        : hasStarted
           ? 'PAUSED'
           : 'READY';
   const liveStatusClass = !hasPlan
@@ -126,13 +137,13 @@ function App() {
       ? 'live'
       : isComplete
         ? 'complete'
-        : elapsedSec > 0
+        : hasStarted
           ? 'paused'
           : 'ready';
   const latestSample = telemetrySamples[telemetrySamples.length - 1];
   const { segment, index, endSec, targetRange } = getTargetRangeAtTime(
     targetSegments,
-    elapsedSec
+    activeSec
   );
   const ftpWatts = activePlan?.ftpWatts ?? 0;
 
@@ -147,6 +158,13 @@ function App() {
   const displayPower = latestSample ? Math.round(latestSample.powerWatts) : null;
   const displayHr = latestSample ? Math.round(latestSample.hrBpm) : null;
   const displayCadence = latestSample ? Math.round(latestSample.cadenceRpm) : null;
+  const bluetoothLatest = bluetoothTelemetry.latest;
+  const simulationLatest = simulation.samples[simulation.samples.length - 1] ?? null;
+  const canDetectWork = trainer.status === 'connected' || bluetoothTelemetry.isActive;
+  const latestTelemetry = canDetectWork ? bluetoothLatest : simulationLatest;
+  const latestPower = latestTelemetry?.powerWatts ?? 0;
+  const latestCadence = latestTelemetry?.cadenceRpm ?? 0;
+  const hasWorkTelemetry = latestPower > 0 || latestCadence > 0;
 
   const avgPower = useMemo(() => {
     if (!telemetrySamples.length) {
@@ -161,16 +179,16 @@ function App() {
 
   const normalizedPower = avgPower ? Math.round(avgPower * 1.03) : 0;
   const tss = avgPower && hasPlan
-    ? Math.round((elapsedSec / 3600) * Math.pow(avgPower / ftpWatts, 2) * 100)
+    ? Math.round((activeSec / 3600) * Math.pow(avgPower / ftpWatts, 2) * 100)
     : 0;
-  const kj = avgPower ? Math.round((avgPower * elapsedSec) / 1000) : 0;
+  const kj = avgPower ? Math.round((avgPower * activeSec) / 1000) : 0;
 
   const compliance = displayPower && targetMid > 0
     ? Math.round((displayPower / targetMid) * 100)
     : 0;
 
-  const remainingSec = Math.max(totalDurationSec - elapsedSec, 0);
-  const segmentRemainingSec = Math.max(endSec - elapsedSec, 0);
+  const remainingSec = Math.max(totalDurationSec - activeSec, 0);
+  const segmentRemainingSec = Math.max(endSec - activeSec, 0);
 
   const workSegments = activeSegments.filter((seg) => seg.isWork);
   const totalIntervals = workSegments.length;
@@ -184,8 +202,8 @@ function App() {
     : 0;
 
   const progressPhases = useMemo(
-    () => (hasPlan ? buildPhaseProgress(activeSegments, elapsedSec) : []),
-    [activeSegments, elapsedSec, hasPlan]
+    () => (hasPlan ? buildPhaseProgress(activeSegments, activeSec) : []),
+    [activeSegments, activeSec, hasPlan]
   );
 
   const coachMessage = !hasPlan
@@ -215,7 +233,8 @@ function App() {
     : '--';
   const complianceLabel = hasPlan ? `${compliance}%` : '--';
   const intervalRemainingLabel = hasPlan ? formatDuration(segmentRemainingSec) : '--:--';
-  const elapsedLabel = hasPlan ? formatDuration(elapsedSec) : '--:--';
+  const activeLabel = hasPlan ? formatDuration(activeSec) : '--:--';
+  const elapsedLabel = hasPlan ? formatDuration(sessionElapsedSec) : '--:--';
   const remainingLabel = hasPlan ? formatDuration(remainingSec) : '--:--';
   const intervalCountLabel = hasPlan
     ? `${currentIntervalIndex}/${totalIntervals}`
@@ -263,23 +282,131 @@ function App() {
       : 'Start';
   const ergToggleLabel = ergEnabled ? 'ERG On' : 'ERG Off';
 
+  useEffect(() => {
+    return () => {
+      if (resumeTimeoutRef.current) {
+        window.clearTimeout(resumeTimeoutRef.current);
+        resumeTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    lastWorkRef.current = null;
+    setAutoResumeOnWork(false);
+    setAutoPauseArmed(true);
+  }, [clock.sessionId]);
+
+  useEffect(() => {
+    if (!canDetectWork || !autoResumeOnWork) {
+      return;
+    }
+    if (!hasWorkTelemetry || !hasPlan || isRunning || isComplete || !isSessionActive) {
+      return;
+    }
+    clock.start();
+    ftmsControl.startWorkout();
+    setAutoResumeOnWork(false);
+    setAutoPauseArmed(true);
+  }, [
+    autoResumeOnWork,
+    canDetectWork,
+    clock.start,
+    ftmsControl.startWorkout,
+    hasPlan,
+    hasWorkTelemetry,
+    isComplete,
+    isRunning,
+    isSessionActive,
+  ]);
+
+  useEffect(() => {
+    if (!canDetectWork || !hasPlan || !isRunning) {
+      return;
+    }
+    if (hasWorkTelemetry) {
+      lastWorkRef.current = sessionElapsedSec;
+      if (!autoPauseArmed) {
+        setAutoPauseArmed(true);
+      }
+      return;
+    }
+    if (!autoPauseArmed) {
+      return;
+    }
+    const lastWork = lastWorkRef.current;
+    if (lastWork === null) {
+      return;
+    }
+    if (sessionElapsedSec - lastWork >= AUTO_PAUSE_THRESHOLD_SEC) {
+      clock.pause();
+      ftmsControl.pauseWorkout();
+      setAutoResumeOnWork(true);
+    }
+  }, [
+    autoPauseArmed,
+    canDetectWork,
+    clock.pause,
+    ftmsControl.pauseWorkout,
+    hasPlan,
+    hasWorkTelemetry,
+    isRunning,
+    sessionElapsedSec,
+  ]);
+
+  useEffect(() => {
+    const wasRunning = prevRunningRef.current;
+    if (!wasRunning && isRunning) {
+      setShowResumeOverlay(true);
+      if (resumeTimeoutRef.current) {
+        window.clearTimeout(resumeTimeoutRef.current);
+        resumeTimeoutRef.current = null;
+      }
+      resumeTimeoutRef.current = window.setTimeout(() => {
+        setShowResumeOverlay(false);
+      }, 2000);
+    } else if (wasRunning && !isRunning) {
+      if (resumeTimeoutRef.current) {
+        window.clearTimeout(resumeTimeoutRef.current);
+        resumeTimeoutRef.current = null;
+      }
+      setShowResumeOverlay(false);
+    }
+    prevRunningRef.current = isRunning;
+  }, [isRunning]);
+
   const handleStart = () => {
     if (!hasPlan) {
       setImportError('Import a workout to start the session.');
       return;
     }
+    const isSessionStarting = !isSessionActive;
+    clock.startSession();
+    if (canDetectWork && isSessionStarting && !hasWorkTelemetry) {
+      setAutoResumeOnWork(true);
+      return;
+    }
     clock.start();
     ftmsControl.startWorkout();
+    setAutoResumeOnWork(false);
+    if (canDetectWork && !hasWorkTelemetry) {
+      setAutoPauseArmed(false);
+    } else {
+      setAutoPauseArmed(true);
+    }
   };
 
   const handlePause = () => {
     clock.pause();
     ftmsControl.pauseWorkout();
+    setAutoResumeOnWork(false);
   };
 
   const handleStop = () => {
     clock.stop();
     ftmsControl.stopWorkout();
+    setAutoResumeOnWork(false);
+    setAutoPauseArmed(true);
   };
 
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -391,7 +518,7 @@ function App() {
           <div className="panel-meta">
             <div>
               <span>Elapsed</span>
-              <strong>{formatDuration(elapsedSec)}</strong>
+              <strong>{elapsedLabel}</strong>
             </div>
             <div>
               <span>FTP</span>
@@ -401,19 +528,37 @@ function App() {
         </div>
         {hasPlan ? (
           <>
-            <WorkoutChart
-              segments={activeSegments}
-              samples={telemetrySamples}
-              elapsedSec={elapsedSec}
-            />
+            <div className="workout-chart-shell">
+              <WorkoutChart
+                segments={activeSegments}
+                samples={telemetrySamples}
+                elapsedSec={activeSec}
+                ftpWatts={ftpWatts}
+                isRecording={isRunning}
+              />
+              {isPaused ? (
+                <div className="chart-overlay paused">
+                  <span className="overlay-icon pause" />
+                </div>
+              ) : null}
+              {showResumeOverlay ? (
+                <div className="chart-overlay resume">
+                  <span className="overlay-icon play" />
+                </div>
+              ) : null}
+            </div>
             <div className="chart-legend">
               <div className="legend-item">
                 <span className="legend-swatch" />
-                Target Zone
+                Target Zones
               </div>
               <div className="legend-item">
                 <span className="legend-line" />
                 Actual
+              </div>
+              <div className="legend-item">
+                <span className="legend-line hr" />
+                HR
               </div>
             </div>
           </>
@@ -460,8 +605,8 @@ function App() {
         </div>
 
         <div className="panel metric-card mini" style={{ '--delay': '0.3s' } as CSSProperties}>
-          <div className="metric-header">Elapsed</div>
-          <div className="metric-value">{elapsedLabel}</div>
+          <div className="metric-header">Active</div>
+          <div className="metric-value">{activeLabel}</div>
         </div>
 
         <div className="panel metric-card mini" style={{ '--delay': '0.35s' } as CSSProperties}>

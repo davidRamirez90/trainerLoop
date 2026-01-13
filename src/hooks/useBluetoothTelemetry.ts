@@ -170,6 +170,11 @@ export const useBluetoothTelemetry = ({
   const [samples, setSamples] = useState<TelemetrySample[]>([]);
   const [isActive, setIsActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [latest, setLatest] = useState<LatestTelemetry>({
+    powerWatts: null,
+    cadenceRpm: null,
+    hrBpm: null,
+  });
   const elapsedRef = useRef(elapsedSec);
   const isRecordingRef = useRef(isRecording);
   const lastValuesRef = useRef<LatestTelemetry>({
@@ -189,12 +194,18 @@ export const useBluetoothTelemetry = ({
   useEffect(() => {
     setSamples([]);
     lastValuesRef.current = { powerWatts: null, cadenceRpm: null, hrBpm: null };
+    setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
   }, [sessionId]);
 
-  const pushSample = useCallback((updates: Partial<LatestTelemetry>) => {
-    const prev = lastValuesRef.current;
-    const next = { ...prev, ...updates };
+  const updateLatest = useCallback((updates: Partial<LatestTelemetry>) => {
+    const next = { ...lastValuesRef.current, ...updates };
     lastValuesRef.current = next;
+    setLatest(next);
+    return next;
+  }, []);
+
+  const pushSample = useCallback((updates: Partial<LatestTelemetry>) => {
+    const next = updateLatest(updates);
 
     if (!isRecordingRef.current) {
       return;
@@ -222,12 +233,13 @@ export const useBluetoothTelemetry = ({
         prevSamples.length > MAX_SAMPLES ? prevSamples.slice(-MAX_SAMPLES) : prevSamples;
       return [...trimmed, nextSample];
     });
-  }, []);
+  }, [updateLatest]);
 
   useEffect(() => {
     if (!trainerDevice) {
       setIsActive(false);
       setError(null);
+      setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
       return undefined;
     }
 
@@ -237,6 +249,7 @@ export const useBluetoothTelemetry = ({
     setError(null);
     setSamples([]);
     lastValuesRef.current = { powerWatts: null, cadenceRpm: null, hrBpm: null };
+    setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
 
     const handleIndoorBikeData = (event: Event) => {
       const target = event.target as BluetoothRemoteGATTCharacteristic | null;
@@ -249,7 +262,7 @@ export const useBluetoothTelemetry = ({
         return;
       }
       if (!isRecordingRef.current) {
-        lastValuesRef.current = { ...lastValuesRef.current, ...parsed };
+        updateLatest(parsed);
         return;
       }
       pushSample(parsed);
@@ -289,7 +302,7 @@ export const useBluetoothTelemetry = ({
         characteristic.stopNotifications().catch(() => undefined);
       }
     };
-  }, [pushSample, trainerDevice]);
+  }, [pushSample, trainerDevice, updateLatest]);
 
   useEffect(() => {
     if (!hrDevice) {
@@ -309,12 +322,10 @@ export const useBluetoothTelemetry = ({
       if (hr === null) {
         return;
       }
-      lastValuesRef.current = {
-        ...lastValuesRef.current,
-        hrBpm: hr,
-      };
       if (isRecordingRef.current) {
         pushSample({ hrBpm: hr });
+      } else {
+        updateLatest({ hrBpm: hr });
       }
     };
 
@@ -345,11 +356,12 @@ export const useBluetoothTelemetry = ({
         characteristic.stopNotifications().catch(() => undefined);
       }
     };
-  }, [hrDevice, pushSample]);
+  }, [hrDevice, pushSample, updateLatest]);
 
   return {
     samples,
     isActive,
     error,
+    latest,
   };
 };
