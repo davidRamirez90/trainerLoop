@@ -39,7 +39,7 @@ Source image: `UI concepts/ui-first-draft.png`
 │  │ ~~~ hr line   │  │ ~~~ hr   │  │ ~~~ hr line     │  │ ~~~ hr  │           │
 │  └───────────────┘  └──────────┘  └────────────────┘  └──────────┘           │
 │                                                                              │
-│  [time axis + gridlines]   [resize handles on interval edges]                │
+│  [time axis + gridlines]   [interval blocks show target ranges]              │
 │  legend: █ target range  ─ power  ~ hr                                       │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```

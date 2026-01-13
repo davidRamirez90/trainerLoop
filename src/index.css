@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap');
+
+:root {
+  font-family: 'Space Grotesk', sans-serif;
+  line-height: 1.4;
+  font-weight: 400;
+  color: #e5edf7;
+  background-color: #070b12;
+
+  --panel: rgba(15, 21, 33, 0.92);
+  --panel-muted: rgba(13, 18, 28, 0.8);
+  --border: rgba(38, 52, 71, 0.8);
+  --text-primary: #e5edf7;
+  --text-secondary: #c1d0e4;
+  --text-muted: #8a9bb3;
+  --shadow: 0 28px 50px rgba(3, 8, 15, 0.45);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(45, 86, 140, 0.25), transparent 45%),
+    radial-gradient(circle at 85% 15%, rgba(245, 160, 82, 0.18), transparent 38%),
+    linear-gradient(180deg, rgba(8, 12, 20, 0.9), rgba(8, 12, 20, 1));
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 80px 80px;
+  opacity: 0.25;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+.uplot {
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.uplot .u-axis text {
+  fill: #7f93ad;
+}

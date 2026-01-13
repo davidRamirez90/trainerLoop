@@ -18,3 +18,10 @@ strain.
   actionable suggestions.
 - UX flow: `docs/ux-flow.md` - User flows for running workouts and accepting or
   rejecting coach feedback.
+
+## Development
+
+```bash
+npm install
+npm run dev
+```
