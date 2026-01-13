@@ -1,10 +1,16 @@
 export type SegmentPhase = 'warmup' | 'work' | 'recovery' | 'cooldown';
 
+export type TargetRange = {
+  low: number;
+  high: number;
+};
+
 export type WorkoutSegment = {
   id: string;
   label: string;
   durationSec: number;
-  targetRangeWatts: [number, number];
+  targetRange: TargetRange;
+  rampToRange?: TargetRange;
   phase: SegmentPhase;
   isWork: boolean;
 };
@@ -27,7 +33,8 @@ export const workoutPlan: WorkoutPlan = {
       id: 'warmup-1',
       label: 'Warmup',
       durationSec: 300,
-      targetRangeWatts: [140, 165],
+      targetRange: { low: 120, high: 140 },
+      rampToRange: { low: 150, high: 170 },
       phase: 'warmup',
       isWork: false,
     },
@@ -35,7 +42,7 @@ export const workoutPlan: WorkoutPlan = {
       id: 'work-1',
       label: 'Interval 1',
       durationSec: 180,
-      targetRangeWatts: [250, 275],
+      targetRange: { low: 250, high: 275 },
       phase: 'work',
       isWork: true,
     },
@@ -43,7 +50,7 @@ export const workoutPlan: WorkoutPlan = {
       id: 'recovery-1',
       label: 'Recovery 1',
       durationSec: 120,
-      targetRangeWatts: [150, 170],
+      targetRange: { low: 150, high: 170 },
       phase: 'recovery',
       isWork: false,
     },
@@ -51,7 +58,7 @@ export const workoutPlan: WorkoutPlan = {
       id: 'work-2',
       label: 'Interval 2',
       durationSec: 180,
-      targetRangeWatts: [250, 275],
+      targetRange: { low: 250, high: 275 },
       phase: 'work',
       isWork: true,
     },
@@ -59,7 +66,7 @@ export const workoutPlan: WorkoutPlan = {
       id: 'recovery-2',
       label: 'Recovery 2',
       durationSec: 120,
-      targetRangeWatts: [150, 170],
+      targetRange: { low: 150, high: 170 },
       phase: 'recovery',
       isWork: false,
     },
@@ -67,7 +74,7 @@ export const workoutPlan: WorkoutPlan = {
       id: 'work-3',
       label: 'Interval 3',
       durationSec: 180,
-      targetRangeWatts: [250, 275],
+      targetRange: { low: 250, high: 275 },
       phase: 'work',
       isWork: true,
     },
@@ -75,7 +82,7 @@ export const workoutPlan: WorkoutPlan = {
       id: 'recovery-3',
       label: 'Recovery 3',
       durationSec: 120,
-      targetRangeWatts: [150, 170],
+      targetRange: { low: 150, high: 170 },
       phase: 'recovery',
       isWork: false,
     },
@@ -83,7 +90,7 @@ export const workoutPlan: WorkoutPlan = {
       id: 'work-4',
       label: 'Interval 4',
       durationSec: 180,
-      targetRangeWatts: [250, 275],
+      targetRange: { low: 250, high: 275 },
       phase: 'work',
       isWork: true,
     },
@@ -91,7 +98,8 @@ export const workoutPlan: WorkoutPlan = {
       id: 'cooldown-1',
       label: 'Cooldown',
       durationSec: 300,
-      targetRangeWatts: [130, 150],
+      targetRange: { low: 150, high: 170 },
+      rampToRange: { low: 120, high: 135 },
       phase: 'cooldown',
       isWork: false,
     },

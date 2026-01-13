@@ -60,10 +60,15 @@ export const WorkoutChart = ({ segments, samples, elapsedSec }: WorkoutChartProp
   const size = useChartSize(containerRef);
 
   const totalDurationSec = useMemo(() => getTotalDurationSec(segments), [segments]);
-  const maxTarget = useMemo(
-    () => Math.max(...segments.map((segment) => segment.targetRangeWatts[1])) + 40,
-    [segments]
-  );
+  const maxTarget = useMemo(() => {
+    const peakTargets = segments.map((segment) =>
+      Math.max(
+        segment.targetRange.high,
+        segment.rampToRange?.high ?? segment.targetRange.high
+      )
+    );
+    return Math.max(...peakTargets) + 40;
+  }, [segments]);
 
   const data = useMemo(() => {
     const times = samples.map((sample) => sample.timeSec);
@@ -103,12 +108,12 @@ export const WorkoutChart = ({ segments, samples, elapsedSec }: WorkoutChartProp
         const end = cursor + segment.durationSec;
         const x0 = u.valToPos(start, 'x', true);
         const x1 = u.valToPos(end, 'x', true);
-        const [low, high] = segment.targetRangeWatts;
-        const y0 = u.valToPos(low, 'y', true);
-        const y1 = u.valToPos(high, 'y', true);
-
-        const top = Math.min(y0, y1);
-        const height = Math.abs(y1 - y0);
+        const { low: lowStart, high: highStart } = segment.targetRange;
+        const { low: lowEnd, high: highEnd } = segment.rampToRange ?? segment.targetRange;
+        const yLowStart = u.valToPos(lowStart, 'y', true);
+        const yHighStart = u.valToPos(highStart, 'y', true);
+        const yLowEnd = u.valToPos(lowEnd, 'y', true);
+        const yHighEnd = u.valToPos(highEnd, 'y', true);
 
         if (segment.isWork) {
           ctx.fillStyle = TARGET_COLORS.work;
@@ -119,8 +124,14 @@ export const WorkoutChart = ({ segments, samples, elapsedSec }: WorkoutChartProp
         }
 
         ctx.lineWidth = 1;
-        ctx.fillRect(x0, top, x1 - x0, height);
-        ctx.strokeRect(x0, top, x1 - x0, height);
+        ctx.beginPath();
+        ctx.moveTo(x0, yLowStart);
+        ctx.lineTo(x1, yLowEnd);
+        ctx.lineTo(x1, yHighEnd);
+        ctx.lineTo(x0, yHighStart);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
 
         cursor = end;
       });

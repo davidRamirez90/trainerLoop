@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { type WorkoutSegment } from '../data/workout';
 import type { TelemetrySample } from '../types';
-import { getSegmentAtTime, getTotalDurationSec } from '../utils/workout';
+import { getTargetRangeAtTime, getTotalDurationSec } from '../utils/workout';
 
 const SAMPLE_INTERVAL_MS = 1000;
 const MAX_SAMPLES = 1800;
@@ -40,8 +40,11 @@ export const useTelemetrySimulation = (segments: WorkoutSegment[]) => {
         totalDurationSec
       );
 
-      const { segment } = getSegmentAtTime(segments, nextElapsedSec);
-      const [lowTarget, highTarget] = segment.targetRangeWatts;
+      const { segment, targetRange } = getTargetRangeAtTime(
+        segments,
+        nextElapsedSec
+      );
+      const { low: lowTarget, high: highTarget } = targetRange;
       const target = (lowTarget + highTarget) / 2;
       const variance = segment.isWork ? 12 : 7;
       const drift = seedNoise(nextElapsedSec, variance);

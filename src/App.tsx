@@ -6,7 +6,7 @@ import { WorkoutChart } from './components/WorkoutChart';
 import { workoutPlan, type WorkoutSegment } from './data/workout';
 import { useTelemetrySimulation } from './hooks/useTelemetrySimulation';
 import { formatDuration } from './utils/time';
-import { getSegmentAtTime } from './utils/workout';
+import { getTargetRangeAtTime } from './utils/workout';
 
 const connectedDevices = [
   { name: 'Wahoo KICKR', battery: 98, status: 'Trainer' },
@@ -64,12 +64,12 @@ function App() {
     workoutPlan.segments
   );
   const latestSample = samples[samples.length - 1];
-  const { segment, index, endSec } = getSegmentAtTime(
+  const { segment, index, endSec, targetRange } = getTargetRangeAtTime(
     workoutPlan.segments,
     elapsedSec
   );
 
-  const [targetLow, targetHigh] = segment.targetRangeWatts;
+  const { low: targetLow, high: targetHigh } = targetRange;
   const targetMid = (targetLow + targetHigh) / 2;
 
   const displayPower = latestSample ? Math.round(latestSample.powerWatts) : null;
