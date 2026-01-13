@@ -62,12 +62,44 @@
   color: #9be7bf;
 }
 
+.live-status.ready {
+  color: #9cc3ff;
+}
+
+.live-status.idle {
+  color: #8a9bb3;
+}
+
+.live-status.complete {
+  color: #f6b26b;
+}
+
 .live-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  background: #53627a;
+  box-shadow: none;
+}
+
+.live-status.live .live-dot {
   background: #3ad17a;
   box-shadow: 0 0 10px rgba(58, 209, 122, 0.6);
+}
+
+.live-status.ready .live-dot {
+  background: #6bb5ff;
+  box-shadow: 0 0 10px rgba(107, 181, 255, 0.45);
+}
+
+.live-status.idle .live-dot {
+  background: #5b6d84;
+  box-shadow: 0 0 8px rgba(91, 109, 132, 0.35);
+}
+
+.live-status.complete .live-dot {
+  background: #f6b26b;
+  box-shadow: 0 0 10px rgba(246, 178, 107, 0.45);
 }
 
 .panel {
@@ -79,8 +111,116 @@
   animation: rise 0.6s ease var(--delay, 0s) both;
 }
 
+.session-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 200px;
+}
+
+.session-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.session-subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.session-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.session-error {
+  font-size: 11px;
+  color: #f6b26b;
+}
+
+.session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.session-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(22, 28, 41, 0.7);
+  color: var(--text-primary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.session-button.primary {
+  background: rgba(101, 199, 255, 0.2);
+  border-color: rgba(101, 199, 255, 0.35);
+  color: #bfe5ff;
+}
+
+.session-button.danger {
+  background: rgba(244, 150, 62, 0.18);
+  border-color: rgba(244, 150, 62, 0.35);
+  color: #f6b26b;
+}
+
+.session-button.toggle.on {
+  background: rgba(58, 209, 122, 0.18);
+  border-color: rgba(58, 209, 122, 0.35);
+  color: #9be7bf;
+}
+
+.session-button.toggle.off {
+  background: rgba(84, 104, 132, 0.2);
+  border-color: rgba(84, 104, 132, 0.4);
+  color: #b5c6dd;
+}
+
+.session-button:disabled,
+.session-button.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .workout-panel {
   padding: 18px 20px 16px;
+}
+
+.workout-placeholder {
+  height: 260px;
+  border-radius: 16px;
+  border: 1px dashed rgba(91, 109, 132, 0.45);
+  background: rgba(12, 18, 28, 0.5);
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 16px;
+  font-size: 13px;
 }
 
 .panel-header {
@@ -257,6 +397,14 @@
   gap: 12px;
 }
 
+.progress-placeholder {
+  border-radius: 12px;
+  border: 1px dashed rgba(91, 109, 132, 0.4);
+  padding: 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 .progress-segment {
   flex: 1;
   position: relative;
@@ -337,10 +485,17 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
   padding: 10px 12px;
   border-radius: 12px;
   background: rgba(18, 24, 36, 0.5);
   border: 1px solid rgba(45, 60, 80, 0.6);
+}
+
+.device-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .device-name {
@@ -351,6 +506,45 @@
 .device-status {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.device-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.device-error {
+  font-size: 11px;
+  color: #f2b36e;
+}
+
+.device-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.device-button {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(22, 28, 41, 0.7);
+  color: var(--text-primary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.device-button.disconnect {
+  background: rgba(244, 150, 62, 0.15);
+  border-color: rgba(244, 150, 62, 0.35);
+  color: #f6b26b;
+}
+
+.device-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .device-battery {
@@ -367,6 +561,15 @@
   border-radius: 50%;
   background: #3ad17a;
   box-shadow: 0 0 8px rgba(58, 209, 122, 0.5);
+}
+
+.device-warning {
+  border-radius: 10px;
+  border: 1px solid rgba(244, 150, 62, 0.35);
+  background: rgba(244, 150, 62, 0.12);
+  color: #f6b26b;
+  padding: 8px 10px;
+  font-size: 12px;
 }
 
 .muted {
@@ -425,6 +628,10 @@
   }
 
   .chart-legend {
+    justify-content: flex-start;
+  }
+
+  .session-actions {
     justify-content: flex-start;
   }
 }

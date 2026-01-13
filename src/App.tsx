@@ -1,17 +1,26 @@
-import type { CSSProperties } from 'react';
-import { useMemo } from 'react';
+import type { ChangeEvent, CSSProperties } from 'react';
+import { useMemo, useState } from 'react';
 
 import './App.css';
 import { WorkoutChart } from './components/WorkoutChart';
-import { workoutPlan, type WorkoutSegment } from './data/workout';
+import type { WorkoutPlan, WorkoutSegment } from './data/workout';
+import { useBluetoothDevices } from './hooks/useBluetoothDevices';
+import { useBluetoothTelemetry } from './hooks/useBluetoothTelemetry';
+import { useFtmsControl } from './hooks/useFtmsControl';
 import { useTelemetrySimulation } from './hooks/useTelemetrySimulation';
+import { useWorkoutClock } from './hooks/useWorkoutClock';
 import { formatDuration } from './utils/time';
+import { parseWorkoutFile } from './utils/workoutImport';
 import { getTargetRangeAtTime } from './utils/workout';
 
-const connectedDevices = [
-  { name: 'Wahoo KICKR', battery: 98, status: 'Trainer' },
-  { name: 'Garmin HRM-Pro', battery: 100, status: 'HR Sensor' },
-];
+const IDLE_SEGMENT: WorkoutSegment = {
+  id: 'idle',
+  label: 'Idle',
+  durationSec: 1,
+  targetRange: { low: 0, high: 0 },
+  phase: 'warmup',
+  isWork: false,
+};
 
 const buildPhaseProgress = (segments: WorkoutSegment[], elapsedSec: number) => {
   const totals = { warmup: 0, intervals: 0, cooldown: 0 };
@@ -60,74 +69,239 @@ const buildPhaseProgress = (segments: WorkoutSegment[], elapsedSec: number) => {
 };
 
 function App() {
-  const { samples, elapsedSec, totalDurationSec, isLive } = useTelemetrySimulation(
-    workoutPlan.segments
+  const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importName, setImportName] = useState<string | null>(null);
+  const [ergEnabled, setErgEnabled] = useState(true);
+  const hasPlan = !!activePlan && activePlan.segments.length > 0;
+  const activeSegments = hasPlan ? activePlan.segments : [];
+  const clockSegments = activeSegments;
+  const targetSegments = hasPlan ? activeSegments : [IDLE_SEGMENT];
+
+  const clock = useWorkoutClock(clockSegments);
+  const {
+    bluetoothAvailable,
+    trainer,
+    hrSensor,
+    connectTrainer,
+    connectHeartRate,
+    disconnectTrainer,
+    disconnectHeartRate,
+    trainerDevice,
+    hrDevice,
+  } = useBluetoothDevices();
+  const bluetoothTelemetry = useBluetoothTelemetry({
+    trainerDevice,
+    hrDevice,
+    elapsedSec: clock.elapsedSec,
+    isRecording: clock.isRunning,
+    sessionId: clock.sessionId,
+  });
+  const simulation = useTelemetrySimulation(
+    clockSegments,
+    clock.elapsedSec,
+    clock.isRunning,
+    clock.sessionId
   );
-  const latestSample = samples[samples.length - 1];
+  const telemetrySamples = bluetoothTelemetry.samples.length
+    ? bluetoothTelemetry.samples
+    : simulation.samples;
+  const elapsedSec = clock.elapsedSec;
+  const totalDurationSec = clock.totalDurationSec;
+  const isRunning = clock.isRunning;
+  const isComplete = clock.isComplete;
+  const hasStarted = isRunning || elapsedSec > 0;
+  const liveStatus = !hasPlan
+    ? 'NO WORKOUT'
+    : isRunning
+      ? 'LIVE'
+      : isComplete
+        ? 'DONE'
+        : elapsedSec > 0
+          ? 'PAUSED'
+          : 'READY';
+  const liveStatusClass = !hasPlan
+    ? 'idle'
+    : isRunning
+      ? 'live'
+      : isComplete
+        ? 'complete'
+        : elapsedSec > 0
+          ? 'paused'
+          : 'ready';
+  const latestSample = telemetrySamples[telemetrySamples.length - 1];
   const { segment, index, endSec, targetRange } = getTargetRangeAtTime(
-    workoutPlan.segments,
+    targetSegments,
     elapsedSec
   );
+  const ftpWatts = activePlan?.ftpWatts ?? 0;
 
   const { low: targetLow, high: targetHigh } = targetRange;
   const targetMid = (targetLow + targetHigh) / 2;
+  const ftmsControl = useFtmsControl({
+    trainerDevice,
+    targetWatts: targetMid,
+    isActive: isRunning && ergEnabled && hasPlan,
+  });
 
   const displayPower = latestSample ? Math.round(latestSample.powerWatts) : null;
   const displayHr = latestSample ? Math.round(latestSample.hrBpm) : null;
   const displayCadence = latestSample ? Math.round(latestSample.cadenceRpm) : null;
 
   const avgPower = useMemo(() => {
-    if (!samples.length) {
+    if (!telemetrySamples.length) {
       return 0;
     }
-    const total = samples.reduce((sum, sample) => sum + sample.powerWatts, 0);
-    return Math.round(total / samples.length);
-  }, [samples]);
+    const total = telemetrySamples.reduce(
+      (sum, sample) => sum + sample.powerWatts,
+      0
+    );
+    return Math.round(total / telemetrySamples.length);
+  }, [telemetrySamples]);
 
   const normalizedPower = avgPower ? Math.round(avgPower * 1.03) : 0;
-  const tss = avgPower
-    ? Math.round(
-        (elapsedSec / 3600) * Math.pow(avgPower / workoutPlan.ftpWatts, 2) * 100
-      )
+  const tss = avgPower && hasPlan
+    ? Math.round((elapsedSec / 3600) * Math.pow(avgPower / ftpWatts, 2) * 100)
     : 0;
   const kj = avgPower ? Math.round((avgPower * elapsedSec) / 1000) : 0;
 
-  const compliance = displayPower
+  const compliance = displayPower && targetMid > 0
     ? Math.round((displayPower / targetMid) * 100)
     : 0;
 
   const remainingSec = Math.max(totalDurationSec - elapsedSec, 0);
   const segmentRemainingSec = Math.max(endSec - elapsedSec, 0);
 
-  const workSegments = workoutPlan.segments.filter((seg) => seg.isWork);
+  const workSegments = activeSegments.filter((seg) => seg.isWork);
   const totalIntervals = workSegments.length;
-  const workIndexBySegment = workoutPlan.segments.reduce<number[]>((acc, seg) => {
+  const workIndexBySegment = activeSegments.reduce<number[]>((acc, seg) => {
     const current = acc.length ? acc[acc.length - 1] : 0;
     acc.push(seg.isWork ? current + 1 : current);
     return acc;
   }, []);
-  const currentIntervalIndex = Math.max(1, workIndexBySegment[index] || 1);
+  const currentIntervalIndex = hasPlan && totalIntervals > 0
+    ? Math.max(1, workIndexBySegment[index] || 1)
+    : 0;
 
   const progressPhases = useMemo(
-    () => buildPhaseProgress(workoutPlan.segments, elapsedSec),
-    [elapsedSec, workoutPlan.segments]
+    () => (hasPlan ? buildPhaseProgress(activeSegments, elapsedSec) : []),
+    [activeSegments, elapsedSec, hasPlan]
   );
 
-  const coachMessage = compliance >= 97 && compliance <= 105
+  const coachMessage = !hasPlan
     ? {
-        title: 'Great work',
-        body: "Excellent power control. You're nailing the target within 5%.",
+        title: 'Import a workout',
+        body: 'Load a workout file to begin and unlock live coaching.',
       }
-    : {
-        title: 'Hold steady',
-        body: 'Settle the effort and smooth out the cadence over the next minute.',
-      };
+    : compliance >= 97 && compliance <= 105
+      ? {
+          title: 'Great work',
+          body: "Excellent power control. You're nailing the target within 5%.",
+        }
+      : {
+          title: 'Hold steady',
+          body: 'Settle the effort and smooth out the cadence over the next minute.',
+        };
 
-  const intervalLabel = segment.isWork
-    ? 'WORK'
-    : segment.phase === 'recovery'
-      ? 'RECOVERY'
-      : segment.phase.toUpperCase();
+  const intervalLabel = hasPlan
+    ? segment.isWork
+      ? 'WORK'
+      : segment.phase === 'recovery'
+        ? 'RECOVERY'
+        : segment.phase.toUpperCase()
+    : 'IDLE';
+  const targetLabel = hasPlan
+    ? `${Math.round(targetLow)}-${Math.round(targetHigh)}W`
+    : '--';
+  const complianceLabel = hasPlan ? `${compliance}%` : '--';
+  const intervalRemainingLabel = hasPlan ? formatDuration(segmentRemainingSec) : '--:--';
+  const elapsedLabel = hasPlan ? formatDuration(elapsedSec) : '--:--';
+  const remainingLabel = hasPlan ? formatDuration(remainingSec) : '--:--';
+  const intervalCountLabel = hasPlan
+    ? `${currentIntervalIndex}/${totalIntervals}`
+    : '--/--';
+  const planName = activePlan?.name ?? 'No workout loaded';
+  const planSubtitle = activePlan?.subtitle ?? 'Import a workout to begin.';
+  const sessionSubtitle = hasPlan
+    ? activePlan?.subtitle ?? 'Imported workout'
+    : 'Import a workout file to preview.';
+
+  const deviceRows = [
+    {
+      key: 'trainer',
+      label: 'Trainer',
+      state: trainer,
+      connect: connectTrainer,
+      disconnect: disconnectTrainer,
+    },
+    {
+      key: 'hr',
+      label: 'HR Sensor',
+      state: hrSensor,
+      connect: connectHeartRate,
+      disconnect: disconnectHeartRate,
+    },
+  ];
+  const trainerTelemetryError = bluetoothTelemetry.error;
+  const trainerControlError = ftmsControl.error;
+  const trainerControlStatus = ftmsControl.status;
+  const trainerControlLabel = trainerControlStatus === 'ready'
+    ? ergEnabled
+      ? hasPlan && isRunning
+        ? 'ERG control active'
+        : 'ERG control ready'
+      : 'ERG control disabled'
+    : trainerControlStatus === 'requesting'
+      ? 'ERG control arming'
+      : trainerControlStatus === 'error'
+        ? 'ERG control error'
+        : 'ERG control idle';
+  const startLabel = isComplete
+    ? 'Restart'
+    : hasStarted && !isRunning
+      ? 'Resume'
+      : 'Start';
+  const ergToggleLabel = ergEnabled ? 'ERG On' : 'ERG Off';
+
+  const handleStart = () => {
+    if (!hasPlan) {
+      setImportError('Import a workout to start the session.');
+      return;
+    }
+    clock.start();
+    ftmsControl.startWorkout();
+  };
+
+  const handlePause = () => {
+    clock.pause();
+    ftmsControl.pauseWorkout();
+  };
+
+  const handleStop = () => {
+    clock.stop();
+    ftmsControl.stopWorkout();
+  };
+
+  const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    setImportError(null);
+    try {
+      const text = await file.text();
+      const parsed = parseWorkoutFile(file.name, text);
+      clock.stop();
+      setActivePlan(parsed);
+      setImportName(file.name);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to import workout.';
+      setImportError(message);
+      setImportName(null);
+    } finally {
+      event.target.value = '';
+    }
+  };
 
   return (
     <div className="app">
@@ -137,15 +311,76 @@ function App() {
             ←
           </button>
           <div>
-            <div className="title">{workoutPlan.name}</div>
-            <div className="subtitle">{workoutPlan.subtitle}</div>
+            <div className="title">{planName}</div>
+            <div className="subtitle">{planSubtitle}</div>
           </div>
         </div>
-        <div className={`live-status ${isLive ? 'live' : 'paused'}`}>
+        <div className={`live-status ${liveStatusClass}`}>
           <span className="live-dot" />
-          {isLive ? 'LIVE' : 'PAUSED'}
+          {liveStatus}
         </div>
       </header>
+
+      <section
+        className="panel session-panel"
+        style={{ '--delay': '0.05s' } as CSSProperties}
+      >
+        <div className="session-info">
+          <div className="panel-title">SESSION CONTROL</div>
+          <div className="session-title">{planName}</div>
+          <div className="session-subtitle">{sessionSubtitle}</div>
+          {importName ? (
+            <div className="session-meta">Imported: {importName}</div>
+          ) : null}
+          {importError ? (
+            <div className="session-error">{importError}</div>
+          ) : null}
+        </div>
+        <div className="session-actions">
+          <label className={`session-button ${hasStarted ? 'disabled' : ''}`}>
+            Import Workout
+            <input
+              className="file-input"
+              type="file"
+              accept=".json,.erg,.mrc,.zwo,application/json"
+              onChange={handleImport}
+              disabled={hasStarted}
+            />
+          </label>
+          <button
+            className="session-button primary"
+            type="button"
+            onClick={handleStart}
+            disabled={!hasPlan || isRunning}
+          >
+            {startLabel}
+          </button>
+          <button
+            className="session-button"
+            type="button"
+            onClick={handlePause}
+            disabled={!isRunning}
+          >
+            Pause
+          </button>
+          <button
+            className="session-button danger"
+            type="button"
+            onClick={handleStop}
+            disabled={!hasStarted}
+          >
+            Stop
+          </button>
+          <button
+            className={`session-button toggle ${ergEnabled ? 'on' : 'off'}`}
+            type="button"
+            onClick={() => setErgEnabled((prev) => !prev)}
+            disabled={trainer.status !== 'connected' || !hasPlan}
+          >
+            {ergToggleLabel}
+          </button>
+        </div>
+      </section>
 
       <section
         className="panel workout-panel"
@@ -160,32 +395,40 @@ function App() {
             </div>
             <div>
               <span>FTP</span>
-              <strong>{workoutPlan.ftpWatts}W</strong>
+              <strong>{hasPlan ? `${ftpWatts}W` : '--'}</strong>
             </div>
           </div>
         </div>
-        <WorkoutChart
-          segments={workoutPlan.segments}
-          samples={samples}
-          elapsedSec={elapsedSec}
-        />
-        <div className="chart-legend">
-          <div className="legend-item">
-            <span className="legend-swatch" />
-            Target Zone
+        {hasPlan ? (
+          <>
+            <WorkoutChart
+              segments={activeSegments}
+              samples={telemetrySamples}
+              elapsedSec={elapsedSec}
+            />
+            <div className="chart-legend">
+              <div className="legend-item">
+                <span className="legend-swatch" />
+                Target Zone
+              </div>
+              <div className="legend-item">
+                <span className="legend-line" />
+                Actual
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="workout-placeholder">
+            Import a workout file to see the timeline and targets.
           </div>
-          <div className="legend-item">
-            <span className="legend-line" />
-            Actual
-          </div>
-        </div>
+        )}
       </section>
 
       <section className="metrics-row">
         <div className="panel metric-card" style={{ '--delay': '0.2s' } as CSSProperties}>
           <div className="metric-header">
             <span>POWER</span>
-            <span className="metric-tag">{segment.isWork ? 'ERG' : 'RES'}</span>
+            <span className="metric-tag">{hasPlan ? (segment.isWork ? 'ERG' : 'RES') : '--'}</span>
           </div>
           <div className="metric-value">
             {displayPower === null ? <span className="muted">--</span> : displayPower}
@@ -193,14 +436,12 @@ function App() {
           </div>
           <div className="metric-sub">
             <div>Target</div>
-            <div className="muted">
-              {targetLow}-{targetHigh}W
-            </div>
+            <div className="muted">{targetLabel}</div>
           </div>
           <div className="metric-sub">
             <div>Compliance</div>
             <div className={`accent ${compliance >= 100 ? 'good' : ''}`}>
-              {compliance}%
+              {complianceLabel}
             </div>
           </div>
         </div>
@@ -209,23 +450,23 @@ function App() {
           <div className="metric-header">
             <span>Interval</span>
             <span className="muted">
-              {currentIntervalIndex}/{totalIntervals}
+              {intervalCountLabel}
             </span>
           </div>
           <div className="metric-value">
-            {formatDuration(segmentRemainingSec)}
+            {intervalRemainingLabel}
           </div>
           <div className="pill">{intervalLabel}</div>
         </div>
 
         <div className="panel metric-card mini" style={{ '--delay': '0.3s' } as CSSProperties}>
           <div className="metric-header">Elapsed</div>
-          <div className="metric-value">{formatDuration(elapsedSec)}</div>
+          <div className="metric-value">{elapsedLabel}</div>
         </div>
 
         <div className="panel metric-card mini" style={{ '--delay': '0.35s' } as CSSProperties}>
           <div className="metric-header">Remaining</div>
-          <div className="metric-value">{formatDuration(remainingSec)}</div>
+          <div className="metric-value">{remainingLabel}</div>
         </div>
       </section>
 
@@ -265,23 +506,29 @@ function App() {
       <section className="bottom-row">
         <div className="panel progress-card" style={{ '--delay': '0.7s' } as CSSProperties}>
           <div className="progress-header">Interval Progress</div>
-          <div className="progress-bar">
-            {progressPhases.map((phase) => {
-              const ratio = phase.totalSec
-                ? Math.min(phase.elapsedSec / phase.totalSec, 1)
-                : 0;
-              return (
-                <div
-                  key={phase.key}
-                  className={`progress-segment ${phase.key}`}
-                  style={{ '--progress': ratio } as CSSProperties}
-                >
-                  <div className="progress-fill" />
-                  <span>{phase.label}</span>
-                </div>
-              );
-            })}
-          </div>
+          {hasPlan ? (
+            <div className="progress-bar">
+              {progressPhases.map((phase) => {
+                const ratio = phase.totalSec
+                  ? Math.min(phase.elapsedSec / phase.totalSec, 1)
+                  : 0;
+                return (
+                  <div
+                    key={phase.key}
+                    className={`progress-segment ${phase.key}`}
+                    style={{ '--progress': ratio } as CSSProperties}
+                  >
+                    <div className="progress-fill" />
+                    <span>{phase.label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="progress-placeholder">
+              Import a workout to view interval progress.
+            </div>
+          )}
           <div className="coach-card">
             <div className="coach-title">
               <span className="coach-icon" />
@@ -293,19 +540,76 @@ function App() {
 
         <div className="panel devices-card" style={{ '--delay': '0.75s' } as CSSProperties}>
           <div className="progress-header">Connected Devices</div>
+          {!bluetoothAvailable ? (
+            <div className="device-warning">
+              Bluetooth is unavailable. Use Chrome or Edge with HTTPS/localhost.
+            </div>
+          ) : null}
           <div className="device-list">
-            {connectedDevices.map((device) => (
-              <div key={device.name} className="device-row">
-                <div>
-                  <div className="device-name">{device.name}</div>
-                  <div className="device-status">{device.status}</div>
+            {deviceRows.map((row) => {
+              const { state } = row;
+              const isConnected = state.status === 'connected';
+              const isConnecting = state.status === 'connecting';
+              const name = state.name || row.label;
+              const statusLabel = isConnected
+                ? 'Connected'
+                : isConnecting
+                  ? 'Connecting...'
+                  : 'Not connected';
+              const infoParts = [state.manufacturer, state.model].filter(Boolean);
+              const errorMessage =
+                row.key === 'trainer'
+                  ? [state.error, trainerTelemetryError, trainerControlError]
+                    .filter(Boolean)
+                    .join(' / ')
+                  : state.error;
+              return (
+                <div key={row.key} className="device-row">
+                  <div className="device-info">
+                    <div className="device-name">{name}</div>
+                    <div className="device-status">{row.label} - {statusLabel}</div>
+                    {infoParts.length ? (
+                      <div className="device-meta">{infoParts.join(' - ')}</div>
+                    ) : null}
+                    {row.key === 'trainer' ? (
+                      <div className="device-meta">{trainerControlLabel}</div>
+                    ) : null}
+                    {row.key === 'trainer' && state.features ? (
+                      <div className="device-meta">FTMS features: {state.features}</div>
+                    ) : null}
+                    {errorMessage ? (
+                      <div className="device-error">{errorMessage}</div>
+                    ) : null}
+                  </div>
+                  <div className="device-actions">
+                    {state.battery !== null ? (
+                      <div className="device-battery">
+                        <span className="battery-dot" />
+                        {state.battery}%
+                      </div>
+                    ) : null}
+                    {isConnected ? (
+                      <button
+                        className="device-button disconnect"
+                        type="button"
+                        onClick={row.disconnect}
+                      >
+                        Disconnect
+                      </button>
+                    ) : (
+                      <button
+                        className="device-button"
+                        type="button"
+                        onClick={row.connect}
+                        disabled={!bluetoothAvailable || isConnecting}
+                      >
+                        {isConnecting ? 'Connecting...' : 'Connect'}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="device-battery">
-                  <span className="battery-dot" />
-                  {device.battery}%
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>

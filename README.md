@@ -25,3 +25,16 @@ strain.
 npm install
 npm run dev
 ```
+
+If you're running in a web sandbox that omits devDependencies, install them
+explicitly:
+
+```bash
+npm install --include=dev
+```
+
+To expose the dev server to the sandbox, run:
+
+```bash
+npm run dev -- --host 0.0.0.0 --port 4173
+```

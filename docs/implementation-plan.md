@@ -24,6 +24,9 @@
 - Completed: uPlot timeline chart with target ranges and live power trace.
 - Completed: Simulated telemetry stream (power, cadence, HR).
 - Completed: Mock workout plan data + interval progress display.
+- Completed: BLE connection flow with FTMS + HR telemetry and target power writes.
+- Completed: Session controls (import, start/pause/stop, ERG toggle).
+- Completed: Workout import (JSON, ERG, MRC, ZWO).
 
 ## Phased Delivery
 
