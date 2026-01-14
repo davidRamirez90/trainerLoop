@@ -88,6 +88,7 @@ type WorkoutChartProps = {
   elapsedSec: number;
   ftpWatts: number;
   isRecording: boolean;
+  hrSensorConnected: boolean;
 };
 
 export const WorkoutChart = ({
@@ -97,6 +98,7 @@ export const WorkoutChart = ({
   elapsedSec,
   ftpWatts,
   isRecording,
+  hrSensorConnected,
 }: WorkoutChartProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
@@ -105,11 +107,18 @@ export const WorkoutChart = ({
   const gapsRef = useRef(gaps);
   const size = useChartSize(containerRef);
   const ftpScale = Math.max(ftpWatts, 1);
-  const hasHrData = useMemo(
-    () => samples.some((sample) => !sample.dropout && sample.hrBpm > 0),
+  const hrValues = useMemo(
+    () => samples.map((sample) => (
+      !sample.dropout && sample.hrBpm > 0 ? sample.hrBpm : null
+    )),
     [samples]
   );
+  const hasHrData = useMemo(
+    () => hrValues.some((value) => value !== null),
+    [hrValues]
+  );
   const showHeartRate = isRecording && hasHrData;
+  const showHeartRateAxis = hrSensorConnected || hasHrData;
 
   const totalDurationSec = useMemo(() => getTotalDurationSec(segments), [segments]);
   const { yMin, yMax } = useMemo(() => {
@@ -135,22 +144,13 @@ export const WorkoutChart = ({
     };
   }, [segments]);
 
-  const hrValues = useMemo(() => {
-    if (!showHeartRate) {
-      return samples.map(() => null);
-    }
-    return samples.map((sample) => (
-      !sample.dropout && sample.hrBpm > 0 ? sample.hrBpm : null
-    ));
-  }, [samples, showHeartRate]);
-
   const powerValues = useMemo(
     () => samples.map((sample) => (sample.dropout ? null : sample.powerWatts)),
     [samples]
   );
 
   const { hrMin, hrMax } = useMemo(() => {
-    if (!showHeartRate) {
+    if (!hasHrData) {
       return { hrMin: 80, hrMax: 180 };
     }
     const values = hrValues.filter((value): value is number => value !== null);
@@ -166,7 +166,7 @@ export const WorkoutChart = ({
       hrMin: Math.floor(paddedMin),
       hrMax: Math.ceil(paddedMax),
     };
-  }, [hrValues, showHeartRate]);
+  }, [hasHrData, hrValues]);
 
   const data = useMemo(() => {
     const times = samples.map((sample) => sample.timeSec);
@@ -345,7 +345,7 @@ export const WorkoutChart = ({
         {
           scale: 'hr',
           side: 1,
-          show: showHeartRate,
+          show: showHeartRateAxis,
           stroke: HR_STROKE,
           grid: { show: false },
           ticks: { stroke: 'rgba(214, 69, 65, 0.45)' },
@@ -389,6 +389,7 @@ export const WorkoutChart = ({
     hrMax,
     hrMin,
     showHeartRate,
+    showHeartRateAxis,
     size.height,
     size.width,
     totalDurationSec,

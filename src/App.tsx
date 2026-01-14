@@ -369,6 +369,8 @@ function App() {
     targetRange,
   } = getTargetRangeAtTime(targetSegments, activeSec);
   const ftpWatts = activePlan?.ftpWatts ?? 0;
+  const hrSensorConnected =
+    hrSensor.status === 'connected' || hrSensor.status === 'connecting';
 
   const { low: targetLow, high: targetHigh } = targetRange;
   const targetMid = (targetLow + targetHigh) / 2;
@@ -1132,6 +1134,7 @@ function App() {
                     elapsedSec={activeSec}
                     ftpWatts={ftpWatts}
                     isRecording={isRunning}
+                    hrSensorConnected={hrSensorConnected}
                   />
                   {isPaused ? (
                     <div className="chart-overlay paused">
