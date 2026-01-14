@@ -9,6 +9,7 @@ import { getTotalDurationSec } from '../utils/workout';
 import 'uplot/dist/uPlot.min.css';
 
 const ACTUAL_STROKE = '#65c7ff';
+const POWER_SMOOTH_STROKE = '#a8def7';
 const HR_STROKE = '#D64541';
 const ZONE_STOPS = [
   { max: 0.55, color: '#6C7A89' },
@@ -23,6 +24,7 @@ const POLYGON_ALPHA = 0.18;
 const RANGE_FILL_ALPHA = 0.45;
 const RANGE_STROKE_ALPHA = 0.75;
 const LINE_STROKE_ALPHA = 0.85;
+const POWER_SMOOTH_WINDOW_SEC = 3;
 const GAP_FILL = 'rgba(214, 69, 65, 0.12)';
 const GAP_STROKE = 'rgba(214, 69, 65, 0.4)';
 
@@ -89,6 +91,7 @@ type WorkoutChartProps = {
   ftpWatts: number;
   isRecording: boolean;
   hrSensorConnected: boolean;
+  showPower3s: boolean;
 };
 
 export const WorkoutChart = ({
@@ -99,6 +102,7 @@ export const WorkoutChart = ({
   ftpWatts,
   isRecording,
   hrSensorConnected,
+  showPower3s,
 }: WorkoutChartProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
@@ -117,7 +121,7 @@ export const WorkoutChart = ({
     () => hrValues.some((value) => value !== null),
     [hrValues]
   );
-  const showHeartRate = isRecording && hasHrData;
+  const showHeartRate = hasHrData;
   const showHeartRateAxis = hrSensorConnected || hasHrData;
 
   const totalDurationSec = useMemo(() => getTotalDurationSec(segments), [segments]);
@@ -148,6 +152,38 @@ export const WorkoutChart = ({
     () => samples.map((sample) => (sample.dropout ? null : sample.powerWatts)),
     [samples]
   );
+  const smoothPowerValues = useMemo(() => {
+    if (!samples.length) {
+      return [];
+    }
+    const window: TelemetrySample[] = [];
+    let sum = 0;
+
+    return samples.map((sample) => {
+      if (sample.dropout) {
+        window.length = 0;
+        sum = 0;
+        return null;
+      }
+
+      const cutoff = sample.timeSec - POWER_SMOOTH_WINDOW_SEC;
+      while (window.length && window[0].timeSec <= cutoff) {
+        const removed = window.shift();
+        if (removed) {
+          sum -= removed.powerWatts;
+        }
+      }
+
+      window.push(sample);
+      sum += sample.powerWatts;
+
+      if (!window.length) {
+        return null;
+      }
+
+      return sum / window.length;
+    });
+  }, [samples]);
 
   const { hrMin, hrMax } = useMemo(() => {
     if (!hasHrData) {
@@ -170,8 +206,8 @@ export const WorkoutChart = ({
 
   const data = useMemo(() => {
     const times = samples.map((sample) => sample.timeSec);
-    return [times, powerValues, hrValues] as uPlot.AlignedData;
-  }, [hrValues, powerValues, samples]);
+    return [times, powerValues, smoothPowerValues, hrValues] as uPlot.AlignedData;
+  }, [hrValues, powerValues, samples, smoothPowerValues]);
 
   useEffect(() => {
     segmentsRef.current = segments;
@@ -357,9 +393,15 @@ export const WorkoutChart = ({
           label: 'time',
         },
         {
-          label: 'Actual',
+          label: 'Power (W)',
           stroke: ACTUAL_STROKE,
           width: 2,
+        },
+        {
+          label: 'Power 3s Avg',
+          stroke: POWER_SMOOTH_STROKE,
+          width: 2,
+          show: showPower3s,
         },
         {
           label: 'HR',
@@ -390,6 +432,7 @@ export const WorkoutChart = ({
     hrMin,
     showHeartRate,
     showHeartRateAxis,
+    showPower3s,
     size.height,
     size.width,
     totalDurationSec,

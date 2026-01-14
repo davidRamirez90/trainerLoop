@@ -173,19 +173,20 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 12px;
   flex-wrap: wrap;
+  padding: 12px 16px;
 }
 
 .session-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
   min-width: 200px;
 }
 
 .session-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -207,7 +208,7 @@
 .session-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   justify-content: flex-end;
 }
 
@@ -216,8 +217,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
-  padding: 10px 18px;
+  min-height: 36px;
+  padding: 8px 16px;
   border-radius: 999px;
   border: 1px solid rgba(98, 118, 145, 0.6);
   background: linear-gradient(
@@ -378,6 +379,25 @@
   justify-content: flex-end;
   gap: 12px;
   border-top: 1px solid rgba(38, 52, 71, 0.6);
+}
+
+.completion-modal {
+  width: min(520px, 92vw);
+}
+
+.completion-body {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.completion-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.completion-actions .session-button {
+  min-width: 180px;
 }
 
 .profile-form {
@@ -544,10 +564,13 @@
 
 .workout-panel {
   padding: 18px 20px 16px 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .workout-placeholder {
-  height: 320px;
+  min-height: 320px;
+  flex: 1;
   border-radius: 16px;
   border: 1px dashed rgba(91, 109, 132, 0.45);
   background: rgba(12, 18, 28, 0.5);
@@ -564,7 +587,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .panel-title {
@@ -587,7 +610,8 @@
 }
 
 .workout-chart {
-  height: 320px;
+  height: 100%;
+  min-height: 320px;
   width: 100%;
   border-radius: 16px;
   overflow: hidden;
@@ -596,12 +620,15 @@
 .workout-chart-shell {
   border-radius: 16px;
   overflow: hidden;
+  flex: 1;
+  display: flex;
 }
 
 .workout-chart-layout {
   display: flex;
   gap: 16px;
   align-items: stretch;
+  flex: 1;
 }
 
 .workout-chart-frame {
@@ -692,6 +719,7 @@
   gap: 12px;
   padding: 12px 10px;
   min-height: 320px;
+  height: 100%;
   border-radius: 16px;
   background: rgba(12, 18, 28, 0.7);
   border: 1px solid rgba(38, 52, 71, 0.7);
@@ -841,6 +869,10 @@
   background: #65c7ff;
 }
 
+.legend-line.avg {
+  background: #a8def7;
+}
+
 .legend-line.hr {
   background: #d64541;
 }
@@ -859,30 +891,50 @@
   );
 }
 
+.legend-toggle {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.legend-toggle.off {
+  opacity: 0.55;
+}
+
+.legend-toggle:focus-visible {
+  outline: 1px solid rgba(111, 136, 171, 0.8);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
 .metrics-row {
   display: grid;
   grid-template-columns: 1.1fr 1.1fr 0.9fr 0.9fr;
-  gap: 16px;
+  gap: 14px;
 }
 
 .metric-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  padding: 14px 16px;
 }
 
 .metric-card.primary .metric-value {
-  font-size: 38px;
+  font-size: 34px;
 }
 
 .metric-card.secondary .metric-value {
-  font-size: 30px;
+  font-size: 26px;
 }
 
 .metric-header {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -913,7 +965,7 @@
 }
 
 .metric-value {
-  font-size: 36px;
+  font-size: 32px;
   font-weight: 600;
   display: flex;
   align-items: flex-end;
@@ -921,19 +973,19 @@
 }
 
 .metric-value .unit {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--text-muted);
-  padding-bottom: 6px;
+  padding-bottom: 4px;
 }
 
 .metric-sub {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .metrics-row.phase-work .metric-card.primary .metric-value {
-  font-size: 42px;
+  font-size: 38px;
 }
 
 .metrics-row.phase-work .metric-card.secondary {
@@ -941,19 +993,19 @@
 }
 
 .metrics-row.phase-recovery .metric-card.primary .metric-value {
-  font-size: 40px;
+  font-size: 36px;
 }
 
 .metrics-row.phase-cooldown .metric-card.primary .metric-value,
 .metrics-row.phase-warmup .metric-card.primary .metric-value {
-  font-size: 36px;
+  font-size: 32px;
 }
 
 .pill {
   align-self: flex-start;
-  padding: 4px 12px;
+  padding: 3px 10px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 1px;
   background: rgba(244, 150, 62, 0.2);
   color: #f5b77f;
@@ -962,24 +1014,25 @@
 .secondary-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .stat-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  padding: 12px 14px;
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
 .stat-value {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
 }
 
@@ -1091,6 +1144,55 @@
   margin-top: 6px;
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+.coach-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: rgba(32, 54, 44, 0.55);
+  border: 1px solid rgba(84, 209, 160, 0.35);
+  flex-wrap: wrap;
+}
+
+.coach-banner-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #8fe2b7;
+}
+
+.coach-banner-body {
+  color: var(--text-secondary);
+  font-size: 13px;
+  flex: 1;
+  min-width: 240px;
+}
+
+.settings-card {
+  border-radius: 14px;
+  border: 1px solid rgba(38, 52, 71, 0.6);
+  background: rgba(12, 18, 28, 0.6);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-card-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+.settings-card-note {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .devices-card {
@@ -1283,5 +1385,11 @@
 
   .profile-form {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (min-height: 1400px) {
+  .workout-panel {
+    min-height: 40vh;
   }
 }

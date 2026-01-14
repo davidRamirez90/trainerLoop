@@ -8,11 +8,12 @@ import { useBluetoothDevices } from './hooks/useBluetoothDevices';
 import { useBluetoothTelemetry } from './hooks/useBluetoothTelemetry';
 import { useFtmsControl } from './hooks/useFtmsControl';
 import { useTelemetryProcessing } from './hooks/useTelemetryProcessing';
-import { useTelemetrySimulation } from './hooks/useTelemetrySimulation';
 import { useWorkoutClock } from './hooks/useWorkoutClock';
 import { formatDuration } from './utils/time';
+import { buildFitFile } from './utils/fit';
 import { parseWorkoutFile } from './utils/workoutImport';
-import { getTargetRangeAtTime } from './utils/workout';
+import { getTargetRangeAtTime, getTotalDurationSec } from './utils/workout';
+import type { TelemetrySample } from './types';
 
 const IDLE_SEGMENT: WorkoutSegment = {
   id: 'idle',
@@ -30,6 +31,32 @@ const AUTO_PAUSE_THRESHOLD_SEC = 5;
 const DEFAULT_CADENCE_RANGE = { low: 70, high: 100 };
 const CADENCE_RANGE_BUFFER_RPM = 4;
 const CADENCE_RANGE_RELAX_RATE = 0.08;
+const FREE_RIDE_EXTENSION_SEC = 900;
+const FREE_RIDE_EXTENSION_BUFFER_SEC = 60;
+
+const pad2 = (value: number) => String(value).padStart(2, '0');
+
+const buildFitFilename = (planName: string, startTimeMs: number) => {
+  const safeName = planName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  const date = new Date(startTimeMs);
+  const stamp = `${date.getFullYear()}${pad2(date.getMonth() + 1)}${pad2(
+    date.getDate()
+  )}-${pad2(date.getHours())}${pad2(date.getMinutes())}`;
+  return `${safeName || 'trainer-loop'}-${stamp}.fit`;
+};
+
+const downloadFitFile = (payload: Uint8Array, filename: string) => {
+  const blob = new Blob([payload], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+};
 
 type ZoneRange = {
   label: string;
@@ -229,61 +256,22 @@ const buildZonesFromTemplate = (
   });
 };
 
-const buildPhaseProgress = (segments: WorkoutSegment[], elapsedSec: number) => {
-  const totals = { warmup: 0, intervals: 0, cooldown: 0 };
-  const elapsed = { warmup: 0, intervals: 0, cooldown: 0 };
-  let cursor = 0;
-
-  segments.forEach((segment) => {
-    const start = cursor;
-    const end = cursor + segment.durationSec;
-    const segmentElapsed = Math.max(0, Math.min(elapsedSec, end) - start);
-
-    if (segment.phase === 'warmup') {
-      totals.warmup += segment.durationSec;
-      elapsed.warmup += segmentElapsed;
-    } else if (segment.phase === 'cooldown') {
-      totals.cooldown += segment.durationSec;
-      elapsed.cooldown += segmentElapsed;
-    } else {
-      totals.intervals += segment.durationSec;
-      elapsed.intervals += segmentElapsed;
-    }
-
-    cursor = end;
-  });
-
-  return [
-    {
-      key: 'warmup',
-      label: 'Warmup',
-      totalSec: totals.warmup,
-      elapsedSec: elapsed.warmup,
-    },
-    {
-      key: 'intervals',
-      label: 'Intervals',
-      totalSec: totals.intervals,
-      elapsedSec: elapsed.intervals,
-    },
-    {
-      key: 'cooldown',
-      label: 'Cooldown',
-      totalSec: totals.cooldown,
-      elapsedSec: elapsed.cooldown,
-    },
-  ];
-};
-
 function App() {
   const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
-  const [importName, setImportName] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
   const [ergEnabled, setErgEnabled] = useState(true);
   const [autoResumeOnWork, setAutoResumeOnWork] = useState(false);
   const [autoPauseArmed, setAutoPauseArmed] = useState(true);
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
+  const [showPower3s, setShowPower3s] = useState(false);
   const [cadenceScale, setCadenceScale] = useState(DEFAULT_CADENCE_RANGE);
+  const [isFreeRide, setIsFreeRide] = useState(false);
+  const [freeRideDurationSec, setFreeRideDurationSec] = useState(FREE_RIDE_EXTENSION_SEC);
+  const [showCompletionPrompt, setShowCompletionPrompt] = useState(false);
+  const [showStopPrompt, setShowStopPrompt] = useState(false);
+  const [stopPromptElapsedSec, setStopPromptElapsedSec] = useState<number | null>(null);
+  const [sessionSamples, setSessionSamples] = useState<TelemetrySample[]>([]);
   const [profile, setProfile] = useState<UserProfile>(() =>
     loadProfileFromStorage()
   );
@@ -294,10 +282,32 @@ function App() {
   const lastWorkRef = useRef<number | null>(null);
   const resumeTimeoutRef = useRef<number | null>(null);
   const prevRunningRef = useRef(false);
+  const stopPromptWasRunningRef = useRef(false);
+  const lastRecordedSecRef = useRef<number | null>(null);
   const hasPlan = !!activePlan && activePlan.segments.length > 0;
   const activeSegments = hasPlan ? activePlan.segments : EMPTY_SEGMENTS;
-  const clockSegments = activeSegments;
-  const targetSegments = hasPlan ? activeSegments : IDLE_SEGMENTS;
+  const planDurationSec = useMemo(
+    () => getTotalDurationSec(activeSegments),
+    [activeSegments]
+  );
+  const freeRideSegment = useMemo(
+    () => ({
+      ...IDLE_SEGMENT,
+      id: 'free-ride',
+      label: 'Free Ride',
+      durationSec: freeRideDurationSec,
+      phase: 'cooldown',
+      isWork: false,
+    }),
+    [freeRideDurationSec]
+  );
+  const displaySegments = hasPlan
+    ? isFreeRide
+      ? [...activeSegments, freeRideSegment]
+      : activeSegments
+    : IDLE_SEGMENTS;
+  const clockSegments = displaySegments;
+  const targetSegments = displaySegments;
 
   const clock = useWorkoutClock(clockSegments);
   const {
@@ -318,21 +328,53 @@ function App() {
     isRecording: clock.isRunning,
     sessionId: clock.sessionId,
   });
-  const simulation = useTelemetrySimulation(
-    clockSegments,
-    clock.activeSec,
-    clock.isRunning,
-    clock.sessionId
-  );
   const sessionElapsedSec = clock.elapsedSec;
   const activeSec = clock.activeSec;
   const totalDurationSec = clock.totalDurationSec;
   const isRunning = clock.isRunning;
   const isComplete = clock.isComplete;
   const isSessionActive = clock.isSessionActive;
-  const rawSamples = bluetoothTelemetry.samples.length
-    ? bluetoothTelemetry.samples
-    : simulation.samples;
+  const sessionStartMs = clock.sessionStartMs;
+  const sessionElapsedSecRef = useRef(sessionElapsedSec);
+  const rawSamples = bluetoothTelemetry.samples;
+  const latestTelemetry = bluetoothTelemetry.latest;
+
+  useEffect(() => {
+    sessionElapsedSecRef.current = sessionElapsedSec;
+  }, [sessionElapsedSec]);
+
+  useEffect(() => {
+    if (!isSessionActive) {
+      return;
+    }
+    const hasAny =
+      latestTelemetry.powerWatts !== null ||
+      latestTelemetry.cadenceRpm !== null ||
+      latestTelemetry.hrBpm !== null;
+    if (!hasAny) {
+      return;
+    }
+    const timeSec = sessionElapsedSecRef.current;
+    if (!Number.isFinite(timeSec)) {
+      return;
+    }
+    setSessionSamples((prevSamples) => {
+      const lastRecorded = lastRecordedSecRef.current ?? -1;
+      if (timeSec <= lastRecorded) {
+        return prevSamples;
+      }
+      lastRecordedSecRef.current = timeSec;
+      return [
+        ...prevSamples,
+        {
+          timeSec,
+          powerWatts: latestTelemetry.powerWatts ?? 0,
+          cadenceRpm: latestTelemetry.cadenceRpm ?? 0,
+          hrBpm: latestTelemetry.hrBpm ?? 0,
+        },
+      ];
+    });
+  }, [isSessionActive, latestTelemetry]);
   const processedTelemetry = useTelemetryProcessing({
     samples: rawSamples,
     elapsedSec: activeSec,
@@ -371,6 +413,8 @@ function App() {
   const ftpWatts = activePlan?.ftpWatts ?? 0;
   const hrSensorConnected =
     hrSensor.status === 'connected' || hrSensor.status === 'connecting';
+  const powerConnected = trainer.status === 'connected';
+  const sessionError = importError ?? startError;
 
   const { low: targetLow, high: targetHigh } = targetRange;
   const targetMid = (targetLow + targetHigh) / 2;
@@ -380,18 +424,16 @@ function App() {
     isActive: isRunning && ergEnabled && hasPlan,
   });
 
+  const bluetoothLatest = bluetoothTelemetry.latest;
   const displayPower = latestSample ? Math.round(latestSample.powerWatts) : null;
   const displayHr =
-    latestSample && latestSample.hrBpm > 0
-      ? Math.round(latestSample.hrBpm)
+    bluetoothLatest.hrBpm !== null && bluetoothLatest.hrBpm > 0
+      ? Math.round(bluetoothLatest.hrBpm)
       : null;
   const displayCadence = latestSample ? Math.round(latestSample.cadenceRpm) : null;
-  const bluetoothLatest = bluetoothTelemetry.latest;
-  const simulationLatest = simulation.samples[simulation.samples.length - 1] ?? null;
   const canDetectWork = trainer.status === 'connected' || bluetoothTelemetry.isActive;
-  const latestTelemetry = canDetectWork ? bluetoothLatest : simulationLatest;
-  const latestPower = latestTelemetry?.powerWatts ?? 0;
-  const latestCadence = latestTelemetry?.cadenceRpm ?? 0;
+  const latestPower = bluetoothLatest.powerWatts ?? 0;
+  const latestCadence = bluetoothLatest.cadenceRpm ?? 0;
   const hasWorkTelemetry = latestPower > 0 || latestCadence > 0;
 
   const avgPower = useMemo(() => {
@@ -495,11 +537,6 @@ function App() {
     ? Math.max(1, workIndexBySegment[index] || 1)
     : 0;
 
-  const progressPhases = useMemo(
-    () => (hasPlan ? buildPhaseProgress(activeSegments, activeSec) : []),
-    [activeSegments, activeSec, hasPlan]
-  );
-
   const profileName = profile.nickname.trim();
   const addCoachPrefix = (message: string) => {
     if (!profileName) {
@@ -532,14 +569,18 @@ function App() {
             'Settle the effort and smooth out the cadence over the next minute.'
           ),
         };
+  const showCoachBanner = !hasPlan
+    || (isRunning && (compliance < 97 || compliance > 105));
 
-  const intervalLabel = hasPlan
-    ? segment.isWork
-      ? 'WORK'
-      : segment.phase === 'recovery'
-        ? 'RECOVERY'
-        : segment.phase.toUpperCase()
-    : 'IDLE';
+  const intervalLabel = isFreeRide
+    ? 'FREE RIDE'
+    : hasPlan
+      ? segment.isWork
+        ? 'WORK'
+        : segment.phase === 'recovery'
+          ? 'RECOVERY'
+          : segment.phase.toUpperCase()
+      : 'IDLE';
   const targetLabel = hasPlan
     ? `${Math.round(targetLow)}-${Math.round(targetHigh)}W`
     : '--';
@@ -553,9 +594,6 @@ function App() {
     : '--/--';
   const planName = activePlan?.name ?? 'No workout loaded';
   const planSubtitle = activePlan?.subtitle ?? 'Import a workout to begin.';
-  const sessionSubtitle = hasPlan
-    ? activePlan?.subtitle ?? 'Imported workout'
-    : 'Import a workout file to preview.';
   const nextSegment = hasPlan ? activeSegments[index + 1] ?? null : null;
   const nextTargetLabel = nextSegment
     ? `${Math.round(nextSegment.targetRange.low)}-${Math.round(
@@ -820,8 +858,49 @@ function App() {
   }, [clock.sessionId]);
 
   useEffect(() => {
+    setIsFreeRide(false);
+    setFreeRideDurationSec(FREE_RIDE_EXTENSION_SEC);
+    setShowCompletionPrompt(false);
+    setShowStopPrompt(false);
+    setStopPromptElapsedSec(null);
+    setSessionSamples([]);
+    lastRecordedSecRef.current = null;
+    stopPromptWasRunningRef.current = false;
+  }, [clock.sessionId]);
+
+  useEffect(() => {
     setCadenceScale(DEFAULT_CADENCE_RANGE);
   }, [clock.sessionId, activePlan?.id]);
+
+  useEffect(() => {
+    if (!hasPlan) {
+      setStartError(null);
+      return;
+    }
+    if (!powerConnected && !hasStarted) {
+      setStartError('Connect a power device to start the workout.');
+      return;
+    }
+    if (powerConnected) {
+      setStartError(null);
+    }
+  }, [hasPlan, hasStarted, powerConnected]);
+
+  useEffect(() => {
+    if (!isFreeRide || !hasPlan) {
+      return;
+    }
+    const limit = planDurationSec + freeRideDurationSec;
+    if (activeSec >= limit - FREE_RIDE_EXTENSION_BUFFER_SEC) {
+      setFreeRideDurationSec((prev) => prev + FREE_RIDE_EXTENSION_SEC);
+    }
+  }, [
+    activeSec,
+    freeRideDurationSec,
+    hasPlan,
+    isFreeRide,
+    planDurationSec,
+  ]);
 
   useEffect(() => {
     setCadenceScale((prev) => {
@@ -960,11 +1039,31 @@ function App() {
     prevRunningRef.current = isRunning;
   }, [isRunning]);
 
+  useEffect(() => {
+    if (!hasPlan || isFreeRide) {
+      return;
+    }
+    if (isComplete) {
+      setShowCompletionPrompt(true);
+      setShowStopPrompt(false);
+    }
+  }, [hasPlan, isComplete, isFreeRide]);
+
   const handleStart = () => {
+    if (isComplete) {
+      setIsFreeRide(false);
+      setFreeRideDurationSec(FREE_RIDE_EXTENSION_SEC);
+      setShowCompletionPrompt(false);
+    }
     if (!hasPlan) {
       setImportError('Import a workout to start the session.');
       return;
     }
+    if (!powerConnected) {
+      setStartError('Connect a power device to start the workout.');
+      return;
+    }
+    setStartError(null);
     const isSessionStarting = !isSessionActive;
     clock.startSession();
     if (canDetectWork && isSessionStarting && !hasWorkTelemetry) {
@@ -987,11 +1086,71 @@ function App() {
     setAutoResumeOnWork(false);
   };
 
+  const handleStopRequest = () => {
+    if (!hasStarted) {
+      return;
+    }
+    stopPromptWasRunningRef.current = isRunning;
+    setStopPromptElapsedSec(sessionElapsedSec);
+    setShowStopPrompt(true);
+    setShowCompletionPrompt(false);
+    setAutoResumeOnWork(false);
+    if (isRunning) {
+      clock.pause();
+      ftmsControl.pauseWorkout();
+    }
+  };
+
   const handleStop = () => {
     clock.stop();
     ftmsControl.stopWorkout();
     setAutoResumeOnWork(false);
     setAutoPauseArmed(true);
+    setIsFreeRide(false);
+    setFreeRideDurationSec(FREE_RIDE_EXTENSION_SEC);
+    setShowCompletionPrompt(false);
+    setShowStopPrompt(false);
+    setStopPromptElapsedSec(null);
+    stopPromptWasRunningRef.current = false;
+  };
+
+  const handleStopAndExport = (elapsedSecOverride?: number) => {
+    const elapsedForExport = elapsedSecOverride ?? sessionElapsedSec;
+    const fallbackStart =
+      Date.now() - Math.max(elapsedForExport, 0) * 1000;
+    const startTimeMs = sessionStartMs ?? fallbackStart;
+    const fitPayload = buildFitFile({
+      startTimeMs,
+      elapsedSec: elapsedForExport,
+      timerSec: activeSec,
+      samples: sessionSamples,
+    });
+    downloadFitFile(fitPayload, buildFitFilename(planName, startTimeMs));
+    handleStop();
+  };
+
+  const handleContinueFreeRide = () => {
+    setIsFreeRide(true);
+    setShowCompletionPrompt(false);
+    setShowStopPrompt(false);
+    setStopPromptElapsedSec(null);
+    stopPromptWasRunningRef.current = false;
+    setFreeRideDurationSec((prev) =>
+      prev > 0 ? prev : FREE_RIDE_EXTENSION_SEC
+    );
+    setErgEnabled(false);
+    clock.resume();
+    ftmsControl.startWorkout();
+  };
+
+  const handleCancelStopPrompt = () => {
+    setShowStopPrompt(false);
+    setStopPromptElapsedSec(null);
+    if (stopPromptWasRunningRef.current) {
+      clock.resume();
+      ftmsControl.startWorkout();
+    }
+    stopPromptWasRunningRef.current = false;
   };
 
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -1005,11 +1164,9 @@ function App() {
       const parsed = parseWorkoutFile(file.name, text);
       clock.stop();
       setActivePlan(parsed);
-      setImportName(file.name);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to import workout.';
       setImportError(message);
-      setImportName(null);
     } finally {
       event.target.value = '';
     }
@@ -1051,12 +1208,8 @@ function App() {
         <div className="session-info">
           <div className="panel-title">SESSION CONTROL</div>
           <div className="session-title">{planName}</div>
-          <div className="session-subtitle">{sessionSubtitle}</div>
-          {importName ? (
-            <div className="session-meta">Imported: {importName}</div>
-          ) : null}
-          {importError ? (
-            <div className="session-error">{importError}</div>
+          {sessionError ? (
+            <div className="session-error">{sessionError}</div>
           ) : null}
         </div>
         <div className="session-actions">
@@ -1074,7 +1227,7 @@ function App() {
             className="session-button primary"
             type="button"
             onClick={handleStart}
-            disabled={!hasPlan || isRunning}
+            disabled={!hasPlan || isRunning || !powerConnected}
           >
             {startLabel}
           </button>
@@ -1089,7 +1242,7 @@ function App() {
           <button
             className="session-button danger"
             type="button"
-            onClick={handleStop}
+            onClick={handleStopRequest}
             disabled={!hasStarted}
           >
             Stop
@@ -1104,6 +1257,19 @@ function App() {
           </button>
         </div>
       </section>
+
+      {showCoachBanner ? (
+        <section
+          className="panel coach-banner"
+          style={{ '--delay': '0.08s' } as CSSProperties}
+        >
+          <div className="coach-banner-title">
+            <span className="coach-icon" />
+            {coachMessage.title.toUpperCase()}
+          </div>
+          <div className="coach-banner-body">{coachMessage.body}</div>
+        </section>
+      ) : null}
 
       <section
         className="panel workout-panel"
@@ -1128,13 +1294,14 @@ function App() {
               <div className="workout-chart-layout">
                 <div className="workout-chart-frame">
                   <WorkoutChart
-                    segments={activeSegments}
+                    segments={displaySegments}
                     samples={telemetrySamples}
                     gaps={processedTelemetry.gaps}
                     elapsedSec={activeSec}
                     ftpWatts={ftpWatts}
                     isRecording={isRunning}
                     hrSensorConnected={hrSensorConnected}
+                    showPower3s={showPower3s}
                   />
                   {isPaused ? (
                     <div className="chart-overlay paused">
@@ -1196,8 +1363,17 @@ function App() {
               </div>
               <div className="legend-item">
                 <span className="legend-line" />
-                Actual
+                Power (W)
               </div>
+              <button
+                className={`legend-item legend-toggle ${showPower3s ? 'on' : 'off'}`}
+                type="button"
+                onClick={() => setShowPower3s((prev) => !prev)}
+                aria-pressed={showPower3s}
+              >
+                <span className="legend-line avg" />
+                3s Avg (W)
+              </button>
               <div className="legend-item">
                 <span className="legend-line hr" />
                 HR
@@ -1344,116 +1520,102 @@ function App() {
         </div>
       </section>
 
-      <section className="bottom-row">
-        <div className="panel progress-card" style={{ '--delay': '0.7s' } as CSSProperties}>
-          <div className="progress-header">Interval Progress</div>
-          {hasPlan ? (
-            <div className="progress-bar">
-              {progressPhases.map((phase) => {
-                const ratio = phase.totalSec
-                  ? Math.min(phase.elapsedSec / phase.totalSec, 1)
-                  : 0;
-                return (
-                  <div
-                    key={phase.key}
-                    className={`progress-segment ${phase.key}`}
-                    style={{ '--progress': ratio } as CSSProperties}
-                  >
-                    <div className="progress-fill" />
-                    <span>{phase.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="progress-placeholder">
-              Import a workout to view interval progress.
-            </div>
-          )}
-          <div className="coach-card">
-            <div className="coach-title">
-              <span className="coach-icon" />
-              {coachMessage.title.toUpperCase()}
-            </div>
-            <div className="coach-body">{coachMessage.body}</div>
-          </div>
-        </div>
-
-        <div className="panel devices-card" style={{ '--delay': '0.75s' } as CSSProperties}>
-          <div className="progress-header">Connected Devices</div>
-          {!bluetoothAvailable ? (
-            <div className="device-warning">
-              Bluetooth is unavailable. Use Chrome or Edge with HTTPS/localhost.
-            </div>
-          ) : null}
-          <div className="device-list">
-            {deviceRows.map((row) => {
-              const { state } = row;
-              const isConnected = state.status === 'connected';
-              const isConnecting = state.status === 'connecting';
-              const name = state.name || row.label;
-              const statusLabel = isConnected
-                ? 'Connected'
-                : isConnecting
-                  ? 'Connecting...'
-                  : 'Not connected';
-              const infoParts = [state.manufacturer, state.model].filter(Boolean);
-              const errorMessage =
-                row.key === 'trainer'
-                  ? [state.error, trainerTelemetryError, trainerControlError]
-                    .filter(Boolean)
-                    .join(' / ')
-                  : state.error;
-              return (
-                <div key={row.key} className="device-row">
-                  <div className="device-info">
-                    <div className="device-name">{name}</div>
-                    <div className="device-status">{row.label} - {statusLabel}</div>
-                    {infoParts.length ? (
-                      <div className="device-meta">{infoParts.join(' - ')}</div>
-                    ) : null}
-                    {row.key === 'trainer' ? (
-                      <div className="device-meta">{trainerControlLabel}</div>
-                    ) : null}
-                    {row.key === 'trainer' && state.features ? (
-                      <div className="device-meta">FTMS features: {state.features}</div>
-                    ) : null}
-                    {errorMessage ? (
-                      <div className="device-error">{errorMessage}</div>
-                    ) : null}
-                  </div>
-                  <div className="device-actions">
-                    {state.battery !== null ? (
-                      <div className="device-battery">
-                        <span className="battery-dot" />
-                        {state.battery}%
-                      </div>
-                    ) : null}
-                    {isConnected ? (
-                      <button
-                        className="device-button disconnect"
-                        type="button"
-                        onClick={row.disconnect}
-                      >
-                        Disconnect
-                      </button>
-                    ) : (
-                      <button
-                        className="device-button"
-                        type="button"
-                        onClick={row.connect}
-                        disabled={!bluetoothAvailable || isConnecting}
-                      >
-                        {isConnecting ? 'Connecting...' : 'Connect'}
-                      </button>
-                    )}
-                  </div>
+      {showCompletionPrompt ? (
+        <div className="modal-scrim" role="presentation">
+          <div
+            className="modal completion-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="completion-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <div className="modal-title" id="completion-modal-title">
+                  Workout complete
                 </div>
-              );
-            })}
+                <div className="modal-subtitle">
+                  Choose to export a FIT file or keep riding in free ride mode.
+                </div>
+              </div>
+            </div>
+            <div className="modal-body completion-body">
+              <div>
+                Plan finished at {formatDuration(activeSec)}.
+              </div>
+            </div>
+            <div className="modal-footer completion-actions">
+              <button
+                className="session-button"
+                type="button"
+                onClick={handleContinueFreeRide}
+              >
+                Continue Free Ride
+              </button>
+              <button
+                className="session-button primary"
+                type="button"
+                onClick={() => handleStopAndExport()}
+              >
+                Stop & Export FIT
+              </button>
+            </div>
           </div>
         </div>
-      </section>
+      ) : null}
+
+      {showStopPrompt ? (
+        <div className="modal-scrim" role="presentation">
+          <div
+            className="modal completion-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="stop-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <div className="modal-title" id="stop-modal-title">
+                  Stop workout?
+                </div>
+                <div className="modal-subtitle">
+                  Export a FIT file now or keep riding in free ride mode.
+                </div>
+              </div>
+            </div>
+            <div className="modal-body completion-body">
+              <div>
+                Workout paused at {formatDuration(activeSec)}.
+              </div>
+            </div>
+            <div className="modal-footer completion-actions">
+              <button
+                className="session-button"
+                type="button"
+                onClick={handleCancelStopPrompt}
+              >
+                Back to Workout
+              </button>
+              <button
+                className="session-button"
+                type="button"
+                onClick={handleContinueFreeRide}
+              >
+                Continue Free Ride
+              </button>
+              <button
+                className="session-button primary"
+                type="button"
+                onClick={() =>
+                  handleStopAndExport(stopPromptElapsedSec ?? undefined)
+                }
+              >
+                Stop & Export FIT
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {isProfileOpen ? (
         <div
@@ -1680,6 +1842,83 @@ function App() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+              <div className="settings-card devices-card">
+                <div className="settings-card-title">Device Connections</div>
+                <div className="settings-card-note">
+                  Pair your trainer, HR, cadence, and other sensors here.
+                </div>
+                {!bluetoothAvailable ? (
+                  <div className="device-warning">
+                    Bluetooth is unavailable. Use Chrome or Edge with HTTPS/localhost.
+                  </div>
+                ) : null}
+                <div className="device-list">
+                  {deviceRows.map((row) => {
+                    const { state } = row;
+                    const isConnected = state.status === 'connected';
+                    const isConnecting = state.status === 'connecting';
+                    const name = state.name || row.label;
+                    const statusLabel = isConnected
+                      ? 'Connected'
+                      : isConnecting
+                        ? 'Connecting...'
+                        : 'Not connected';
+                    const infoParts = [state.manufacturer, state.model].filter(Boolean);
+                    const errorMessage =
+                      row.key === 'trainer'
+                        ? [state.error, trainerTelemetryError, trainerControlError]
+                          .filter(Boolean)
+                          .join(' / ')
+                        : state.error;
+                    return (
+                      <div key={row.key} className="device-row">
+                        <div className="device-info">
+                          <div className="device-name">{name}</div>
+                          <div className="device-status">{row.label} - {statusLabel}</div>
+                          {infoParts.length ? (
+                            <div className="device-meta">{infoParts.join(' - ')}</div>
+                          ) : null}
+                          {row.key === 'trainer' ? (
+                            <div className="device-meta">{trainerControlLabel}</div>
+                          ) : null}
+                          {row.key === 'trainer' && state.features ? (
+                            <div className="device-meta">FTMS features: {state.features}</div>
+                          ) : null}
+                          {errorMessage ? (
+                            <div className="device-error">{errorMessage}</div>
+                          ) : null}
+                        </div>
+                        <div className="device-actions">
+                          {state.battery !== null ? (
+                            <div className="device-battery">
+                              <span className="battery-dot" />
+                              {state.battery}%
+                            </div>
+                          ) : null}
+                          {isConnected ? (
+                            <button
+                              className="device-button disconnect"
+                              type="button"
+                              onClick={row.disconnect}
+                            >
+                              Disconnect
+                            </button>
+                          ) : (
+                            <button
+                              className="device-button"
+                              type="button"
+                              onClick={row.connect}
+                              disabled={!bluetoothAvailable || isConnecting}
+                            >
+                              {isConnecting ? 'Connecting...' : 'Connect'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
               <div className="integration-card">

@@ -175,6 +175,7 @@ export const useBluetoothTelemetry = ({
     cadenceRpm: null,
     hrBpm: null,
   });
+  const hrDeviceRef = useRef<BluetoothDevice | null>(hrDevice);
   const elapsedRef = useRef(elapsedSec);
   const isRecordingRef = useRef(isRecording);
   const lastValuesRef = useRef<LatestTelemetry>({
@@ -182,6 +183,10 @@ export const useBluetoothTelemetry = ({
     cadenceRpm: null,
     hrBpm: null,
   });
+
+  useEffect(() => {
+    hrDeviceRef.current = hrDevice;
+  }, [hrDevice]);
 
   useEffect(() => {
     elapsedRef.current = elapsedSec;
@@ -239,7 +244,11 @@ export const useBluetoothTelemetry = ({
     if (!trainerDevice) {
       setIsActive(false);
       setError(null);
-      setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
+      setLatest((prev) =>
+        hrDeviceRef.current
+          ? { ...prev, powerWatts: null, cadenceRpm: null }
+          : { powerWatts: null, cadenceRpm: null, hrBpm: null }
+      );
       return undefined;
     }
 
@@ -261,11 +270,17 @@ export const useBluetoothTelemetry = ({
       if (!parsed) {
         return;
       }
+      const updates: Partial<LatestTelemetry> = hrDeviceRef.current
+        ? {
+            powerWatts: parsed.powerWatts,
+            cadenceRpm: parsed.cadenceRpm,
+          }
+        : parsed;
       if (!isRecordingRef.current) {
-        updateLatest(parsed);
+        updateLatest(updates);
         return;
       }
-      pushSample(parsed);
+      pushSample(updates);
     };
 
     const startNotifications = async () => {

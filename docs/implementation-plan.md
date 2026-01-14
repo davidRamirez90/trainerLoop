@@ -28,6 +28,7 @@
 - Completed: Session controls (import, start/pause/stop, ERG toggle). ✅
 - Completed: Workout import (JSON, ERG, MRC, ZWO). ✅
 - Completed: Athlete profile modal via settings icon (nickname, FTP, HR, zones). ✅
+- Completed: Basic FIT export + end-of-workout free ride decision. ✅
 
 ## Phased Delivery
 

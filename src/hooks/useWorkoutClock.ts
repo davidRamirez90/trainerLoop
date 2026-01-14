@@ -10,9 +10,11 @@ type WorkoutClock = {
   isRunning: boolean;
   isComplete: boolean;
   isSessionActive: boolean;
+  sessionStartMs: number | null;
   sessionId: number;
   start: () => void;
   startSession: () => void;
+  resume: () => void;
   pause: () => void;
   stop: () => void;
 };
@@ -27,19 +29,27 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
   const [isComplete, setIsComplete] = useState(false);
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [sessionId, setSessionId] = useState(0);
+  const [sessionStartMs, setSessionStartMs] = useState<number | null>(null);
 
   const sessionStartRef = useRef<number | null>(null);
   const activeStartRef = useRef<number | null>(null);
   const accumulatedRef = useRef(0);
+
+  const ensureSessionStart = useCallback(() => {
+    if (sessionStartRef.current !== null) {
+      return;
+    }
+    const now = Date.now();
+    sessionStartRef.current = now;
+    setSessionStartMs(now);
+  }, []);
 
   useEffect(() => {
     if (!isSessionActive) {
       return undefined;
     }
 
-    if (sessionStartRef.current === null) {
-      sessionStartRef.current = Date.now();
-    }
+    ensureSessionStart();
     const intervalId = window.setInterval(() => {
       if (sessionStartRef.current === null) {
         return;
@@ -71,7 +81,6 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
       if (nextActive >= totalDurationSec) {
         accumulatedRef.current = totalDurationSec;
         setIsRunning(false);
-        setIsSessionActive(false);
         setIsComplete(true);
       }
     }, TICK_MS);
@@ -87,6 +96,7 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
     setActiveSec(0);
     accumulatedRef.current = 0;
     sessionStartRef.current = null;
+    setSessionStartMs(null);
     activeStartRef.current = null;
     setSessionId((prev) => prev + 1);
   }, []);
@@ -100,12 +110,10 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
     }
     if (!isSessionActive) {
       setIsSessionActive(true);
-      if (sessionStartRef.current === null) {
-        sessionStartRef.current = Date.now();
-      }
+      ensureSessionStart();
     }
     setIsRunning(true);
-  }, [isComplete, isRunning, isSessionActive, stop]);
+  }, [ensureSessionStart, isComplete, isRunning, isSessionActive, stop]);
 
   const startSession = useCallback(() => {
     if (isComplete) {
@@ -115,8 +123,20 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
       return;
     }
     setIsSessionActive(true);
-    sessionStartRef.current = Date.now();
-  }, [isComplete, isSessionActive, stop]);
+    ensureSessionStart();
+  }, [ensureSessionStart, isComplete, isSessionActive, stop]);
+
+  const resume = useCallback(() => {
+    if (isRunning) {
+      return;
+    }
+    if (!isSessionActive) {
+      setIsSessionActive(true);
+      ensureSessionStart();
+    }
+    setIsComplete(false);
+    setIsRunning(true);
+  }, [ensureSessionStart, isRunning, isSessionActive]);
 
   const pause = useCallback(() => {
     if (!isRunning) {
@@ -138,9 +158,11 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
     isRunning,
     isComplete,
     isSessionActive,
+    sessionStartMs,
     sessionId,
     start,
     startSession,
+    resume,
     pause,
     stop,
   };
