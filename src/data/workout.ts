@@ -10,6 +10,7 @@ export type WorkoutSegment = {
   label: string;
   durationSec: number;
   targetRange: TargetRange;
+  cadenceRange?: TargetRange;
   rampToRange?: TargetRange;
   phase: SegmentPhase;
   isWork: boolean;
@@ -43,6 +44,7 @@ export const workoutPlan: WorkoutPlan = {
       label: 'Interval 1',
       durationSec: 180,
       targetRange: { low: 250, high: 275 },
+      cadenceRange: { low: 85, high: 95 },
       phase: 'work',
       isWork: true,
     },
@@ -59,6 +61,7 @@ export const workoutPlan: WorkoutPlan = {
       label: 'Interval 2',
       durationSec: 180,
       targetRange: { low: 250, high: 275 },
+      cadenceRange: { low: 85, high: 95 },
       phase: 'work',
       isWork: true,
     },
@@ -75,6 +78,7 @@ export const workoutPlan: WorkoutPlan = {
       label: 'Interval 3',
       durationSec: 180,
       targetRange: { low: 250, high: 275 },
+      cadenceRange: { low: 85, high: 95 },
       phase: 'work',
       isWork: true,
     },
@@ -91,6 +95,7 @@ export const workoutPlan: WorkoutPlan = {
       label: 'Interval 4',
       durationSec: 180,
       targetRange: { low: 250, high: 275 },
+      cadenceRange: { low: 85, high: 95 },
       phase: 'work',
       isWork: true,
     },

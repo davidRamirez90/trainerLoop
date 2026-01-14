@@ -594,7 +594,20 @@
 }
 
 .workout-chart-shell {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.workout-chart-layout {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.workout-chart-frame {
   position: relative;
+  flex: 1;
+  min-width: 0;
   border-radius: 16px;
   overflow: hidden;
 }
@@ -672,6 +685,133 @@
   font-size: 12px;
 }
 
+.cadence-gauge {
+  width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 10px;
+  min-height: 320px;
+  border-radius: 16px;
+  background: rgba(12, 18, 28, 0.7);
+  border: 1px solid rgba(38, 52, 71, 0.7);
+  --indicator-color: #9be7bf;
+  --target-color: rgba(101, 199, 255, 0.4);
+}
+
+.cadence-gauge.low {
+  --indicator-color: #65c7ff;
+}
+
+.cadence-gauge.high {
+  --indicator-color: #f6b26b;
+}
+
+.cadence-gauge.idle {
+  --indicator-color: rgba(229, 237, 247, 0.4);
+}
+
+.cadence-gauge-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cadence-gauge-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.cadence-gauge-value .unit {
+  font-size: 12px;
+  margin-left: 4px;
+  color: var(--text-muted);
+}
+
+.cadence-gauge-track {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 0;
+}
+
+.cadence-gauge-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+}
+
+.cadence-gauge-range {
+  position: absolute;
+  inset: 8px 26px;
+  border-radius: 999px;
+  background: rgba(84, 104, 132, 0.35);
+  border: 1px solid rgba(91, 109, 132, 0.4);
+}
+
+.cadence-gauge-target {
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: calc(var(--target-start) * 100%);
+  height: calc((var(--target-end) - var(--target-start)) * 100%);
+  border-radius: 999px;
+  background: var(--target-color);
+}
+
+.cadence-gauge-target.single {
+  min-height: 8px;
+  background: rgba(101, 199, 255, 0.55);
+}
+
+.cadence-gauge-target span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: #c5d6f2;
+  white-space: nowrap;
+}
+
+.cadence-gauge-indicator {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--indicator-color);
+  bottom: calc(var(--indicator) * 100%);
+  transform: translateY(50%);
+  box-shadow: 0 0 10px rgba(101, 199, 255, 0.3);
+}
+
+.cadence-gauge-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.app.workout-micro .cadence-gauge {
+  border-color: rgba(101, 199, 255, 0.45);
+  box-shadow: 0 0 24px rgba(101, 199, 255, 0.15);
+}
+
+.app.workout-micro .hr-card .metric-tag.zone {
+  opacity: 0.5;
+}
+
 .legend-item {
   display: inline-flex;
   align-items: center;
@@ -721,7 +861,7 @@
 
 .metrics-row {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 0.7fr 0.7fr;
+  grid-template-columns: 1.1fr 1.1fr 0.9fr 0.9fr;
   gap: 16px;
 }
 
@@ -731,8 +871,12 @@
   gap: 8px;
 }
 
-.metric-card.mini {
-  justify-content: center;
+.metric-card.primary .metric-value {
+  font-size: 38px;
+}
+
+.metric-card.secondary .metric-value {
+  font-size: 30px;
 }
 
 .metric-header {
@@ -750,6 +894,22 @@
   font-size: 10px;
   background: rgba(244, 150, 62, 0.15);
   color: #f6b26b;
+}
+
+.metric-tag.subtle {
+  background: rgba(101, 199, 255, 0.15);
+  color: #9bd7ff;
+}
+
+.metric-tag.zone {
+  background: rgba(11, 16, 26, 0.8);
+  color: var(--zone-color, var(--text-muted));
+  border: 1px solid var(--zone-color, rgba(90, 105, 124, 0.6));
+}
+
+.metric-tag.zone.empty {
+  color: var(--text-muted);
+  border-color: rgba(90, 105, 124, 0.5);
 }
 
 .metric-value {
@@ -772,6 +932,23 @@
   font-size: 13px;
 }
 
+.metrics-row.phase-work .metric-card.primary .metric-value {
+  font-size: 42px;
+}
+
+.metrics-row.phase-work .metric-card.secondary {
+  opacity: 0.78;
+}
+
+.metrics-row.phase-recovery .metric-card.primary .metric-value {
+  font-size: 40px;
+}
+
+.metrics-row.phase-cooldown .metric-card.primary .metric-value,
+.metrics-row.phase-warmup .metric-card.primary .metric-value {
+  font-size: 36px;
+}
+
 .pill {
   align-self: flex-start;
   padding: 4px 12px;
@@ -784,7 +961,7 @@
 
 .secondary-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -804,6 +981,20 @@
 .stat-value {
   font-size: 20px;
   font-weight: 600;
+}
+
+.secondary-grid.phase-work .stat-card {
+  opacity: 0.6;
+}
+
+.secondary-grid.phase-recovery .stat-card.interval-avg,
+.secondary-grid.phase-cooldown .stat-card.interval-avg {
+  border-color: rgba(101, 199, 255, 0.4);
+  box-shadow: 0 16px 30px rgba(12, 18, 28, 0.35);
+}
+
+.secondary-grid.steady.phase-work .stat-card.interval-avg {
+  opacity: 1;
 }
 
 .bottom-row {
@@ -1037,6 +1228,10 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .cadence-gauge {
+    width: 100px;
+  }
+
   .bottom-row {
     grid-template-columns: 1fr;
   }
@@ -1066,6 +1261,16 @@
 
   .secondary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workout-chart-layout {
+    flex-direction: column;
+  }
+
+  .cadence-gauge {
+    width: 100%;
+    height: 180px;
+    min-height: 180px;
   }
 
   .chart-legend {

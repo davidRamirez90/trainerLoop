@@ -27,6 +27,9 @@ const EMPTY_SEGMENTS: WorkoutSegment[] = [];
 const IDLE_SEGMENTS: WorkoutSegment[] = [IDLE_SEGMENT];
 
 const AUTO_PAUSE_THRESHOLD_SEC = 5;
+const DEFAULT_CADENCE_RANGE = { low: 70, high: 100 };
+const CADENCE_RANGE_BUFFER_RPM = 4;
+const CADENCE_RANGE_RELAX_RATE = 0.08;
 
 type ZoneRange = {
   label: string;
@@ -55,6 +58,15 @@ type UserProfile = {
 
 const DEFAULT_HR_ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'];
 const DEFAULT_POWER_ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'];
+const HR_ZONE_COLORS = [
+  '#6c7a89',
+  '#3b8ea5',
+  '#5faf5f',
+  '#c9a227',
+  '#e57a1f',
+  '#d64541',
+  '#8c2a2a',
+];
 const COGGAN_HR_TEMPLATE: ZoneTemplate = {
   name: 'Coggan 5',
   zones: [
@@ -155,6 +167,40 @@ const parsePositiveNumber = (value: string) => {
   return parsed;
 };
 
+const clampValue = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const parseZoneBoundary = (value: string) => {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  return parsed;
+};
+
+const getHrZone = (value: number | null, zones: ZoneRange[]) => {
+  if (value === null) {
+    return null;
+  }
+  for (let index = 0; index < zones.length; index += 1) {
+    const zone = zones[index];
+    const low = parseZoneBoundary(zone.low);
+    const high = parseZoneBoundary(zone.high);
+    if (low === null && high === null) {
+      continue;
+    }
+    const minValue = low ?? 0;
+    const maxValue = high ?? Number.POSITIVE_INFINITY;
+    if (value >= minValue && value <= maxValue) {
+      return {
+        label: zone.label,
+        color: HR_ZONE_COLORS[index] ?? HR_ZONE_COLORS[HR_ZONE_COLORS.length - 1],
+      };
+    }
+  }
+  return null;
+};
+
 const formatZoneValue = (value: number) => `${Math.round(value)}`;
 
 const buildZonesFromTemplate = (
@@ -237,6 +283,7 @@ function App() {
   const [autoResumeOnWork, setAutoResumeOnWork] = useState(false);
   const [autoPauseArmed, setAutoPauseArmed] = useState(true);
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
+  const [cadenceScale, setCadenceScale] = useState(DEFAULT_CADENCE_RANGE);
   const [profile, setProfile] = useState<UserProfile>(() =>
     loadProfileFromStorage()
   );
@@ -313,10 +360,14 @@ function App() {
           ? 'paused'
           : 'ready';
   const latestSample = processedTelemetry.latestSample;
-  const { segment, index, endSec, targetRange } = getTargetRangeAtTime(
-    targetSegments,
-    activeSec
-  );
+  const {
+    segment,
+    index,
+    startSec,
+    endSec,
+    elapsedInSegmentSec,
+    targetRange,
+  } = getTargetRangeAtTime(targetSegments, activeSec);
   const ftpWatts = activePlan?.ftpWatts ?? 0;
 
   const { low: targetLow, high: targetHigh } = targetRange;
@@ -328,7 +379,10 @@ function App() {
   });
 
   const displayPower = latestSample ? Math.round(latestSample.powerWatts) : null;
-  const displayHr = latestSample ? Math.round(latestSample.hrBpm) : null;
+  const displayHr =
+    latestSample && latestSample.hrBpm > 0
+      ? Math.round(latestSample.hrBpm)
+      : null;
   const displayCadence = latestSample ? Math.round(latestSample.cadenceRpm) : null;
   const bluetoothLatest = bluetoothTelemetry.latest;
   const simulationLatest = simulation.samples[simulation.samples.length - 1] ?? null;
@@ -349,21 +403,87 @@ function App() {
     return Math.round(total / rawSamples.length);
   }, [rawSamples]);
 
+  const intervalAvgPower = useMemo(() => {
+    if (!hasPlan || !rawSamples.length) {
+      return 0;
+    }
+    let rangeStart = startSec;
+    let rangeEnd = Math.min(activeSec, endSec);
+    if (segment.phase === 'recovery' && index > 0) {
+      const previousSegment = activeSegments[index - 1];
+      if (previousSegment?.isWork) {
+        rangeEnd = startSec;
+        rangeStart = Math.max(0, startSec - previousSegment.durationSec);
+      }
+    }
+    const samplesInRange = rawSamples.filter(
+      (sample) => sample.timeSec >= rangeStart && sample.timeSec <= rangeEnd
+    );
+    if (!samplesInRange.length) {
+      return 0;
+    }
+    const total = samplesInRange.reduce(
+      (sum, sample) => sum + sample.powerWatts,
+      0
+    );
+    return Math.round(total / samplesInRange.length);
+  }, [
+    activeSec,
+    activeSegments,
+    endSec,
+    hasPlan,
+    index,
+    rawSamples,
+    segment.phase,
+    startSec,
+  ]);
+
   const normalizedPower = avgPower ? Math.round(avgPower * 1.03) : 0;
   const tss = avgPower && hasPlan
     ? Math.round((activeSec / 3600) * Math.pow(avgPower / ftpWatts, 2) * 100)
     : 0;
   const kj = avgPower ? Math.round((avgPower * activeSec) / 1000) : 0;
+  const ifValue =
+    ftpWatts > 0 && normalizedPower ? normalizedPower / ftpWatts : 0;
+  const ifLabel = ifValue ? ifValue.toFixed(2) : '--';
+  const tssLabel = tss ? `${tss}` : '--';
+  const ifTssLabel = `${ifLabel} · ${tssLabel}`;
 
   const compliance = displayPower && targetMid > 0
     ? Math.round((displayPower / targetMid) * 100)
     : 0;
+  const isPowerInRange =
+    displayPower !== null &&
+    displayPower >= targetLow &&
+    displayPower <= targetHigh;
 
   const remainingSec = Math.max(totalDurationSec - activeSec, 0);
   const segmentRemainingSec = Math.max(endSec - activeSec, 0);
+  const isWorkPhase = hasPlan && segment.isWork;
+  const isRecoveryPhase = hasPlan && segment.phase === 'recovery';
+  const isWarmupPhase = hasPlan && segment.phase === 'warmup';
+  const isCooldownPhase = hasPlan && segment.phase === 'cooldown';
+  const phaseClass = hasPlan ? `phase-${segment.phase}` : 'phase-idle';
 
   const workSegments = activeSegments.filter((seg) => seg.isWork);
   const totalIntervals = workSegments.length;
+  const avgWorkDurationSec = useMemo(() => {
+    if (!workSegments.length) {
+      return 0;
+    }
+    const totalDuration = workSegments.reduce(
+      (sum, seg) => sum + seg.durationSec,
+      0
+    );
+    return totalDuration / workSegments.length;
+  }, [workSegments]);
+  const isMicroIntervals = avgWorkDurationSec > 0 && avgWorkDurationSec < 120;
+  const isSteadyWork = avgWorkDurationSec >= 480;
+  const workoutTypeClass = isMicroIntervals
+    ? 'workout-micro'
+    : isSteadyWork
+      ? 'workout-steady'
+      : 'workout-mixed';
   const workIndexBySegment = activeSegments.reduce<number[]>((acc, seg) => {
     const current = acc.length ? acc[acc.length - 1] : 0;
     acc.push(seg.isWork ? current + 1 : current);
@@ -423,9 +543,9 @@ function App() {
     : '--';
   const complianceLabel = hasPlan ? `${compliance}%` : '--';
   const intervalRemainingLabel = hasPlan ? formatDuration(segmentRemainingSec) : '--:--';
-  const activeLabel = hasPlan ? formatDuration(activeSec) : '--:--';
   const elapsedLabel = hasPlan ? formatDuration(sessionElapsedSec) : '--:--';
   const remainingLabel = hasPlan ? formatDuration(remainingSec) : '--:--';
+  const segmentElapsedLabel = hasPlan ? formatDuration(elapsedInSegmentSec) : '--:--';
   const intervalCountLabel = hasPlan
     ? `${currentIntervalIndex}/${totalIntervals}`
     : '--/--';
@@ -434,6 +554,86 @@ function App() {
   const sessionSubtitle = hasPlan
     ? activePlan?.subtitle ?? 'Imported workout'
     : 'Import a workout file to preview.';
+  const nextSegment = hasPlan ? activeSegments[index + 1] ?? null : null;
+  const nextTargetLabel = nextSegment
+    ? `${Math.round(nextSegment.targetRange.low)}-${Math.round(
+        nextSegment.targetRange.high
+      )}W`
+    : '--';
+  const powerMeta = isRecoveryPhase
+    ? {
+        primaryLabel: 'Next',
+        primaryValue: nextTargetLabel,
+        secondaryLabel: 'Starts In',
+        secondaryValue: intervalRemainingLabel,
+      }
+    : isCooldownPhase
+      ? {
+          primaryLabel: 'Cooldown',
+          primaryValue: targetLabel,
+          secondaryLabel: 'Remaining',
+          secondaryValue: intervalRemainingLabel,
+        }
+      : isWarmupPhase
+        ? {
+            primaryLabel: 'Target',
+            primaryValue: targetLabel,
+            secondaryLabel: 'Remaining',
+            secondaryValue: intervalRemainingLabel,
+          }
+        : {
+            primaryLabel: 'Target',
+            primaryValue: targetLabel,
+            secondaryLabel: 'Compliance',
+            secondaryValue: complianceLabel,
+          };
+  const hrZone = getHrZone(displayHr, profile.hrZones);
+  const hrZoneStyle = hrZone
+    ? ({ '--zone-color': hrZone.color } as CSSProperties)
+    : undefined;
+  const cadenceTargetRange = hasPlan ? segment.cadenceRange : undefined;
+  const cadenceTargetLow = cadenceTargetRange?.low ?? null;
+  const cadenceTargetHigh = cadenceTargetRange?.high ?? null;
+  const isCadenceTargetSingle =
+    cadenceTargetRange &&
+    Math.abs(cadenceTargetRange.low - cadenceTargetRange.high) < 0.5;
+  const cadenceSpan = Math.max(1, cadenceScale.high - cadenceScale.low);
+  const cadenceIndicator =
+    displayCadence === null
+      ? 0
+      : clampValue(
+          (displayCadence - cadenceScale.low) / cadenceSpan,
+          0,
+          1
+        );
+  const cadenceTargetStart = cadenceTargetRange
+    ? clampValue(
+        (cadenceTargetRange.low - cadenceScale.low) / cadenceSpan,
+        0,
+        1
+      )
+    : 0;
+  const cadenceTargetEnd = cadenceTargetRange
+    ? clampValue(
+        (cadenceTargetRange.high - cadenceScale.low) / cadenceSpan,
+        0,
+        1
+      )
+    : 0;
+  const cadenceBounds = cadenceTargetRange ?? cadenceScale;
+  const cadenceState =
+    displayCadence === null
+      ? 'idle'
+      : displayCadence < cadenceBounds.low
+        ? 'low'
+        : displayCadence > cadenceBounds.high
+          ? 'high'
+          : 'in';
+  const cadenceGaugeStyle = {
+    '--indicator': cadenceIndicator,
+    '--target-start': cadenceTargetStart,
+    '--target-end': cadenceTargetEnd,
+  } as CSSProperties;
 
   const deviceRows = [
     {
@@ -618,6 +818,69 @@ function App() {
   }, [clock.sessionId]);
 
   useEffect(() => {
+    setCadenceScale(DEFAULT_CADENCE_RANGE);
+  }, [clock.sessionId, activePlan?.id]);
+
+  useEffect(() => {
+    setCadenceScale((prev) => {
+      const defaultLow = DEFAULT_CADENCE_RANGE.low;
+      const defaultHigh = DEFAULT_CADENCE_RANGE.high;
+      const candidates: number[] = [];
+      if (displayCadence !== null) {
+        candidates.push(displayCadence);
+      }
+      if (cadenceTargetLow !== null) {
+        candidates.push(cadenceTargetLow);
+      }
+      if (cadenceTargetHigh !== null) {
+        candidates.push(cadenceTargetHigh);
+      }
+      const withinDefault =
+        candidates.length === 0 ||
+        candidates.every(
+          (value) => value >= defaultLow && value <= defaultHigh
+        );
+
+      let nextLow = prev.low;
+      let nextHigh = prev.high;
+
+      if (!withinDefault && candidates.length) {
+        const minCandidate = Math.min(...candidates, nextLow);
+        const maxCandidate = Math.max(...candidates, nextHigh);
+        if (minCandidate < nextLow) {
+          nextLow = Math.floor(minCandidate - CADENCE_RANGE_BUFFER_RPM);
+        }
+        if (maxCandidate > nextHigh) {
+          nextHigh = Math.ceil(maxCandidate + CADENCE_RANGE_BUFFER_RPM);
+        }
+      } else {
+        nextLow = nextLow + (defaultLow - nextLow) * CADENCE_RANGE_RELAX_RATE;
+        nextHigh = nextHigh + (defaultHigh - nextHigh) * CADENCE_RANGE_RELAX_RATE;
+      }
+
+      if (nextHigh - nextLow < 10) {
+        const mid = (nextHigh + nextLow) / 2;
+        nextLow = mid - 5;
+        nextHigh = mid + 5;
+      }
+
+      const rounded = {
+        low: Math.round(nextLow * 10) / 10,
+        high: Math.round(nextHigh * 10) / 10,
+      };
+
+      if (
+        Math.abs(rounded.low - prev.low) < 0.1 &&
+        Math.abs(rounded.high - prev.high) < 0.1
+      ) {
+        return prev;
+      }
+
+      return rounded;
+    });
+  }, [displayCadence, cadenceTargetLow, cadenceTargetHigh]);
+
+  useEffect(() => {
     if (!canDetectWork || !autoResumeOnWork) {
       return;
     }
@@ -751,7 +1014,7 @@ function App() {
   };
 
   return (
-    <div className="app">
+    <div className={`app ${phaseClass} ${workoutTypeClass}`}>
       <header className="top-bar">
         <div className="title-block">
           <button className="back-button" type="button" aria-label="Back">
@@ -860,24 +1123,68 @@ function App() {
         {hasPlan ? (
           <>
             <div className="workout-chart-shell">
-              <WorkoutChart
-                segments={activeSegments}
-                samples={telemetrySamples}
-                gaps={processedTelemetry.gaps}
-                elapsedSec={activeSec}
-                ftpWatts={ftpWatts}
-                isRecording={isRunning}
-              />
-              {isPaused ? (
-                <div className="chart-overlay paused">
-                  <span className="overlay-icon pause" />
+              <div className="workout-chart-layout">
+                <div className="workout-chart-frame">
+                  <WorkoutChart
+                    segments={activeSegments}
+                    samples={telemetrySamples}
+                    gaps={processedTelemetry.gaps}
+                    elapsedSec={activeSec}
+                    ftpWatts={ftpWatts}
+                    isRecording={isRunning}
+                  />
+                  {isPaused ? (
+                    <div className="chart-overlay paused">
+                      <span className="overlay-icon pause" />
+                    </div>
+                  ) : null}
+                  {showResumeOverlay ? (
+                    <div className="chart-overlay resume">
+                      <span className="overlay-icon play" />
+                    </div>
+                  ) : null}
                 </div>
-              ) : null}
-              {showResumeOverlay ? (
-                <div className="chart-overlay resume">
-                  <span className="overlay-icon play" />
+                <div
+                  className={`cadence-gauge ${cadenceState} ${
+                    cadenceTargetRange ? 'has-target' : ''
+                  }`}
+                >
+                  <div className="cadence-gauge-header">
+                    <span>Cadence</span>
+                    <span className="cadence-gauge-value">
+                      {displayCadence === null ? '--' : displayCadence}
+                      <span className="unit">rpm</span>
+                    </span>
+                  </div>
+                  <div className="cadence-gauge-body">
+                    <span className="cadence-gauge-label">
+                      {Math.round(cadenceScale.high)}
+                    </span>
+                    <div className="cadence-gauge-track" style={cadenceGaugeStyle}>
+                      <div className="cadence-gauge-range" />
+                    {cadenceTargetRange ? (
+                      <div
+                        className={`cadence-gauge-target ${
+                          isCadenceTargetSingle ? 'single' : ''
+                        }`}
+                      >
+                        <span>
+                          {isCadenceTargetSingle
+                            ? Math.round(cadenceTargetRange.low)
+                            : `${Math.round(cadenceTargetRange.low)}-${Math.round(
+                                cadenceTargetRange.high
+                              )}`}
+                        </span>
+                      </div>
+                    ) : null}
+                      <div className="cadence-gauge-indicator" />
+                    </div>
+                    <span className="cadence-gauge-label">
+                      {Math.round(cadenceScale.low)}
+                    </span>
+                  </div>
                 </div>
-              ) : null}
+              </div>
             </div>
             <div className="chart-legend">
               <div className="legend-item">
@@ -905,82 +1212,132 @@ function App() {
         )}
       </section>
 
-      <section className="metrics-row">
-        <div className="panel metric-card" style={{ '--delay': '0.2s' } as CSSProperties}>
+      <section className={`metrics-row ${phaseClass}`}>
+        <div
+          className="panel metric-card interval-card primary"
+          style={{ '--delay': '0.2s' } as CSSProperties}
+        >
           <div className="metric-header">
-            <span>POWER</span>
-            <span className="metric-tag">{hasPlan ? (segment.isWork ? 'ERG' : 'RES') : '--'}</span>
+            <span>Interval</span>
+            <span className="muted">{intervalCountLabel}</span>
+          </div>
+          <div className="metric-value">{intervalRemainingLabel}</div>
+          <div className="metric-sub">
+            <div>Elapsed</div>
+            <div className="muted">{segmentElapsedLabel}</div>
+          </div>
+          <div className="metric-sub">
+            <div>Workout Rem.</div>
+            <div className="muted">{remainingLabel}</div>
+          </div>
+          <div className="pill">{intervalLabel}</div>
+        </div>
+
+        <div
+          className="panel metric-card power-card primary"
+          style={{ '--delay': '0.25s' } as CSSProperties}
+        >
+          <div className="metric-header">
+            <span>Power</span>
+            <span className="metric-tag">
+              {hasPlan ? (segment.isWork ? 'ERG' : 'RES') : '--'}
+            </span>
           </div>
           <div className="metric-value">
             {displayPower === null ? <span className="muted">--</span> : displayPower}
             <span className="unit">W</span>
           </div>
           <div className="metric-sub">
-            <div>Target</div>
-            <div className="muted">{targetLabel}</div>
+            <div>{powerMeta.primaryLabel}</div>
+            <div className="muted">{powerMeta.primaryValue}</div>
           </div>
           <div className="metric-sub">
-            <div>Compliance</div>
-            <div className={`accent ${compliance >= 100 ? 'good' : ''}`}>
-              {complianceLabel}
+            <div>{powerMeta.secondaryLabel}</div>
+            <div
+              className={
+                powerMeta.secondaryLabel === 'Compliance'
+                  ? `accent ${isPowerInRange ? 'good' : ''}`
+                  : 'muted'
+              }
+            >
+              {powerMeta.secondaryValue}
             </div>
           </div>
         </div>
 
-        <div className="panel metric-card interval-card" style={{ '--delay': '0.25s' } as CSSProperties}>
+        <div
+          className="panel metric-card hr-card secondary"
+          style={{ '--delay': '0.3s' } as CSSProperties}
+        >
           <div className="metric-header">
-            <span>Interval</span>
-            <span className="muted">
-              {intervalCountLabel}
+            <span>Heart Rate</span>
+            <span
+              className={`metric-tag zone ${hrZone ? '' : 'empty'}`}
+              style={hrZoneStyle}
+            >
+              {hrZone?.label ?? '--'}
             </span>
           </div>
           <div className="metric-value">
-            {intervalRemainingLabel}
+            {displayHr === null ? <span className="muted">--</span> : displayHr}
+            <span className="unit">bpm</span>
           </div>
-          <div className="pill">{intervalLabel}</div>
         </div>
 
-        <div className="panel metric-card mini" style={{ '--delay': '0.3s' } as CSSProperties}>
-          <div className="metric-header">Active</div>
-          <div className="metric-value">{activeLabel}</div>
-        </div>
-
-        <div className="panel metric-card mini" style={{ '--delay': '0.35s' } as CSSProperties}>
-          <div className="metric-header">Remaining</div>
-          <div className="metric-value">{remainingLabel}</div>
+        <div
+          className="panel metric-card cadence-card secondary"
+          style={{ '--delay': '0.35s' } as CSSProperties}
+        >
+          <div className="metric-header">
+            <span>Cadence</span>
+            <span className="metric-tag subtle">
+              {cadenceTargetRange
+                ? `${Math.round(cadenceTargetRange.low)}-${Math.round(
+                    cadenceTargetRange.high
+                  )}`
+                : `${Math.round(cadenceScale.low)}-${Math.round(cadenceScale.high)}`}
+            </span>
+          </div>
+          <div className="metric-value">
+            {displayCadence === null ? <span className="muted">--</span> : displayCadence}
+            <span className="unit">rpm</span>
+          </div>
+          <div className="metric-sub">
+            <div>{cadenceTargetRange ? 'Target' : 'Range'}</div>
+            <div className="muted">
+              {cadenceTargetRange
+                ? `${Math.round(cadenceTargetRange.low)}-${Math.round(
+                    cadenceTargetRange.high
+                  )} rpm`
+                : `${DEFAULT_CADENCE_RANGE.low}-${DEFAULT_CADENCE_RANGE.high} rpm`}
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="secondary-grid">
-        <div className="panel stat-card" style={{ '--delay': '0.4s' } as CSSProperties}>
-          <div className="stat-label">Avg Power</div>
-          <div className="stat-value">{avgPower || '--'}W</div>
+      <section className={`secondary-grid ${phaseClass} ${isSteadyWork ? 'steady' : ''}`}>
+        <div
+          className="panel stat-card interval-avg"
+          style={{ '--delay': '0.4s' } as CSSProperties}
+        >
+          <div className="stat-label">Interval Avg</div>
+          <div className="stat-value">{intervalAvgPower || '--'}W</div>
         </div>
         <div className="panel stat-card" style={{ '--delay': '0.45s' } as CSSProperties}>
           <div className="stat-label">Norm Power</div>
           <div className="stat-value">{normalizedPower || '--'}W</div>
         </div>
         <div className="panel stat-card" style={{ '--delay': '0.5s' } as CSSProperties}>
-          <div className="stat-label">TSS</div>
-          <div className="stat-value">{tss || '--'}</div>
+          <div className="stat-label">IF / TSS</div>
+          <div className="stat-value">{ifTssLabel}</div>
         </div>
         <div className="panel stat-card" style={{ '--delay': '0.55s' } as CSSProperties}>
           <div className="stat-label">KJ</div>
           <div className="stat-value">{kj || '--'}</div>
         </div>
         <div className="panel stat-card" style={{ '--delay': '0.6s' } as CSSProperties}>
-          <div className="stat-label">Heart Rate</div>
-          <div className="stat-value">
-            {displayHr === null ? '--' : displayHr}
-            <span className="unit">bpm</span>
-          </div>
-        </div>
-        <div className="panel stat-card" style={{ '--delay': '0.65s' } as CSSProperties}>
-          <div className="stat-label">Cadence</div>
-          <div className="stat-value">
-            {displayCadence === null ? '--' : displayCadence}
-            <span className="unit">rpm</span>
-          </div>
+          <div className="stat-label">Intervals</div>
+          <div className="stat-value">{intervalCountLabel}</div>
         </div>
       </section>
 

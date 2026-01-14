@@ -79,6 +79,12 @@ export const normalizeWorkoutPlan = (
       segmentData.targetRange,
       `segments[${index}].targetRange`
     );
+    const cadenceRange = segmentData.cadenceRange
+      ? parseTargetRange(
+          segmentData.cadenceRange,
+          `segments[${index}].cadenceRange`
+        )
+      : undefined;
     const rampToRange = segmentData.rampToRange
       ? parseTargetRange(segmentData.rampToRange, `segments[${index}].rampToRange`)
       : undefined;
@@ -96,6 +102,7 @@ export const normalizeWorkoutPlan = (
         `segments[${index}].durationSec`
       ),
       targetRange,
+      cadenceRange,
       rampToRange,
       phase,
       isWork:
@@ -326,6 +333,26 @@ const getOptionalAttrNumber = (node: Element, attr: string) => {
   return parsed;
 };
 
+const getCadenceRange = (node: Element): TargetRange | undefined => {
+  const cadenceLow = getOptionalAttrNumber(node, 'CadenceLow');
+  const cadenceHigh = getOptionalAttrNumber(node, 'CadenceHigh');
+  if (cadenceLow !== null || cadenceHigh !== null) {
+    const low = cadenceLow ?? cadenceHigh;
+    const high = cadenceHigh ?? cadenceLow;
+    if (low !== null && high !== null) {
+      return {
+        low: Math.min(low, high),
+        high: Math.max(low, high),
+      };
+    }
+  }
+  const cadence = getOptionalAttrNumber(node, 'Cadence');
+  if (cadence !== null) {
+    return { low: cadence, high: cadence };
+  }
+  return undefined;
+};
+
 const parseZwo = (text: string, fileName: string): WorkoutPlan => {
   const parser = new DOMParser();
   const xml = parser.parseFromString(text, 'application/xml');
@@ -355,7 +382,8 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
     low: number,
     high: number,
     phase: SegmentPhase,
-    isWork: boolean
+    isWork: boolean,
+    cadenceRange?: TargetRange
   ) => {
     const segment = buildSegment(
       segmentIndex,
@@ -367,6 +395,9 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
       isWork
     );
     if (segment) {
+      if (cadenceRange) {
+        segment.cadenceRange = cadenceRange;
+      }
       segmentIndex += 1;
       segments.push(segment);
     }
@@ -378,7 +409,8 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
     low: number,
     high: number,
     phase: SegmentPhase,
-    isWork: boolean
+    isWork: boolean,
+    cadenceRange?: TargetRange
   ) => {
     const roundedDuration = Math.round(durationSec);
     if (roundedDuration <= 0) {
@@ -389,6 +421,7 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
       label,
       durationSec: roundedDuration,
       targetRange: { low, high },
+      cadenceRange,
       phase,
       isWork,
     });
@@ -404,7 +437,8 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
       const duration = getAttrNumber(child, 'Duration');
       const low = toWattsWithFallback(getAttrNumber(child, 'PowerLow'));
       const high = toWattsWithFallback(getAttrNumber(child, 'PowerHigh'));
-      createSegment('Warmup', duration, low, high, 'warmup', false);
+      const cadenceRange = getCadenceRange(child);
+      createSegment('Warmup', duration, low, high, 'warmup', false, cadenceRange);
       return;
     }
 
@@ -412,7 +446,8 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
       const duration = getAttrNumber(child, 'Duration');
       const low = toWattsWithFallback(getAttrNumber(child, 'PowerLow'));
       const high = toWattsWithFallback(getAttrNumber(child, 'PowerHigh'));
-      createSegment('Cooldown', duration, low, high, 'cooldown', false);
+      const cadenceRange = getCadenceRange(child);
+      createSegment('Cooldown', duration, low, high, 'cooldown', false, cadenceRange);
       return;
     }
 
@@ -422,7 +457,8 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
       const high = toWattsWithFallback(getAttrNumber(child, 'PowerHigh'));
       const isWork = high >= ftpWatts * WORK_THRESHOLD;
       const phase: SegmentPhase = isWork ? 'work' : 'recovery';
-      createSegment('Ramp', duration, low, high, phase, isWork);
+      const cadenceRange = getCadenceRange(child);
+      createSegment('Ramp', duration, low, high, phase, isWork, cadenceRange);
       return;
     }
 
@@ -461,10 +497,11 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
       } else {
         recoveryCount += 1;
       }
+      const cadenceRange = getCadenceRange(child);
       if (rangeLow !== rangeHigh) {
-        createRangeSegment(label, duration, rangeLow, rangeHigh, phase, isWork);
+        createRangeSegment(label, duration, rangeLow, rangeHigh, phase, isWork, cadenceRange);
       } else {
-        createSegment(label, duration, rangeLow, rangeHigh, phase, isWork);
+        createSegment(label, duration, rangeLow, rangeHigh, phase, isWork, cadenceRange);
       }
       return;
     }
@@ -496,10 +533,27 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
         : low;
       const rangeLow = Math.min(low, high);
       const rangeHigh = Math.max(low, high);
+      const cadenceRange = getCadenceRange(child);
       if (rangeLow !== rangeHigh) {
-        createRangeSegment('Free Ride', duration, rangeLow, rangeHigh, 'recovery', false);
+        createRangeSegment(
+          'Free Ride',
+          duration,
+          rangeLow,
+          rangeHigh,
+          'recovery',
+          false,
+          cadenceRange
+        );
       } else {
-        createSegment('Free Ride', duration, rangeLow, rangeHigh, 'recovery', false);
+        createSegment(
+          'Free Ride',
+          duration,
+          rangeLow,
+          rangeHigh,
+          'recovery',
+          false,
+          cadenceRange
+        );
       }
       return;
     }
@@ -510,6 +564,7 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
       const offDuration = getAttrNumber(child, 'OffDuration');
       const onPower = toWattsWithFallback(getAttrNumber(child, 'OnPower'));
       const offPower = toWattsWithFallback(getAttrNumber(child, 'OffPower'));
+      const cadenceRange = getCadenceRange(child);
       for (let rep = 0; rep < repeat; rep += 1) {
         intervalCount += 1;
         createSegment(
@@ -518,7 +573,8 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
           onPower,
           onPower,
           'work',
-          true
+          true,
+          cadenceRange
         );
         recoveryCount += 1;
         createSegment(
@@ -527,7 +583,8 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
           offPower,
           offPower,
           'recovery',
-          false
+          false,
+          cadenceRange
         );
       }
     }
