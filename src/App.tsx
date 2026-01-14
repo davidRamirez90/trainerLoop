@@ -28,6 +28,161 @@ const IDLE_SEGMENTS: WorkoutSegment[] = [IDLE_SEGMENT];
 
 const AUTO_PAUSE_THRESHOLD_SEC = 5;
 
+type ZoneRange = {
+  label: string;
+  low: string;
+  high: string;
+};
+
+type ZoneTemplate = {
+  name: string;
+  zones: {
+    label: string;
+    low: number;
+    high: number | null;
+  }[];
+};
+
+type UserProfile = {
+  nickname: string;
+  weightKg: string;
+  ftpWatts: string;
+  thresholdHr: string;
+  maxHr: string;
+  hrZones: ZoneRange[];
+  powerZones: ZoneRange[];
+};
+
+const DEFAULT_HR_ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'];
+const DEFAULT_POWER_ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'];
+const COGGAN_HR_TEMPLATE: ZoneTemplate = {
+  name: 'Coggan 5',
+  zones: [
+    { label: 'Z1', low: 0.0, high: 0.68 },
+    { label: 'Z2', low: 0.69, high: 0.83 },
+    { label: 'Z3', low: 0.84, high: 0.94 },
+    { label: 'Z4', low: 0.95, high: 1.05 },
+    { label: 'Z5', low: 1.06, high: 1.2 },
+  ],
+};
+const EIGHTY_TWENTY_POWER_TEMPLATE: ZoneTemplate = {
+  name: '80/20',
+  zones: [
+    { label: 'Z1', low: 0.5, high: 0.7 },
+    { label: 'Z2', low: 0.7, high: 0.83 },
+    { label: 'X', low: 0.83, high: 0.91 },
+    { label: 'Z3', low: 0.91, high: 1.0 },
+    { label: 'Y', low: 1.0, high: 1.02 },
+    { label: 'Z4', low: 1.02, high: 1.1 },
+    { label: 'Z5', low: 1.1, high: null },
+  ],
+};
+
+const buildZones = (labels: string[]): ZoneRange[] => {
+  return labels.map((label) => ({
+    label,
+    low: '',
+    high: '',
+  }));
+};
+
+const buildEmptyProfile = (): UserProfile => ({
+  nickname: '',
+  weightKg: '',
+  ftpWatts: '',
+  thresholdHr: '',
+  maxHr: '',
+  hrZones: buildZones(DEFAULT_HR_ZONE_LABELS),
+  powerZones: buildZones(DEFAULT_POWER_ZONE_LABELS),
+});
+
+const sanitizeZones = (zones: ZoneRange[] | undefined, fallback: string[]) => {
+  if (!zones?.length) {
+    return buildZones(fallback);
+  }
+  return zones.map((zone, index) => ({
+    label: zone.label ?? fallback[index] ?? `Z${index + 1}`,
+    low: zone.low ?? '',
+    high: zone.high ?? '',
+  }));
+};
+
+const PROFILE_STORAGE_KEY = 'trainerLoop.profile.v1';
+
+const loadProfileFromStorage = (): UserProfile => {
+  if (typeof window === 'undefined') {
+    return buildEmptyProfile();
+  }
+  try {
+    const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
+    if (!raw) {
+      return buildEmptyProfile();
+    }
+    const parsed = JSON.parse(raw) as UserProfile;
+    return {
+      ...buildEmptyProfile(),
+      ...parsed,
+      hrZones: sanitizeZones(parsed.hrZones, DEFAULT_HR_ZONE_LABELS),
+      powerZones: sanitizeZones(parsed.powerZones, DEFAULT_POWER_ZONE_LABELS),
+    };
+  } catch {
+    return buildEmptyProfile();
+  }
+};
+
+const saveProfileToStorage = (profile: UserProfile) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+  } catch {
+    // Ignore storage errors (quota or unavailable).
+  }
+};
+
+const cloneProfile = (profile: UserProfile): UserProfile => ({
+  ...profile,
+  hrZones: profile.hrZones.map((zone) => ({ ...zone })),
+  powerZones: profile.powerZones.map((zone) => ({ ...zone })),
+});
+
+const parsePositiveNumber = (value: string) => {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+};
+
+const formatZoneValue = (value: number) => `${Math.round(value)}`;
+
+const buildZonesFromTemplate = (
+  base: number,
+  template: ZoneTemplate,
+  options?: { capLast?: number }
+): ZoneRange[] => {
+  const lastIndex = template.zones.length - 1;
+  return template.zones.map((zone, index) => {
+    if (zone.high === null) {
+      return {
+        label: zone.label,
+        low: formatZoneValue(base * zone.low),
+        high: '',
+      };
+    }
+    const highValue =
+      options?.capLast !== undefined && index === lastIndex
+        ? options.capLast
+        : base * zone.high;
+    return {
+      label: zone.label,
+      low: formatZoneValue(base * zone.low),
+      high: formatZoneValue(highValue),
+    };
+  });
+};
+
 const buildPhaseProgress = (segments: WorkoutSegment[], elapsedSec: number) => {
   const totals = { warmup: 0, intervals: 0, cooldown: 0 };
   const elapsed = { warmup: 0, intervals: 0, cooldown: 0 };
@@ -82,6 +237,13 @@ function App() {
   const [autoResumeOnWork, setAutoResumeOnWork] = useState(false);
   const [autoPauseArmed, setAutoPauseArmed] = useState(true);
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
+  const [profile, setProfile] = useState<UserProfile>(() =>
+    loadProfileFromStorage()
+  );
+  const [draftProfile, setDraftProfile] = useState<UserProfile>(() =>
+    buildEmptyProfile()
+  );
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const lastWorkRef = useRef<number | null>(null);
   const resumeTimeoutRef = useRef<number | null>(null);
   const prevRunningRef = useRef(false);
@@ -216,19 +378,37 @@ function App() {
     [activeSegments, activeSec, hasPlan]
   );
 
+  const profileName = profile.nickname.trim();
+  const addCoachPrefix = (message: string) => {
+    if (!profileName) {
+      return message;
+    }
+    const trimmed = message.trim();
+    if (!trimmed) {
+      return `${profileName},`;
+    }
+    return `${profileName}, ${trimmed[0].toLowerCase()}${trimmed.slice(1)}`;
+  };
+
   const coachMessage = !hasPlan
     ? {
         title: 'Import a workout',
-        body: 'Load a workout file to begin and unlock live coaching.',
+        body: addCoachPrefix(
+          'Load a workout file to begin and unlock live coaching.'
+        ),
       }
     : compliance >= 97 && compliance <= 105
       ? {
           title: 'Great work',
-          body: "Excellent power control. You're nailing the target within 5%.",
+          body: addCoachPrefix(
+            "Excellent power control. You're nailing the target within 5%."
+          ),
         }
       : {
           title: 'Hold steady',
-          body: 'Settle the effort and smooth out the cadence over the next minute.',
+          body: addCoachPrefix(
+            'Settle the effort and smooth out the cadence over the next minute.'
+          ),
         };
 
   const intervalLabel = hasPlan
@@ -291,6 +471,136 @@ function App() {
       ? 'Resume'
       : 'Start';
   const ergToggleLabel = ergEnabled ? 'ERG On' : 'ERG Off';
+
+  const handleProfileOpen = () => {
+    setDraftProfile(cloneProfile(profile));
+    setIsProfileOpen(true);
+  };
+
+  const handleProfileClose = () => {
+    setIsProfileOpen(false);
+  };
+
+  const handleProfileSave = () => {
+    const nextProfile = cloneProfile(draftProfile);
+    setProfile(nextProfile);
+    saveProfileToStorage(nextProfile);
+    setIsProfileOpen(false);
+  };
+
+  const handleDraftFieldChange =
+    (field: 'nickname' | 'weightKg' | 'ftpWatts' | 'thresholdHr' | 'maxHr') =>
+      (event: ChangeEvent<HTMLInputElement>) => {
+        const { value } = event.target;
+        setDraftProfile((prev) => ({
+          ...prev,
+          [field]: value,
+        }));
+      };
+
+  const handleZoneChange =
+    (key: 'hrZones' | 'powerZones', index: number, field: 'low' | 'high') =>
+      (event: ChangeEvent<HTMLInputElement>) => {
+        const { value } = event.target;
+        setDraftProfile((prev) => {
+          const zones = prev[key].map((zone, zoneIndex) =>
+            zoneIndex === index ? { ...zone, [field]: value } : zone
+          );
+          return {
+            ...prev,
+            [key]: zones,
+          };
+        });
+      };
+
+  const handleZoneLabelChange =
+    (key: 'hrZones' | 'powerZones', index: number) =>
+      (event: ChangeEvent<HTMLInputElement>) => {
+        const { value } = event.target;
+        setDraftProfile((prev) => {
+          const zones = prev[key].map((zone, zoneIndex) =>
+            zoneIndex === index ? { ...zone, label: value } : zone
+          );
+          return {
+            ...prev,
+            [key]: zones,
+          };
+        });
+      };
+
+  const handleAddZone = (key: 'hrZones' | 'powerZones') => () => {
+    setDraftProfile((prev) => {
+      const nextIndex = prev[key].length + 1;
+      const nextZones = [
+        ...prev[key],
+        { label: `Z${nextIndex}`, low: '', high: '' },
+      ];
+      return {
+        ...prev,
+        [key]: nextZones,
+      };
+    });
+  };
+
+  const handleRemoveZone =
+    (key: 'hrZones' | 'powerZones', index: number) => () => {
+      setDraftProfile((prev) => {
+        if (prev[key].length <= 1) {
+          return prev;
+        }
+        const nextZones = prev[key].filter((_, zoneIndex) => zoneIndex !== index);
+        return {
+          ...prev,
+          [key]: nextZones,
+        };
+      });
+    };
+
+  const handleApplyHrPreset = () => {
+    setDraftProfile((prev) => {
+      const threshold = parsePositiveNumber(prev.thresholdHr);
+      if (!threshold) {
+        return prev;
+      }
+      const maxHr = parsePositiveNumber(prev.maxHr);
+      const fallbackMax =
+        threshold *
+        (COGGAN_HR_TEMPLATE.zones[COGGAN_HR_TEMPLATE.zones.length - 1].high ??
+          1.2);
+      const cap = maxHr ?? fallbackMax;
+      const hrZones = buildZonesFromTemplate(threshold, COGGAN_HR_TEMPLATE, {
+        capLast: cap,
+      });
+      return {
+        ...prev,
+        hrZones,
+      };
+    });
+  };
+
+  const handleApplyPowerPreset = () => {
+    setDraftProfile((prev) => {
+      const ftp = parsePositiveNumber(prev.ftpWatts);
+      if (!ftp) {
+        return prev;
+      }
+      const powerZones = buildZonesFromTemplate(
+        ftp,
+        EIGHTY_TWENTY_POWER_TEMPLATE
+      );
+      return {
+        ...prev,
+        powerZones,
+      };
+    });
+  };
+
+  const thresholdHrValue = parsePositiveNumber(draftProfile.thresholdHr);
+  const ftpValue = parsePositiveNumber(draftProfile.ftpWatts);
+  const canApplyHrPreset = !!thresholdHrValue;
+  const canApplyPowerPreset = !!ftpValue;
+  const canRemoveHrZone = draftProfile.hrZones.length > 1;
+  const canRemovePowerZone = draftProfile.powerZones.length > 1;
 
   useEffect(() => {
     return () => {
@@ -452,9 +762,20 @@ function App() {
             <div className="subtitle">{planSubtitle}</div>
           </div>
         </div>
-        <div className={`live-status ${liveStatusClass}`}>
-          <span className="live-dot" />
-          {liveStatus}
+        <div className="top-actions">
+          <div className={`live-status ${liveStatusClass}`}>
+            <span className="live-dot" />
+            {liveStatus}
+          </div>
+          <button
+            className="settings-button"
+            type="button"
+            aria-label="Open profile settings"
+            onClick={handleProfileOpen}
+          >
+            <span className="settings-icon" aria-hidden="true" />
+            <span className="sr-only">Profile settings</span>
+          </button>
         </div>
       </header>
 
@@ -773,6 +1094,265 @@ function App() {
           </div>
         </div>
       </section>
+
+      {isProfileOpen ? (
+        <div
+          className="modal-scrim"
+          role="presentation"
+          onClick={handleProfileClose}
+        >
+          <div
+            className="modal profile-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <div className="modal-title" id="profile-modal-title">
+                  Athlete Profile
+                </div>
+                <div className="modal-subtitle">
+                  Update your training stats or sync from Intervals.icu.
+                </div>
+              </div>
+              <button
+                className="modal-close"
+                type="button"
+                aria-label="Close profile"
+                onClick={handleProfileClose}
+              >
+                x
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="profile-form">
+                <label className="profile-field">
+                  <span>Nickname</span>
+                  <input
+                    type="text"
+                    value={draftProfile.nickname}
+                    onChange={handleDraftFieldChange('nickname')}
+                    placeholder="e.g. Alex"
+                  />
+                </label>
+                <label className="profile-field">
+                  <span>Weight (kg)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    inputMode="decimal"
+                    value={draftProfile.weightKg}
+                    onChange={handleDraftFieldChange('weightKg')}
+                    placeholder="e.g. 68.5"
+                  />
+                </label>
+                <label className="profile-field">
+                  <span>FTP (W)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputMode="numeric"
+                    value={draftProfile.ftpWatts}
+                    onChange={handleDraftFieldChange('ftpWatts')}
+                    placeholder="e.g. 260"
+                  />
+                </label>
+                <label className="profile-field">
+                  <span>Threshold HR (bpm)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputMode="numeric"
+                    value={draftProfile.thresholdHr}
+                    onChange={handleDraftFieldChange('thresholdHr')}
+                    placeholder="e.g. 172"
+                  />
+                </label>
+                <label className="profile-field">
+                  <span>Max HR (bpm)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    inputMode="numeric"
+                    value={draftProfile.maxHr}
+                    onChange={handleDraftFieldChange('maxHr')}
+                    placeholder="e.g. 190"
+                  />
+                </label>
+              </div>
+              <div className="zone-grid">
+                <div className="zone-card">
+                  <div className="zone-header-row">
+                    <div className="zone-header">Heart Rate Zones</div>
+                    <div className="zone-actions">
+                      <button
+                        className="zone-button"
+                        type="button"
+                        onClick={handleApplyHrPreset}
+                        disabled={!canApplyHrPreset}
+                      >
+                        Auto-fill ({COGGAN_HR_TEMPLATE.name})
+                      </button>
+                      <button
+                        className="zone-button"
+                        type="button"
+                        onClick={handleAddZone('hrZones')}
+                      >
+                        Add Zone
+                      </button>
+                    </div>
+                  </div>
+                  <div className="zone-note">
+                    Uses threshold HR. Max HR caps the top zone.
+                  </div>
+                  <div className="zone-list">
+                    {draftProfile.hrZones.map((zone, index) => (
+                      <div key={index} className="zone-row">
+                        <input
+                          className="zone-label-input"
+                          type="text"
+                          value={zone.label}
+                          onChange={handleZoneLabelChange('hrZones', index)}
+                          placeholder="Label"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          inputMode="numeric"
+                          value={zone.low}
+                          onChange={handleZoneChange('hrZones', index, 'low')}
+                          placeholder="Low"
+                        />
+                        <span className="zone-sep">-</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          inputMode="numeric"
+                          value={zone.high}
+                          onChange={handleZoneChange('hrZones', index, 'high')}
+                          placeholder="High"
+                        />
+                        <span className="zone-unit">bpm</span>
+                        <button
+                          className="zone-remove"
+                          type="button"
+                          onClick={handleRemoveZone('hrZones', index)}
+                          disabled={!canRemoveHrZone}
+                          aria-label={`Remove heart rate zone ${zone.label}`}
+                        >
+                          x
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="zone-card">
+                  <div className="zone-header-row">
+                    <div className="zone-header">Power Zones</div>
+                    <div className="zone-actions">
+                      <button
+                        className="zone-button"
+                        type="button"
+                        onClick={handleApplyPowerPreset}
+                        disabled={!canApplyPowerPreset}
+                      >
+                        Auto-fill ({EIGHTY_TWENTY_POWER_TEMPLATE.name})
+                      </button>
+                      <button
+                        className="zone-button"
+                        type="button"
+                        onClick={handleAddZone('powerZones')}
+                      >
+                        Add Zone
+                      </button>
+                    </div>
+                  </div>
+                  <div className="zone-note">
+                    Uses FTP with 80/20 Cycling zone ranges.
+                  </div>
+                  <div className="zone-list">
+                    {draftProfile.powerZones.map((zone, index) => (
+                      <div key={index} className="zone-row">
+                        <input
+                          className="zone-label-input"
+                          type="text"
+                          value={zone.label}
+                          onChange={handleZoneLabelChange('powerZones', index)}
+                          placeholder="Label"
+                        />
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          inputMode="numeric"
+                          value={zone.low}
+                          onChange={handleZoneChange('powerZones', index, 'low')}
+                          placeholder="Low"
+                        />
+                        <span className="zone-sep">-</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          inputMode="numeric"
+                          value={zone.high}
+                          onChange={handleZoneChange('powerZones', index, 'high')}
+                          placeholder="High"
+                        />
+                        <span className="zone-unit">W</span>
+                        <button
+                          className="zone-remove"
+                          type="button"
+                          onClick={handleRemoveZone('powerZones', index)}
+                          disabled={!canRemovePowerZone}
+                          aria-label={`Remove power zone ${zone.label}`}
+                        >
+                          x
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="integration-card">
+                <div>
+                  <div className="integration-title">Intervals.icu</div>
+                  <div className="integration-note">
+                    Connect to auto-fill FTP, HR, and zones. OAuth support coming soon.
+                  </div>
+                </div>
+                <button className="device-button" type="button" disabled>
+                  Connect (Soon)
+                </button>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="session-button"
+                type="button"
+                onClick={handleProfileClose}
+              >
+                Cancel
+              </button>
+              <button
+                className="session-button primary"
+                type="button"
+                onClick={handleProfileSave}
+              >
+                Save Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

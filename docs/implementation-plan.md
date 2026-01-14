@@ -27,6 +27,7 @@
 - Completed: BLE connection flow with FTMS + HR telemetry and target power writes. ✅
 - Completed: Session controls (import, start/pause/stop, ERG toggle). ✅
 - Completed: Workout import (JSON, ERG, MRC, ZWO). ✅
+- Completed: Athlete profile modal via settings icon (nickname, FTP, HR, zones). ✅
 
 ## Phased Delivery
 
