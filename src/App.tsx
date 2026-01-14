@@ -51,7 +51,9 @@ const buildFitFilename = (planName: string, startTimeMs: number) => {
 };
 
 const downloadFitFile = (payload: Uint8Array, filename: string) => {
-  const blob = new Blob([payload], { type: 'application/octet-stream' });
+  const buffer = payload.buffer as ArrayBuffer;
+  const slice = buffer.slice(payload.byteOffset, payload.byteOffset + payload.byteLength);
+  const blob = new Blob([slice], { type: 'application/octet-stream' });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -294,7 +296,7 @@ function App() {
     () => getTotalDurationSec(activeSegments),
     [activeSegments]
   );
-  const freeRideSegment = useMemo(
+  const freeRideSegment = useMemo<WorkoutSegment>(
     () => ({
       ...IDLE_SEGMENT,
       id: 'free-ride',
@@ -521,7 +523,6 @@ function App() {
 
   const remainingSec = Math.max(totalDurationSec - activeSec, 0);
   const segmentRemainingSec = Math.max(endSec - activeSec, 0);
-  const isWorkPhase = hasPlan && segment.isWork;
   const isRecoveryPhase = hasPlan && segment.phase === 'recovery';
   const isWarmupPhase = hasPlan && segment.phase === 'warmup';
   const isCooldownPhase = hasPlan && segment.phase === 'cooldown';
@@ -1343,7 +1344,6 @@ function App() {
                     gaps={processedTelemetry.gaps}
                     elapsedSec={activeSec}
                     ftpWatts={ftpWatts}
-                    isRecording={isRunning}
                     hrSensorConnected={hrSensorConnected}
                     showPower3s={showPower3s}
                   />

@@ -65,15 +65,6 @@ const parseIndoorBikeData = (data: DataView) => {
     return value;
   };
 
-  const readUint8 = () => {
-    if (!ensure(1)) {
-      return null;
-    }
-    const value = data.getUint8(offset);
-    offset += 1;
-    return value;
-  };
-
   const skip = (bytes: number) => {
     if (!ensure(bytes)) {
       return false;

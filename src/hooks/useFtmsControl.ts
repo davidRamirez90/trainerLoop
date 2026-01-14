@@ -43,8 +43,9 @@ const writeControlPoint = async (
   controlPoint: BluetoothRemoteGATTCharacteristic,
   payload: Uint8Array
 ) => {
-  if ('writeValueWithResponse' in controlPoint) {
-    await controlPoint.writeValueWithResponse(payload);
+  const writeWithResponse = controlPoint.writeValueWithResponse;
+  if (typeof writeWithResponse === 'function') {
+    await writeWithResponse.call(controlPoint, payload);
     return;
   }
   await controlPoint.writeValue(payload);

@@ -345,13 +345,22 @@ export const useBluetoothDevices = () => {
       }));
       return;
     }
+    const bluetooth = navigator.bluetooth;
+    if (!bluetooth) {
+      setTrainer((prev) => ({
+        ...prev,
+        status: 'error',
+        error: 'Bluetooth is unavailable in this browser.',
+      }));
+      return;
+    }
 
     markAutoReconnect(trainerReconnectRef);
     clearReconnect(trainerReconnectRef);
     setTrainer((prev) => ({ ...prev, status: 'connecting', error: null }));
 
     try {
-      const device = await navigator.bluetooth.requestDevice({
+      const device = await bluetooth.requestDevice({
         filters: [{ services: [FTMS_SERVICE] }],
         optionalServices: [BATTERY_SERVICE, DEVICE_INFO_SERVICE],
       });
@@ -406,13 +415,22 @@ export const useBluetoothDevices = () => {
       }));
       return;
     }
+    const bluetooth = navigator.bluetooth;
+    if (!bluetooth) {
+      setHrSensor((prev) => ({
+        ...prev,
+        status: 'error',
+        error: 'Bluetooth is unavailable in this browser.',
+      }));
+      return;
+    }
 
     markAutoReconnect(hrReconnectRef);
     clearReconnect(hrReconnectRef);
     setHrSensor((prev) => ({ ...prev, status: 'connecting', error: null }));
 
     try {
-      const device = await navigator.bluetooth.requestDevice({
+      const device = await bluetooth.requestDevice({
         filters: [{ services: [HEART_RATE_SERVICE] }],
         optionalServices: [BATTERY_SERVICE, DEVICE_INFO_SERVICE],
       });

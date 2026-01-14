@@ -54,7 +54,7 @@ const getSegmentTargetWatts = (segment: WorkoutSegment) => {
   return (startMid + endMid) / 2;
 };
 
-const useChartSize = (ref: React.RefObject<HTMLDivElement>) => {
+const useChartSize = (ref: React.RefObject<HTMLDivElement | null>) => {
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   useLayoutEffect(() => {
@@ -89,7 +89,6 @@ type WorkoutChartProps = {
   gaps: TelemetryGap[];
   elapsedSec: number;
   ftpWatts: number;
-  isRecording: boolean;
   hrSensorConnected: boolean;
   showPower3s: boolean;
 };
@@ -100,7 +99,6 @@ export const WorkoutChart = ({
   gaps,
   elapsedSec,
   ftpWatts,
-  isRecording,
   hrSensorConnected,
   showPower3s,
 }: WorkoutChartProps) => {
