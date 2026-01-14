@@ -413,6 +413,20 @@
   background: #d64541;
 }
 
+.legend-gap {
+  width: 18px;
+  height: 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(214, 69, 65, 0.6);
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(214, 69, 65, 0.35) 0px,
+    rgba(214, 69, 65, 0.35) 5px,
+    rgba(214, 69, 65, 0.1) 5px,
+    rgba(214, 69, 65, 0.1) 10px
+  );
+}
+
 .metrics-row {
   display: grid;
   grid-template-columns: 1.3fr 1fr 0.7fr 0.7fr;

@@ -3,6 +3,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -21,6 +22,12 @@ type DeviceState = {
   error: string | null;
 };
 
+type ReconnectState = {
+  attempts: number;
+  timeoutId: number | null;
+  manualDisconnect: boolean;
+};
+
 const createInitialDeviceState = (): DeviceState => ({
   id: null,
   name: null,
@@ -30,6 +37,12 @@ const createInitialDeviceState = (): DeviceState => ({
   model: null,
   features: null,
   error: null,
+});
+
+const createReconnectState = (): ReconnectState => ({
+  attempts: 0,
+  timeoutId: null,
+  manualDisconnect: false,
 });
 
 const textDecoder = new TextDecoder('utf-8');
@@ -42,6 +55,10 @@ const FITNESS_MACHINE_FEATURE = 0x2acc;
 const BATTERY_LEVEL = 0x2a19;
 const MANUFACTURER_NAME = 0x2a29;
 const MODEL_NUMBER = 0x2a24;
+
+const RECONNECT_BASE_DELAY_MS = 1000;
+const RECONNECT_MAX_DELAY_MS = 10000;
+const RECONNECT_MAX_ATTEMPTS = 5;
 
 const readOptionalString = async (
   service: BluetoothRemoteGATTService,
@@ -100,6 +117,22 @@ const readFeatureBits = async (server: BluetoothRemoteGATTServer) => {
   }
 };
 
+type ReconnectExtras = {
+  battery: number | null;
+  manufacturer: string | null;
+  model: string | null;
+  features: string | null;
+};
+
+type ReconnectConfig = {
+  deviceRef: MutableRefObject<BluetoothDevice | null>;
+  reconnectRef: MutableRefObject<ReconnectState>;
+  setState: Dispatch<SetStateAction<DeviceState>>;
+  setDevice: Dispatch<SetStateAction<BluetoothDevice | null>>;
+  label: string;
+  readExtras: (server: BluetoothRemoteGATTServer) => Promise<ReconnectExtras>;
+};
+
 const formatDeviceName = (device: BluetoothDevice) =>
   device.name && device.name.trim() ? device.name.trim() : 'Unknown Device';
 
@@ -116,26 +149,174 @@ export const useBluetoothDevices = () => {
 
   const trainerRef = useRef<BluetoothDevice | null>(null);
   const hrRef = useRef<BluetoothDevice | null>(null);
+  const trainerReconnectRef = useRef<ReconnectState>(createReconnectState());
+  const hrReconnectRef = useRef<ReconnectState>(createReconnectState());
+
+  const clearReconnect = useCallback((reconnectRef: MutableRefObject<ReconnectState>) => {
+    const current = reconnectRef.current;
+    if (current.timeoutId !== null) {
+      window.clearTimeout(current.timeoutId);
+    }
+    current.timeoutId = null;
+    current.attempts = 0;
+  }, []);
+
+  const markManualDisconnect = useCallback(
+    (reconnectRef: MutableRefObject<ReconnectState>) => {
+      clearReconnect(reconnectRef);
+      reconnectRef.current.manualDisconnect = true;
+    },
+    [clearReconnect]
+  );
+
+  const markAutoReconnect = useCallback(
+    (reconnectRef: MutableRefObject<ReconnectState>) => {
+      reconnectRef.current.manualDisconnect = false;
+    },
+    []
+  );
+
+  const scheduleReconnect = useCallback((config: ReconnectConfig) => {
+    const { deviceRef, reconnectRef, setState, setDevice, label, readExtras } = config;
+    const device = deviceRef.current;
+    const reconnectState = reconnectRef.current;
+    if (!device || reconnectState.manualDisconnect || reconnectState.timeoutId !== null) {
+      return;
+    }
+
+    const delay = Math.min(
+      RECONNECT_BASE_DELAY_MS * Math.pow(2, reconnectState.attempts),
+      RECONNECT_MAX_DELAY_MS
+    );
+
+    reconnectState.timeoutId = window.setTimeout(async () => {
+      reconnectState.timeoutId = null;
+      const currentDevice = deviceRef.current;
+      if (!currentDevice || reconnectState.manualDisconnect) {
+        return;
+      }
+
+      reconnectState.attempts += 1;
+      setState((prev) => ({
+        ...prev,
+        status: 'connecting',
+        error: `${label} disconnected. Reconnecting...`,
+      }));
+
+      try {
+        const server =
+          currentDevice.gatt?.connected
+            ? currentDevice.gatt
+            : await currentDevice.gatt?.connect();
+        if (!server) {
+          throw new Error(`Unable to reconnect to ${label.toLowerCase()}.`);
+        }
+
+        const extras = await readExtras(server);
+        setDevice(currentDevice);
+        setState({
+          id: currentDevice.id,
+          name: formatDeviceName(currentDevice),
+          status: 'connected',
+          battery: extras.battery,
+          manufacturer: extras.manufacturer,
+          model: extras.model,
+          features: extras.features,
+          error: null,
+        });
+        reconnectState.attempts = 0;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : `${label} reconnect failed.`;
+        if (reconnectState.attempts >= RECONNECT_MAX_ATTEMPTS) {
+          setState((prev) => ({
+            ...prev,
+            status: 'error',
+            error: `${message} Reconnect stopped.`,
+          }));
+          return;
+        }
+        setState((prev) => ({
+          ...prev,
+          status: 'connecting',
+          error: `${message} Retrying...`,
+        }));
+        scheduleReconnect(config);
+      }
+    }, delay);
+  }, []);
+
+  const readTrainerExtras = useCallback(
+    async (server: BluetoothRemoteGATTServer): Promise<ReconnectExtras> => {
+      const [battery, info, features] = await Promise.all([
+        readBatteryLevel(server),
+        readDeviceInfo(server),
+        readFeatureBits(server),
+      ]);
+      return {
+        battery,
+        manufacturer: info.manufacturer,
+        model: info.model,
+        features,
+      };
+    },
+    []
+  );
+
+  const readHrExtras = useCallback(
+    async (server: BluetoothRemoteGATTServer): Promise<ReconnectExtras> => {
+      const [battery, info] = await Promise.all([
+        readBatteryLevel(server),
+        readDeviceInfo(server),
+      ]);
+      return {
+        battery,
+        manufacturer: info.manufacturer,
+        model: info.model,
+        features: null,
+      };
+    },
+    []
+  );
 
   const handleTrainerDisconnect = useCallback(() => {
-    trainerRef.current = null;
+    if (!trainerRef.current || trainerReconnectRef.current.manualDisconnect) {
+      return;
+    }
     setTrainerDevice(null);
     setTrainer((prev) => ({
       ...prev,
-      status: 'idle',
-      error: 'Trainer disconnected.',
+      status: 'connecting',
+      error: 'Trainer disconnected. Reconnecting...',
     }));
-  }, []);
+    scheduleReconnect({
+      deviceRef: trainerRef,
+      reconnectRef: trainerReconnectRef,
+      setState: setTrainer,
+      setDevice: setTrainerDevice,
+      label: 'Trainer',
+      readExtras: readTrainerExtras,
+    });
+  }, [readTrainerExtras, scheduleReconnect]);
 
   const handleHrDisconnect = useCallback(() => {
-    hrRef.current = null;
+    if (!hrRef.current || hrReconnectRef.current.manualDisconnect) {
+      return;
+    }
     setHrDevice(null);
     setHrSensor((prev) => ({
       ...prev,
-      status: 'idle',
-      error: 'Heart rate sensor disconnected.',
+      status: 'connecting',
+      error: 'Heart rate sensor disconnected. Reconnecting...',
     }));
-  }, []);
+    scheduleReconnect({
+      deviceRef: hrRef,
+      reconnectRef: hrReconnectRef,
+      setState: setHrSensor,
+      setDevice: setHrDevice,
+      label: 'Heart rate sensor',
+      readExtras: readHrExtras,
+    });
+  }, [readHrExtras, scheduleReconnect]);
 
   const resetDeviceState = useCallback(
     (
@@ -165,6 +346,8 @@ export const useBluetoothDevices = () => {
       return;
     }
 
+    markAutoReconnect(trainerReconnectRef);
+    clearReconnect(trainerReconnectRef);
     setTrainer((prev) => ({ ...prev, status: 'connecting', error: null }));
 
     try {
@@ -185,22 +368,19 @@ export const useBluetoothDevices = () => {
       setTrainerDevice(device);
       device.addEventListener('gattserverdisconnected', handleTrainerDisconnect);
 
-      const [battery, info, features] = await Promise.all([
-        readBatteryLevel(server),
-        readDeviceInfo(server),
-        readFeatureBits(server),
-      ]);
+      const { battery, manufacturer, model, features } = await readTrainerExtras(server);
 
       setTrainer({
         id: device.id,
         name: formatDeviceName(device),
         status: 'connected',
         battery,
-        manufacturer: info.manufacturer,
-        model: info.model,
+        manufacturer,
+        model,
         features,
         error: null,
       });
+      clearReconnect(trainerReconnectRef);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Trainer connection failed.';
       setTrainer((prev) => ({
@@ -209,7 +389,13 @@ export const useBluetoothDevices = () => {
         error: message,
       }));
     }
-  }, [bluetoothAvailable, handleTrainerDisconnect]);
+  }, [
+    bluetoothAvailable,
+    clearReconnect,
+    handleTrainerDisconnect,
+    markAutoReconnect,
+    readTrainerExtras,
+  ]);
 
   const connectHeartRate = useCallback(async () => {
     if (!bluetoothAvailable) {
@@ -221,6 +407,8 @@ export const useBluetoothDevices = () => {
       return;
     }
 
+    markAutoReconnect(hrReconnectRef);
+    clearReconnect(hrReconnectRef);
     setHrSensor((prev) => ({ ...prev, status: 'connecting', error: null }));
 
     try {
@@ -241,21 +429,19 @@ export const useBluetoothDevices = () => {
       setHrDevice(device);
       device.addEventListener('gattserverdisconnected', handleHrDisconnect);
 
-      const [battery, info] = await Promise.all([
-        readBatteryLevel(server),
-        readDeviceInfo(server),
-      ]);
+      const { battery, manufacturer, model } = await readHrExtras(server);
 
       setHrSensor({
         id: device.id,
         name: formatDeviceName(device),
         status: 'connected',
         battery,
-        manufacturer: info.manufacturer,
-        model: info.model,
+        manufacturer,
+        model,
         features: null,
         error: null,
       });
+      clearReconnect(hrReconnectRef);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Heart rate connection failed.';
       setHrSensor((prev) => ({
@@ -264,15 +450,30 @@ export const useBluetoothDevices = () => {
         error: message,
       }));
     }
-  }, [bluetoothAvailable, handleHrDisconnect]);
+  }, [
+    bluetoothAvailable,
+    clearReconnect,
+    handleHrDisconnect,
+    markAutoReconnect,
+    readHrExtras,
+  ]);
 
   const disconnectTrainer = useCallback(() => {
+    markManualDisconnect(trainerReconnectRef);
     resetDeviceState(trainerRef, setTrainer, setTrainerDevice, handleTrainerDisconnect);
-  }, [handleTrainerDisconnect, resetDeviceState]);
+  }, [handleTrainerDisconnect, markManualDisconnect, resetDeviceState]);
 
   const disconnectHeartRate = useCallback(() => {
+    markManualDisconnect(hrReconnectRef);
     resetDeviceState(hrRef, setHrSensor, setHrDevice, handleHrDisconnect);
-  }, [handleHrDisconnect, resetDeviceState]);
+  }, [handleHrDisconnect, markManualDisconnect, resetDeviceState]);
+
+  useEffect(() => {
+    return () => {
+      clearReconnect(trainerReconnectRef);
+      clearReconnect(hrReconnectRef);
+    };
+  }, [clearReconnect]);
 
   return {
     bluetoothAvailable,

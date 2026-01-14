@@ -9,8 +9,8 @@
 
 ## MVP Scope
 
-- Devices: BLE FTMS smart trainer + HR sensor (optional cadence if available).
-- Workout engine: steps + ramps, ERG targets, pause/stop, safety bounds.
+- Devices: BLE FTMS smart trainer + HR sensor (optional cadence if available). ✅
+- Workout engine: steps + ramps, ERG targets, pause/stop, safety bounds. ✅
 - Telemetry: power, cadence, HR, virtual speed, smoothing, dropout detection.
 - Live coach v1: rules-only suggestions with accept/reject controls.
 - Coach profiles: file-based JSON, selected per session.
@@ -19,33 +19,33 @@
 
 ## Progress
 
-- Completed: Vite + React + TypeScript scaffold at repo root.
-- Completed: First workout screen layout aligned to UI draft.
-- Completed: uPlot timeline chart with target ranges and live power trace.
-- Completed: Simulated telemetry stream (power, cadence, HR).
-- Completed: Mock workout plan data + interval progress display.
-- Completed: BLE connection flow with FTMS + HR telemetry and target power writes.
-- Completed: Session controls (import, start/pause/stop, ERG toggle).
-- Completed: Workout import (JSON, ERG, MRC, ZWO).
+- Completed: Vite + React + TypeScript scaffold at repo root. ✅
+- Completed: First workout screen layout aligned to UI draft. ✅
+- Completed: uPlot timeline chart with target ranges and live power trace. ✅
+- Completed: Simulated telemetry stream (power, cadence, HR). ✅
+- Completed: Mock workout plan data + interval progress display. ✅
+- Completed: BLE connection flow with FTMS + HR telemetry and target power writes. ✅
+- Completed: Session controls (import, start/pause/stop, ERG toggle). ✅
+- Completed: Workout import (JSON, ERG, MRC, ZWO). ✅
 
 ## Phased Delivery
 
 ### Phase 0 - Foundation
 
 - App shell, state model, routing.
-- BLE connection flow, capability discovery, reconnect strategy.
-- FTMS read/write scaffolding, base error handling.
+- BLE connection flow, capability discovery, reconnect strategy. ✅
+- FTMS read/write scaffolding, base error handling. ✅
 
 ### Phase 1 - Workout Player
 
-- Interval timeline model (step + ramp).
-- ERG target control loop with bounds and debounce.
-- Workout UI: timeline, current target, live charts.
+- Interval timeline model (step + ramp). ✅
+- ERG target control loop with bounds and debounce. ✅
+- Workout UI: timeline, current target, live charts. ✅
 
 ### Phase 2 - Telemetry Pipeline
 
-- Smoothing and lag compensation.
-- Dropout detection and gap annotation.
+- Smoothing and lag compensation. ✅
+- Dropout detection and gap annotation. ✅
 - Session recorder (raw + smoothed streams).
 
 ### Phase 2.5 - Coach Profiles and Feedback Stream
@@ -70,6 +70,6 @@
 ## Future Extensions
 
 - Intervals.icu sync: fetch planned workouts and map to internal model.
-- Workout file import: ERG/MRC/ZWO (start here before intervals.icu).
+- Workout file import: ERG/MRC/ZWO (start here before intervals.icu). ✅
 - FIT/TCX export and integrations (Strava, TrainingPeaks).
 - AI/ML layer: readiness, fatigue inference, personalized adjustments.

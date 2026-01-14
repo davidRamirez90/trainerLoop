@@ -7,6 +7,7 @@ import type { WorkoutPlan, WorkoutSegment } from './data/workout';
 import { useBluetoothDevices } from './hooks/useBluetoothDevices';
 import { useBluetoothTelemetry } from './hooks/useBluetoothTelemetry';
 import { useFtmsControl } from './hooks/useFtmsControl';
+import { useTelemetryProcessing } from './hooks/useTelemetryProcessing';
 import { useTelemetrySimulation } from './hooks/useTelemetrySimulation';
 import { useWorkoutClock } from './hooks/useWorkoutClock';
 import { formatDuration } from './utils/time';
@@ -114,15 +115,21 @@ function App() {
     clock.isRunning,
     clock.sessionId
   );
-  const telemetrySamples = bluetoothTelemetry.samples.length
-    ? bluetoothTelemetry.samples
-    : simulation.samples;
   const sessionElapsedSec = clock.elapsedSec;
   const activeSec = clock.activeSec;
   const totalDurationSec = clock.totalDurationSec;
   const isRunning = clock.isRunning;
   const isComplete = clock.isComplete;
   const isSessionActive = clock.isSessionActive;
+  const rawSamples = bluetoothTelemetry.samples.length
+    ? bluetoothTelemetry.samples
+    : simulation.samples;
+  const processedTelemetry = useTelemetryProcessing({
+    samples: rawSamples,
+    elapsedSec: activeSec,
+    isRunning,
+  });
+  const telemetrySamples = processedTelemetry.samples;
   const hasStarted = isSessionActive || activeSec > 0;
   const isPaused = hasPlan && hasStarted && !isRunning && !isComplete;
   const liveStatus = !hasPlan
@@ -143,7 +150,7 @@ function App() {
         : hasStarted
           ? 'paused'
           : 'ready';
-  const latestSample = telemetrySamples[telemetrySamples.length - 1];
+  const latestSample = processedTelemetry.latestSample;
   const { segment, index, endSec, targetRange } = getTargetRangeAtTime(
     targetSegments,
     activeSec
@@ -170,15 +177,15 @@ function App() {
   const hasWorkTelemetry = latestPower > 0 || latestCadence > 0;
 
   const avgPower = useMemo(() => {
-    if (!telemetrySamples.length) {
+    if (!rawSamples.length) {
       return 0;
     }
-    const total = telemetrySamples.reduce(
+    const total = rawSamples.reduce(
       (sum, sample) => sum + sample.powerWatts,
       0
     );
-    return Math.round(total / telemetrySamples.length);
-  }, [telemetrySamples]);
+    return Math.round(total / rawSamples.length);
+  }, [rawSamples]);
 
   const normalizedPower = avgPower ? Math.round(avgPower * 1.03) : 0;
   const tss = avgPower && hasPlan
@@ -535,6 +542,7 @@ function App() {
               <WorkoutChart
                 segments={activeSegments}
                 samples={telemetrySamples}
+                gaps={processedTelemetry.gaps}
                 elapsedSec={activeSec}
                 ftpWatts={ftpWatts}
                 isRecording={isRunning}
@@ -562,6 +570,10 @@ function App() {
               <div className="legend-item">
                 <span className="legend-line hr" />
                 HR
+              </div>
+              <div className="legend-item">
+                <span className="legend-gap" />
+                Dropouts
               </div>
             </div>
           </>

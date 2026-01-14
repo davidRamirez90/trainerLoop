@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import uPlot from 'uplot';
 
 import type { WorkoutSegment } from '../data/workout';
-import type { TelemetrySample } from '../types';
+import type { TelemetryGap, TelemetrySample } from '../types';
 import { formatDuration } from '../utils/time';
 import { getTotalDurationSec } from '../utils/workout';
 
@@ -23,6 +23,8 @@ const POLYGON_ALPHA = 0.18;
 const RANGE_FILL_ALPHA = 0.45;
 const RANGE_STROKE_ALPHA = 0.75;
 const LINE_STROKE_ALPHA = 0.85;
+const GAP_FILL = 'rgba(214, 69, 65, 0.12)';
+const GAP_STROKE = 'rgba(214, 69, 65, 0.4)';
 
 const hexToRgba = (value: string, alpha: number) => {
   const hex = value.replace('#', '');
@@ -82,6 +84,7 @@ const useChartSize = (ref: React.RefObject<HTMLDivElement>) => {
 type WorkoutChartProps = {
   segments: WorkoutSegment[];
   samples: TelemetrySample[];
+  gaps: TelemetryGap[];
   elapsedSec: number;
   ftpWatts: number;
   isRecording: boolean;
@@ -90,6 +93,7 @@ type WorkoutChartProps = {
 export const WorkoutChart = ({
   segments,
   samples,
+  gaps,
   elapsedSec,
   ftpWatts,
   isRecording,
@@ -98,10 +102,11 @@ export const WorkoutChart = ({
   const plotRef = useRef<uPlot | null>(null);
   const segmentsRef = useRef(segments);
   const elapsedRef = useRef(elapsedSec);
+  const gapsRef = useRef(gaps);
   const size = useChartSize(containerRef);
   const ftpScale = Math.max(ftpWatts, 1);
   const hasHrData = useMemo(
-    () => samples.some((sample) => sample.hrBpm > 0),
+    () => samples.some((sample) => !sample.dropout && sample.hrBpm > 0),
     [samples]
   );
   const showHeartRate = isRecording && hasHrData;
@@ -134,8 +139,15 @@ export const WorkoutChart = ({
     if (!showHeartRate) {
       return samples.map(() => null);
     }
-    return samples.map((sample) => (sample.hrBpm > 0 ? sample.hrBpm : null));
+    return samples.map((sample) => (
+      !sample.dropout && sample.hrBpm > 0 ? sample.hrBpm : null
+    ));
   }, [samples, showHeartRate]);
+
+  const powerValues = useMemo(
+    () => samples.map((sample) => (sample.dropout ? null : sample.powerWatts)),
+    [samples]
+  );
 
   const { hrMin, hrMax } = useMemo(() => {
     if (!showHeartRate) {
@@ -158,9 +170,8 @@ export const WorkoutChart = ({
 
   const data = useMemo(() => {
     const times = samples.map((sample) => sample.timeSec);
-    const power = samples.map((sample) => sample.powerWatts);
-    return [times, power, hrValues] as uPlot.AlignedData;
-  }, [hrValues, samples]);
+    return [times, powerValues, hrValues] as uPlot.AlignedData;
+  }, [hrValues, powerValues, samples]);
 
   useEffect(() => {
     segmentsRef.current = segments;
@@ -172,6 +183,13 @@ export const WorkoutChart = ({
       plotRef.current.redraw();
     }
   }, [elapsedSec]);
+
+  useEffect(() => {
+    gapsRef.current = gaps;
+    if (plotRef.current) {
+      plotRef.current.redraw();
+    }
+  }, [gaps]);
 
   useLayoutEffect(() => {
     if (!containerRef.current || size.width === 0 || size.height === 0) {
@@ -264,6 +282,38 @@ export const WorkoutChart = ({
       ctx.restore();
     };
 
+    const drawGapBands = (u: uPlot) => {
+      const ctx = u.ctx;
+      const currentGaps = gapsRef.current;
+      if (!currentGaps.length) {
+        return;
+      }
+      ctx.save();
+      ctx.fillStyle = GAP_FILL;
+      ctx.strokeStyle = GAP_STROKE;
+      ctx.lineWidth = 1;
+
+      currentGaps.forEach((gap) => {
+        const start = Math.max(gap.startSec, 0);
+        const end = Math.max(gap.endSec, start);
+        const x0 = u.valToPos(start, 'x', true);
+        const x1 = u.valToPos(end, 'x', true);
+        const width = x1 - x0;
+        if (width <= 0) {
+          return;
+        }
+        ctx.fillRect(x0, u.bbox.top, width, u.bbox.height);
+        ctx.beginPath();
+        ctx.moveTo(x0, u.bbox.top);
+        ctx.lineTo(x0, u.bbox.top + u.bbox.height);
+        ctx.moveTo(x1, u.bbox.top);
+        ctx.lineTo(x1, u.bbox.top + u.bbox.height);
+        ctx.stroke();
+      });
+
+      ctx.restore();
+    };
+
     const options: uPlot.Options = {
       width: size.width,
       height: size.height,
@@ -323,7 +373,7 @@ export const WorkoutChart = ({
         show: false,
       },
       hooks: {
-        draw: [drawTargetBands, drawTimeMarker],
+        draw: [drawTargetBands, drawGapBands, drawTimeMarker],
       },
     };
 
