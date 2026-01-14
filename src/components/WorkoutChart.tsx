@@ -111,18 +111,20 @@ export const WorkoutChart = ({
   const gapsRef = useRef(gaps);
   const size = useChartSize(containerRef);
   const ftpScale = Math.max(ftpWatts, 1);
-  const hrValues = useMemo(
-    () => samples.map((sample) => (
+  const hrValues = useMemo(() => {
+    if (!hrSensorConnected) {
+      return samples.map(() => null);
+    }
+    return samples.map((sample) => (
       !sample.dropout && sample.hrBpm > 0 ? sample.hrBpm : null
-    )),
-    [samples]
-  );
+    ));
+  }, [hrSensorConnected, samples]);
   const hasHrData = useMemo(
     () => hrValues.some((value) => value !== null),
     [hrValues]
   );
-  const showHeartRate = hasHrData;
-  const showHeartRateAxis = hrSensorConnected || hasHrData;
+  const showHeartRate = hrSensorConnected && hasHrData;
+  const showHeartRateAxis = showHeartRate;
 
   const totalDurationSec = useMemo(() => getTotalDurationSec(segments), [segments]);
   const { yMin, yMax } = useMemo(() => {
@@ -396,12 +398,14 @@ export const WorkoutChart = ({
           label: 'Power (W)',
           stroke: ACTUAL_STROKE,
           width: 2,
+          points: { show: false },
         },
         {
           label: 'Power 3s Avg',
           stroke: POWER_SMOOTH_STROKE,
           width: 2,
           show: showPower3s,
+          points: { show: false },
         },
         {
           label: 'HR',
@@ -409,6 +413,7 @@ export const WorkoutChart = ({
           stroke: HR_STROKE,
           width: 2,
           show: showHeartRate,
+          points: { show: false },
         },
       ],
       legend: {

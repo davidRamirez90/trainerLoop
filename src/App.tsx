@@ -33,6 +33,8 @@ const CADENCE_RANGE_BUFFER_RPM = 4;
 const CADENCE_RANGE_RELAX_RATE = 0.08;
 const FREE_RIDE_EXTENSION_SEC = 900;
 const FREE_RIDE_EXTENSION_BUFFER_SEC = 60;
+const ERG_RAMP_SEC = 12;
+const ERG_START_TARGET_WATTS = 50;
 
 const pad2 = (value: number) => String(value).padStart(2, '0');
 
@@ -272,6 +274,8 @@ function App() {
   const [showStopPrompt, setShowStopPrompt] = useState(false);
   const [stopPromptElapsedSec, setStopPromptElapsedSec] = useState<number | null>(null);
   const [sessionSamples, setSessionSamples] = useState<TelemetrySample[]>([]);
+  const [ergRampStartSec, setErgRampStartSec] = useState<number | null>(null);
+  const [ergRampComplete, setErgRampComplete] = useState(false);
   const [profile, setProfile] = useState<UserProfile>(() =>
     loadProfileFromStorage()
   );
@@ -335,46 +339,56 @@ function App() {
   const isComplete = clock.isComplete;
   const isSessionActive = clock.isSessionActive;
   const sessionStartMs = clock.sessionStartMs;
-  const sessionElapsedSecRef = useRef(sessionElapsedSec);
   const rawSamples = bluetoothTelemetry.samples;
   const latestTelemetry = bluetoothTelemetry.latest;
+  const sessionElapsedSecRef = useRef(sessionElapsedSec);
+  const latestTelemetryRef = useRef(latestTelemetry);
 
   useEffect(() => {
     sessionElapsedSecRef.current = sessionElapsedSec;
   }, [sessionElapsedSec]);
 
   useEffect(() => {
+    latestTelemetryRef.current = latestTelemetry;
+  }, [latestTelemetry]);
+
+  useEffect(() => {
     if (!isSessionActive) {
-      return;
+      return undefined;
     }
-    const hasAny =
-      latestTelemetry.powerWatts !== null ||
-      latestTelemetry.cadenceRpm !== null ||
-      latestTelemetry.hrBpm !== null;
-    if (!hasAny) {
-      return;
-    }
-    const timeSec = sessionElapsedSecRef.current;
-    if (!Number.isFinite(timeSec)) {
-      return;
-    }
-    setSessionSamples((prevSamples) => {
-      const lastRecorded = lastRecordedSecRef.current ?? -1;
-      if (timeSec <= lastRecorded) {
-        return prevSamples;
+    const intervalId = window.setInterval(() => {
+      const nextTelemetry = latestTelemetryRef.current;
+      const hasAny =
+        nextTelemetry.powerWatts !== null ||
+        nextTelemetry.cadenceRpm !== null ||
+        nextTelemetry.hrBpm !== null;
+      if (!hasAny) {
+        return;
       }
-      lastRecordedSecRef.current = timeSec;
-      return [
-        ...prevSamples,
-        {
-          timeSec,
-          powerWatts: latestTelemetry.powerWatts ?? 0,
-          cadenceRpm: latestTelemetry.cadenceRpm ?? 0,
-          hrBpm: latestTelemetry.hrBpm ?? 0,
-        },
-      ];
-    });
-  }, [isSessionActive, latestTelemetry]);
+      const timeSec = sessionElapsedSecRef.current;
+      if (!Number.isFinite(timeSec)) {
+        return;
+      }
+      setSessionSamples((prevSamples) => {
+        const lastRecorded = lastRecordedSecRef.current ?? -1;
+        if (timeSec <= lastRecorded) {
+          return prevSamples;
+        }
+        lastRecordedSecRef.current = timeSec;
+        return [
+          ...prevSamples,
+          {
+            timeSec,
+            powerWatts: nextTelemetry.powerWatts ?? 0,
+            cadenceRpm: nextTelemetry.cadenceRpm ?? 0,
+            hrBpm: nextTelemetry.hrBpm ?? 0,
+          },
+        ];
+      });
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isSessionActive]);
   const processedTelemetry = useTelemetryProcessing({
     samples: rawSamples,
     elapsedSec: activeSec,
@@ -418,13 +432,17 @@ function App() {
 
   const { low: targetLow, high: targetHigh } = targetRange;
   const targetMid = (targetLow + targetHigh) / 2;
+  const isErgRamping = !ergRampComplete && ergEnabled && hasPlan && isRunning;
+  const ergTargetWatts = isErgRamping
+    ? Math.min(targetMid, ERG_START_TARGET_WATTS)
+    : targetMid;
   const ftmsControl = useFtmsControl({
     trainerDevice,
-    targetWatts: targetMid,
+    targetWatts: ergTargetWatts,
     isActive: isRunning && ergEnabled && hasPlan,
   });
 
-  const bluetoothLatest = bluetoothTelemetry.latest;
+  const bluetoothLatest = latestTelemetry;
   const displayPower = latestSample ? Math.round(latestSample.powerWatts) : null;
   const displayHr =
     bluetoothLatest.hrBpm !== null && bluetoothLatest.hrBpm > 0
@@ -866,7 +884,29 @@ function App() {
     setSessionSamples([]);
     lastRecordedSecRef.current = null;
     stopPromptWasRunningRef.current = false;
+    setErgRampStartSec(null);
+    setErgRampComplete(false);
   }, [clock.sessionId]);
+
+  useEffect(() => {
+    if (!isRunning || ergRampComplete || !ergEnabled || !hasPlan) {
+      return;
+    }
+    if (ergRampStartSec === null) {
+      setErgRampStartSec(activeSec);
+      return;
+    }
+    if (activeSec - ergRampStartSec >= ERG_RAMP_SEC) {
+      setErgRampComplete(true);
+    }
+  }, [
+    activeSec,
+    ergEnabled,
+    ergRampComplete,
+    ergRampStartSec,
+    hasPlan,
+    isRunning,
+  ]);
 
   useEffect(() => {
     setCadenceScale(DEFAULT_CADENCE_RANGE);
@@ -1116,14 +1156,18 @@ function App() {
 
   const handleStopAndExport = (elapsedSecOverride?: number) => {
     const elapsedForExport = elapsedSecOverride ?? sessionElapsedSec;
+    const exportSamples =
+      sessionSamples.length > 0 ? sessionSamples : rawSamples;
+    const timerSecForExport =
+      activeSec > 0 ? activeSec : Math.max(0, elapsedForExport);
     const fallbackStart =
       Date.now() - Math.max(elapsedForExport, 0) * 1000;
     const startTimeMs = sessionStartMs ?? fallbackStart;
     const fitPayload = buildFitFile({
       startTimeMs,
       elapsedSec: elapsedForExport,
-      timerSec: activeSec,
-      samples: sessionSamples,
+      timerSec: timerSecForExport,
+      samples: exportSamples,
     });
     downloadFitFile(fitPayload, buildFitFilename(planName, startTimeMs));
     handleStop();

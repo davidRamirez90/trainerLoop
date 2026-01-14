@@ -121,9 +121,8 @@ const parseIndoorBikeData = (data: DataView) => {
     return null;
   }
 
-  let hrBpm: number | null = null;
-  if (hasHeartRate) {
-    hrBpm = readUint8();
+  if (hasHeartRate && !skip(1)) {
+    return null;
   }
 
   if (hasMet && !skip(1)) {
@@ -141,7 +140,7 @@ const parseIndoorBikeData = (data: DataView) => {
   return {
     cadenceRpm,
     powerWatts,
-    hrBpm,
+    hrBpm: null,
   };
 };
 
@@ -270,12 +269,13 @@ export const useBluetoothTelemetry = ({
       if (!parsed) {
         return;
       }
-      const updates: Partial<LatestTelemetry> = hrDeviceRef.current
-        ? {
-            powerWatts: parsed.powerWatts,
-            cadenceRpm: parsed.cadenceRpm,
-          }
-        : parsed;
+      const updates: Partial<LatestTelemetry> = {
+        powerWatts: parsed.powerWatts,
+        cadenceRpm: parsed.cadenceRpm,
+      };
+      if (!hrDeviceRef.current) {
+        updates.hrBpm = null;
+      }
       if (!isRecordingRef.current) {
         updateLatest(updates);
         return;
