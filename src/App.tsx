@@ -22,6 +22,9 @@ const IDLE_SEGMENT: WorkoutSegment = {
   isWork: false,
 };
 
+const EMPTY_SEGMENTS: WorkoutSegment[] = [];
+const IDLE_SEGMENTS: WorkoutSegment[] = [IDLE_SEGMENT];
+
 const AUTO_PAUSE_THRESHOLD_SEC = 5;
 
 const buildPhaseProgress = (segments: WorkoutSegment[], elapsedSec: number) => {
@@ -82,9 +85,9 @@ function App() {
   const resumeTimeoutRef = useRef<number | null>(null);
   const prevRunningRef = useRef(false);
   const hasPlan = !!activePlan && activePlan.segments.length > 0;
-  const activeSegments = hasPlan ? activePlan.segments : [];
+  const activeSegments = hasPlan ? activePlan.segments : EMPTY_SEGMENTS;
   const clockSegments = activeSegments;
-  const targetSegments = hasPlan ? activeSegments : [IDLE_SEGMENT];
+  const targetSegments = hasPlan ? activeSegments : IDLE_SEGMENTS;
 
   const clock = useWorkoutClock(clockSegments);
   const {
