@@ -794,7 +794,7 @@
 }
 
 .cadence-gauge {
-  width: 120px;
+  width: 108px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1412,7 +1412,7 @@
   }
 
   .cadence-gauge {
-    width: 100px;
+    width: 94px;
   }
 
   .bottom-row {
