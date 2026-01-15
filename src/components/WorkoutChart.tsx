@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
 import uPlot from 'uplot';
 
 import type { WorkoutSegment } from '../data/workout';
@@ -20,6 +21,7 @@ const ZONE_STOPS = [
   { max: 1.2, color: '#D64541' },
   { max: Number.POSITIVE_INFINITY, color: '#8C2A2A' },
 ];
+const ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'];
 const POLYGON_ALPHA = 0.18;
 const RANGE_FILL_ALPHA = 0.45;
 const RANGE_STROKE_ALPHA = 0.75;
@@ -27,6 +29,9 @@ const LINE_STROKE_ALPHA = 0.85;
 const POWER_SMOOTH_WINDOW_SEC = 3;
 const GAP_FILL = 'rgba(214, 69, 65, 0.12)';
 const GAP_STROKE = 'rgba(214, 69, 65, 0.4)';
+
+const clampValue = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
 
 const hexToRgba = (value: string, alpha: number) => {
   const hex = value.replace('#', '');
@@ -46,12 +51,48 @@ const getZoneColor = (ratio: number) =>
   (ZONE_STOPS.find((stop) => ratio <= stop.max) ?? ZONE_STOPS[ZONE_STOPS.length - 1])
     .color;
 
+const getZoneLabel = (ratio: number) => {
+  const index = ZONE_STOPS.findIndex((stop) => ratio <= stop.max);
+  const safeIndex = index >= 0 ? index : ZONE_LABELS.length - 1;
+  return ZONE_LABELS[safeIndex] ?? `Z${safeIndex + 1}`;
+};
+
 const getSegmentTargetWatts = (segment: WorkoutSegment) => {
   const start = segment.targetRange;
   const end = segment.rampToRange ?? segment.targetRange;
   const startMid = (start.low + start.high) / 2;
   const endMid = (end.low + end.high) / 2;
   return (startMid + endMid) / 2;
+};
+
+const formatRange = (low: number, high: number, suffix: string) => {
+  const roundedLow = Math.round(low);
+  const roundedHigh = Math.round(high);
+  if (roundedLow === roundedHigh) {
+    return `${roundedLow}${suffix}`;
+  }
+  return `${roundedLow}-${roundedHigh}${suffix}`;
+};
+
+const getPowerTargetLabel = (segment: WorkoutSegment) => {
+  const start = segment.targetRange;
+  const end = segment.rampToRange ?? segment.targetRange;
+  const startLabel = formatRange(start.low, start.high, 'W');
+  const endLabel = formatRange(end.low, end.high, 'W');
+  const hasRamp = !!segment.rampToRange &&
+    (segment.rampToRange.low !== segment.targetRange.low ||
+      segment.rampToRange.high !== segment.targetRange.high);
+  if (hasRamp) {
+    return `Ramp ${startLabel} -> ${endLabel}`;
+  }
+  return `Target ${startLabel}`;
+};
+
+const getCadenceLabel = (segment: WorkoutSegment) => {
+  if (!segment.cadenceRange) {
+    return 'No target';
+  }
+  return formatRange(segment.cadenceRange.low, segment.cadenceRange.high, ' rpm');
 };
 
 const useChartSize = (ref: React.RefObject<HTMLDivElement | null>) => {
@@ -93,6 +134,12 @@ type WorkoutChartProps = {
   showPower3s: boolean;
 };
 
+type HoverState = {
+  index: number;
+  x: number;
+  y: number;
+};
+
 export const WorkoutChart = ({
   segments,
   samples,
@@ -104,11 +151,27 @@ export const WorkoutChart = ({
 }: WorkoutChartProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
   const segmentsRef = useRef(segments);
   const elapsedRef = useRef(elapsedSec);
   const gapsRef = useRef(gaps);
   const size = useChartSize(containerRef);
+  const [hoverState, setHoverState] = useState<HoverState | null>(null);
   const ftpScale = Math.max(ftpWatts, 1);
+  const segmentTimeline = useMemo(() => {
+    let cursor = 0;
+    return segments.map((segment, index) => {
+      const startSec = cursor;
+      const endSec = cursor + segment.durationSec;
+      cursor = endSec;
+      return {
+        segment,
+        index,
+        startSec,
+        endSec,
+      };
+    });
+  }, [segments]);
   const hrValues = useMemo(() => {
     if (!hrSensorConnected) {
       return samples.map(() => null);
@@ -208,6 +271,74 @@ export const WorkoutChart = ({
     const times = samples.map((sample) => sample.timeSec);
     return [times, powerValues, smoothPowerValues, hrValues] as uPlot.AlignedData;
   }, [hrValues, powerValues, samples, smoothPowerValues]);
+
+  const handleMouseLeave = () => setHoverState(null);
+
+  const handleMouseMove = (event: MouseEvent<HTMLDivElement>) => {
+    const plot = plotRef.current;
+    const container = containerRef.current;
+    if (!plot || !container) {
+      return;
+    }
+    const rect = container.getBoundingClientRect();
+    const overRect = plot.over.getBoundingClientRect();
+    const xInOver = event.clientX - overRect.left;
+    const yInOver = event.clientY - overRect.top;
+    if (
+      xInOver < 0 ||
+      xInOver > overRect.width ||
+      yInOver < 0 ||
+      yInOver > overRect.height
+    ) {
+      setHoverState(null);
+      return;
+    }
+    const timeSec = plot.posToVal(xInOver, 'x');
+    if (!Number.isFinite(timeSec) || timeSec < 0 || timeSec > totalDurationSec) {
+      setHoverState(null);
+      return;
+    }
+    let hoveredIndex: number | null = null;
+    for (let index = 0; index < segmentTimeline.length; index += 1) {
+      const segment = segmentTimeline[index];
+      if (timeSec >= segment.startSec && timeSec < segment.endSec) {
+        hoveredIndex = index;
+        break;
+      }
+    }
+    if (hoveredIndex === null && segmentTimeline.length) {
+      const last = segmentTimeline[segmentTimeline.length - 1];
+      if (timeSec >= last.endSec) {
+        hoveredIndex = segmentTimeline.length - 1;
+      }
+    }
+    if (hoveredIndex === null) {
+      setHoverState(null);
+      return;
+    }
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    let posX = x + 12;
+    let posY = y + 12;
+    const tooltip = tooltipRef.current;
+    if (tooltip) {
+      const maxX = rect.width - tooltip.offsetWidth - 8;
+      const maxY = rect.height - tooltip.offsetHeight - 8;
+      posX = clampValue(posX, 8, Math.max(8, maxX));
+      posY = clampValue(posY, 8, Math.max(8, maxY));
+    }
+    setHoverState((prev) => {
+      if (
+        prev &&
+        prev.index === hoveredIndex &&
+        Math.abs(prev.x - posX) < 0.5 &&
+        Math.abs(prev.y - posY) < 0.5
+      ) {
+        return prev;
+      }
+      return { index: hoveredIndex, x: posX, y: posY };
+    });
+  };
 
   useEffect(() => {
     segmentsRef.current = segments;
@@ -449,5 +580,53 @@ export const WorkoutChart = ({
     }
   }, [data]);
 
-  return <div ref={containerRef} className="workout-chart" />;
+  const hoveredSegment = hoverState
+    ? segmentTimeline[hoverState.index] ?? null
+    : null;
+  const tooltipTitle = hoveredSegment?.segment.label || 'Segment';
+  const durationLabel = hoveredSegment
+    ? formatDuration(hoveredSegment.segment.durationSec)
+    : '--';
+  const powerTargetLabel = hoveredSegment
+    ? getPowerTargetLabel(hoveredSegment.segment)
+    : '--';
+  const cadenceLabel = hoveredSegment ? getCadenceLabel(hoveredSegment.segment) : '--';
+  const zoneLabel = hoveredSegment && ftpWatts > 0
+    ? getZoneLabel(getSegmentTargetWatts(hoveredSegment.segment) / ftpWatts)
+    : '--';
+
+  return (
+    <div
+      ref={containerRef}
+      className="workout-chart"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      {hoverState && hoveredSegment ? (
+        <div
+          ref={tooltipRef}
+          className="workout-tooltip"
+          style={{ left: hoverState.x, top: hoverState.y }}
+        >
+          <div className="workout-tooltip-title">{tooltipTitle}</div>
+          <div className="workout-tooltip-row">
+            <span>Duration</span>
+            <strong>{durationLabel}</strong>
+          </div>
+          <div className="workout-tooltip-row">
+            <span>Power</span>
+            <strong>{powerTargetLabel}</strong>
+          </div>
+          <div className="workout-tooltip-row">
+            <span>Cadence</span>
+            <strong>{cadenceLabel}</strong>
+          </div>
+          <div className="workout-tooltip-row">
+            <span>Zone</span>
+            <strong>{zoneLabel}</strong>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 };
