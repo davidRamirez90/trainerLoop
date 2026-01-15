@@ -87,6 +87,15 @@ type UserProfile = {
   powerZones: ZoneRange[];
 };
 
+type FtpChoice = {
+  workoutPlan: WorkoutPlan;
+  profilePlan: WorkoutPlan;
+  workoutFtpWatts: number;
+  profileFtpWatts: number;
+  workoutSource: 'file' | 'default';
+  selected: 'workout' | 'profile';
+};
+
 const DEFAULT_HR_ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'];
 const DEFAULT_POWER_ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'];
 const HR_ZONE_COLORS = [
@@ -263,6 +272,8 @@ const buildZonesFromTemplate = (
 function App() {
   const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+  const [ftpChoice, setFtpChoice] = useState<FtpChoice | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
   const [ergEnabled, setErgEnabled] = useState(true);
   const [autoResumeOnWork, setAutoResumeOnWork] = useState(false);
@@ -621,10 +632,10 @@ function App() {
     : '--';
   const powerMeta = isRecoveryPhase
     ? {
-        primaryLabel: 'Next',
-        primaryValue: nextTargetLabel,
-        secondaryLabel: 'Starts In',
-        secondaryValue: intervalRemainingLabel,
+        primaryLabel: 'Target',
+        primaryValue: targetLabel,
+        secondaryLabel: nextSegment ? 'Next' : 'Remaining',
+        secondaryValue: nextSegment ? nextTargetLabel : intervalRemainingLabel,
       }
     : isCooldownPhase
       ? {
@@ -693,6 +704,14 @@ function App() {
     '--target-start': cadenceTargetStart,
     '--target-end': cadenceTargetEnd,
   } as CSSProperties;
+  const workoutFtpLabel = ftpChoice
+    ? ftpChoice.workoutSource === 'file'
+      ? 'Workout FTP (from file)'
+      : 'Workout FTP (default)'
+    : '';
+  const ftpChoiceMessage = ftpChoice
+    ? `Choose FTP for this workout: ${workoutFtpLabel} ${ftpChoice.workoutFtpWatts}W / Profile FTP ${ftpChoice.profileFtpWatts}W.`
+    : '';
 
   const deviceRows = [
     {
@@ -875,6 +894,12 @@ function App() {
     setAutoResumeOnWork(false);
     setAutoPauseArmed(true);
   }, [clock.sessionId]);
+
+  useEffect(() => {
+    if (parsePositiveNumber(profile.ftpWatts)) {
+      setImportNotice(null);
+    }
+  }, [profile.ftpWatts]);
 
   useEffect(() => {
     setIsFreeRide(false);
@@ -1204,17 +1229,64 @@ function App() {
       return;
     }
     setImportError(null);
+    setImportNotice(null);
+    setFtpChoice(null);
     try {
       const text = await file.text();
-      const parsed = parseWorkoutFile(file.name, text);
+      const profileFtpRaw = parsePositiveNumber(profile.ftpWatts);
+      const profileFtp = profileFtpRaw ? Math.round(profileFtpRaw) : null;
+      const workoutResult = parseWorkoutFile(file.name, text);
+      let nextPlan = workoutResult.plan;
+
+      if (profileFtp) {
+        const profileResult = parseWorkoutFile(file.name, text, {
+          overrideFtpWatts: profileFtp,
+          fallbackFtpWatts: profileFtp,
+        });
+        const workoutFtp = workoutResult.meta.resolvedFtpWatts;
+        if (workoutFtp !== profileFtp) {
+          const workoutSource =
+            workoutResult.meta.ftpSource === 'file' ? 'file' : 'default';
+          const defaultChoice =
+            workoutResult.meta.ftpSource === 'fallback' ? 'profile' : 'workout';
+          nextPlan =
+            defaultChoice === 'profile' ? profileResult.plan : workoutResult.plan;
+          setFtpChoice({
+            workoutPlan: workoutResult.plan,
+            profilePlan: profileResult.plan,
+            workoutFtpWatts: workoutFtp,
+            profileFtpWatts: profileFtp,
+            workoutSource,
+            selected: defaultChoice,
+          });
+        }
+      } else {
+        setImportNotice(
+          'Tip: complete your profile info (FTP) for best workout results.'
+        );
+      }
       clock.stop();
-      setActivePlan(parsed);
+      setActivePlan(nextPlan);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to import workout.';
       setImportError(message);
     } finally {
       event.target.value = '';
     }
+  };
+
+  const handleFtpChoice = (choice: 'workout' | 'profile') => {
+    setFtpChoice((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      const nextPlan = choice === 'workout' ? prev.workoutPlan : prev.profilePlan;
+      setActivePlan(nextPlan);
+      if (prev.selected === choice) {
+        return prev;
+      }
+      return { ...prev, selected: choice };
+    });
   };
 
   return (
@@ -1255,6 +1327,36 @@ function App() {
           <div className="session-title">{planName}</div>
           {sessionError ? (
             <div className="session-error">{sessionError}</div>
+          ) : null}
+          {ftpChoice ? (
+            <div className="session-choice">
+              <div className="session-info-message">{ftpChoiceMessage}</div>
+              <div className="session-choice-actions">
+                <button
+                  className={`session-choice-button ${
+                    ftpChoice.selected === 'workout' ? 'active' : ''
+                  }`}
+                  type="button"
+                  onClick={() => handleFtpChoice('workout')}
+                  disabled={ftpChoice.selected === 'workout'}
+                >
+                  Use {workoutFtpLabel} ({ftpChoice.workoutFtpWatts}W)
+                </button>
+                <button
+                  className={`session-choice-button ${
+                    ftpChoice.selected === 'profile' ? 'active' : ''
+                  }`}
+                  type="button"
+                  onClick={() => handleFtpChoice('profile')}
+                  disabled={ftpChoice.selected === 'profile'}
+                >
+                  Use Profile FTP ({ftpChoice.profileFtpWatts}W)
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {importNotice && !ftpChoice ? (
+            <div className="session-info-message">{importNotice}</div>
           ) : null}
         </div>
         <div className="session-actions">

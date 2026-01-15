@@ -8,6 +8,51 @@ import type {
 const DEFAULT_FTP_WATTS = 250;
 const WORK_THRESHOLD = 0.85;
 
+type WorkoutImportOptions = {
+  fallbackFtpWatts?: number;
+  overrideFtpWatts?: number;
+};
+
+type WorkoutFtpSource = 'file' | 'fallback' | 'override';
+
+type WorkoutImportMeta = {
+  fileFtpWatts: number | null;
+  resolvedFtpWatts: number;
+  ftpSource: WorkoutFtpSource;
+};
+
+export type WorkoutImportResult = {
+  plan: WorkoutPlan;
+  meta: WorkoutImportMeta;
+};
+
+const coerceFtpValue = (value?: number | null) => {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  return null;
+};
+
+const resolveFallbackFtpWatts = (value?: number) => {
+  const valid = coerceFtpValue(value);
+  return valid === null ? DEFAULT_FTP_WATTS : Math.round(valid);
+};
+
+const resolveFtpMeta = (fileFtpWatts: number | null, options?: WorkoutImportOptions) => {
+  const overrideFtp = coerceFtpValue(options?.overrideFtpWatts);
+  if (overrideFtp !== null) {
+    return { ftpWatts: Math.round(overrideFtp), ftpSource: 'override' as const };
+  }
+  const fileFtp = coerceFtpValue(fileFtpWatts);
+  if (fileFtp !== null) {
+    return { ftpWatts: Math.round(fileFtp), ftpSource: 'file' as const };
+  }
+  return {
+    ftpWatts: resolveFallbackFtpWatts(options?.fallbackFtpWatts),
+    ftpSource: 'fallback' as const,
+  };
+};
+
 const parseNumber = (value: unknown, label: string) => {
   if (typeof value !== 'number' || Number.isNaN(value)) {
     throw new Error(`${label} must be a number.`);
@@ -171,7 +216,11 @@ const buildSegment = (
   };
 };
 
-const parseErgMrc = (text: string, fileName: string): WorkoutPlan => {
+const parseErgMrc = (
+  text: string,
+  fileName: string,
+  options?: WorkoutImportOptions
+): WorkoutImportResult => {
   const lines = text.split(/\r?\n/);
   const header: Record<string, string> = {};
   let timeUnit: 'minutes' | 'seconds' = 'minutes';
@@ -225,7 +274,10 @@ const parseErgMrc = (text: string, fileName: string): WorkoutPlan => {
     header['FTP WATTS'] ||
     header['FTP_WATTS'] ||
     header['FTPWATTS'];
-  const ftpWatts = ftpWattsRaw ? Number.parseFloat(ftpWattsRaw) : DEFAULT_FTP_WATTS;
+  const ftpWattsParsed = ftpWattsRaw ? Number.parseFloat(ftpWattsRaw) : NaN;
+  const fileFtpWatts = coerceFtpValue(ftpWattsParsed);
+  const ftpMeta = resolveFtpMeta(fileFtpWatts, options);
+  const ftpWatts = ftpMeta.ftpWatts;
 
   const resolvedPowerUnit =
     powerUnit ?? (dataPoints[0].power <= 2 ? 'percent' : 'watts');
@@ -298,11 +350,18 @@ const parseErgMrc = (text: string, fileName: string): WorkoutPlan => {
   const subtitle = header.DESCRIPTION || 'Imported ERG/MRC workout';
 
   return {
-    id: slugFromFileName(fileName) || `import-${Date.now()}`,
-    name,
-    subtitle,
-    ftpWatts: Number.isFinite(ftpWatts) ? Math.round(ftpWatts) : DEFAULT_FTP_WATTS,
-    segments,
+    plan: {
+      id: slugFromFileName(fileName) || `import-${Date.now()}`,
+      name,
+      subtitle,
+      ftpWatts,
+      segments,
+    },
+    meta: {
+      fileFtpWatts: fileFtpWatts === null ? null : Math.round(fileFtpWatts),
+      resolvedFtpWatts: ftpWatts,
+      ftpSource: ftpMeta.ftpSource,
+    },
   };
 };
 
@@ -353,7 +412,11 @@ const getCadenceRange = (node: Element): TargetRange | undefined => {
   return undefined;
 };
 
-const parseZwo = (text: string, fileName: string): WorkoutPlan => {
+const parseZwo = (
+  text: string,
+  fileName: string,
+  options?: WorkoutImportOptions
+): WorkoutImportResult => {
   const parser = new DOMParser();
   const xml = parser.parseFromString(text, 'application/xml');
   if (xml.querySelector('parsererror')) {
@@ -370,7 +433,8 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
   const name = nameNode?.textContent?.trim() || slugFromFileName(fileName);
   const subtitle = descriptionNode?.textContent?.trim() || 'Imported ZWO workout';
 
-  const ftpWatts = DEFAULT_FTP_WATTS;
+  const ftpMeta = resolveFtpMeta(null, options);
+  const ftpWatts = ftpMeta.ftpWatts;
   const segments: WorkoutSegment[] = [];
   let segmentIndex = 0;
   let intervalCount = 0;
@@ -595,15 +659,26 @@ const parseZwo = (text: string, fileName: string): WorkoutPlan => {
   }
 
   return {
-    id: slugFromFileName(fileName) || `import-${Date.now()}`,
-    name,
-    subtitle,
-    ftpWatts,
-    segments,
+    plan: {
+      id: slugFromFileName(fileName) || `import-${Date.now()}`,
+      name,
+      subtitle,
+      ftpWatts,
+      segments,
+    },
+    meta: {
+      fileFtpWatts: null,
+      resolvedFtpWatts: ftpWatts,
+      ftpSource: ftpMeta.ftpSource,
+    },
   };
 };
 
-export const parseWorkoutFile = (fileName: string, text: string): WorkoutPlan => {
+export const parseWorkoutFile = (
+  fileName: string,
+  text: string,
+  options?: WorkoutImportOptions
+): WorkoutImportResult => {
   const trimmed = text.trim();
   const fallbackName = slugFromFileName(fileName) || 'Imported Workout';
   const fallbackSubtitle = 'Imported workout';
@@ -611,16 +686,29 @@ export const parseWorkoutFile = (fileName: string, text: string): WorkoutPlan =>
 
   if (extension === 'json' || trimmed.startsWith('{') || trimmed.startsWith('[')) {
     const parsed = JSON.parse(trimmed);
-    return normalizeWorkoutPlan(parsed, fallbackName, fallbackSubtitle);
+    const plan = normalizeWorkoutPlan(parsed, fallbackName, fallbackSubtitle);
+    const fileFtpWatts = coerceFtpValue(plan.ftpWatts);
+    const ftpMeta = resolveFtpMeta(fileFtpWatts, options);
+    return {
+      plan: {
+        ...plan,
+        ftpWatts: ftpMeta.ftpWatts,
+      },
+      meta: {
+        fileFtpWatts: fileFtpWatts === null ? null : Math.round(fileFtpWatts),
+        resolvedFtpWatts: ftpMeta.ftpWatts,
+        ftpSource: ftpMeta.ftpSource,
+      },
+    };
   }
 
   if (extension === 'zwo' || trimmed.startsWith('<')) {
-    return parseZwo(trimmed, fileName);
+    return parseZwo(trimmed, fileName, options);
   }
 
   if (extension === 'erg' || extension === 'mrc') {
-    return parseErgMrc(trimmed, fileName);
+    return parseErgMrc(trimmed, fileName, options);
   }
 
-  return parseErgMrc(trimmed, fileName);
+  return parseErgMrc(trimmed, fileName, options);
 };

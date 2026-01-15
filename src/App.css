@@ -205,6 +205,51 @@
   color: #f6b26b;
 }
 
+.session-info-message {
+  font-size: 11px;
+  color: #9bc4ff;
+}
+
+.session-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.session-choice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.session-choice-button {
+  border-radius: 999px;
+  border: 1px solid rgba(98, 118, 145, 0.6);
+  background: rgba(18, 26, 38, 0.75);
+  color: var(--text-primary);
+  font-size: 10px;
+  letter-spacing: 0.8px;
+  padding: 6px 12px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.session-choice-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(155, 196, 255, 0.7);
+}
+
+.session-choice-button.active {
+  border-color: rgba(155, 196, 255, 0.8);
+  box-shadow: 0 8px 16px rgba(22, 40, 60, 0.35);
+}
+
+.session-choice-button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
 .session-actions {
   display: flex;
   flex-wrap: wrap;
