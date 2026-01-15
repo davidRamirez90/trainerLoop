@@ -7,7 +7,6 @@ const INDOOR_BIKE_DATA = 0x2ad2;
 const HEART_RATE_SERVICE = 0x180d;
 const HEART_RATE_MEASUREMENT = 0x2a37;
 
-const MAX_SAMPLES = 1800;
 
 type LatestTelemetry = {
   powerWatts: number | null;
@@ -223,11 +222,7 @@ export const useBluetoothTelemetry = ({
       hrBpm: hr,
     };
 
-    setSamples((prevSamples) => {
-      const trimmed =
-        prevSamples.length > MAX_SAMPLES ? prevSamples.slice(-MAX_SAMPLES) : prevSamples;
-      return [...trimmed, nextSample];
-    });
+    setSamples((prevSamples) => [...prevSamples, nextSample]);
   }, [updateLatest]);
 
   useEffect(() => {

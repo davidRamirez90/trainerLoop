@@ -356,6 +356,7 @@ function App() {
   const latestTelemetry = bluetoothTelemetry.latest;
   const sessionElapsedSecRef = useRef(sessionElapsedSec);
   const latestTelemetryRef = useRef(latestTelemetry);
+  const isRunningRef = useRef(isRunning);
 
   useEffect(() => {
     sessionElapsedSecRef.current = sessionElapsedSec;
@@ -366,10 +367,17 @@ function App() {
   }, [latestTelemetry]);
 
   useEffect(() => {
+    isRunningRef.current = isRunning;
+  }, [isRunning]);
+
+  useEffect(() => {
     if (!isSessionActive) {
       return undefined;
     }
     const intervalId = window.setInterval(() => {
+      if (!isRunningRef.current) {
+        return;
+      }
       const nextTelemetry = latestTelemetryRef.current;
       const hasAny =
         nextTelemetry.powerWatts !== null ||
@@ -1182,8 +1190,7 @@ function App() {
 
   const handleStopAndExport = (elapsedSecOverride?: number) => {
     const elapsedForExport = elapsedSecOverride ?? sessionElapsedSec;
-    const exportSamples =
-      sessionSamples.length > 0 ? sessionSamples : rawSamples;
+    const exportSamples = rawSamples.length > 0 ? rawSamples : sessionSamples;
     const timerSecForExport =
       activeSec > 0 ? activeSec : Math.max(0, elapsedForExport);
     const fallbackStart =
