@@ -81,6 +81,7 @@ type UserProfile = {
   nickname: string;
   weightKg: string;
   ftpWatts: string;
+  ergBiasWatts: string;
   thresholdHr: string;
   maxHr: string;
   hrZones: ZoneRange[];
@@ -142,6 +143,7 @@ const buildEmptyProfile = (): UserProfile => ({
   nickname: '',
   weightKg: '',
   ftpWatts: '',
+  ergBiasWatts: '',
   thresholdHr: '',
   maxHr: '',
   hrZones: buildZones(DEFAULT_HR_ZONE_LABELS),
@@ -206,6 +208,17 @@ const parsePositiveNumber = (value: string) => {
   }
   return parsed;
 };
+
+const parseNumber = (value: string) => {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  return parsed;
+};
+
+const formatSignedWatts = (value: number) =>
+  `${value > 0 ? '+' : ''}${value}W`;
 
 const clampValue = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -453,10 +466,13 @@ function App() {
 
   const { low: targetLow, high: targetHigh } = targetRange;
   const targetMid = (targetLow + targetHigh) / 2;
+  const ergBiasWatts = parseNumber(profile.ergBiasWatts) ?? 0;
+  const ergBiasRounded = Math.round(ergBiasWatts);
+  const ergTargetBaseWatts = targetMid + ergBiasWatts;
   const isErgRamping = !ergRampComplete && ergEnabled && hasPlan && isRunning;
   const ergTargetWatts = isErgRamping
-    ? Math.min(targetMid, ERG_START_TARGET_WATTS)
-    : targetMid;
+    ? Math.min(ergTargetBaseWatts, ERG_START_TARGET_WATTS)
+    : ergTargetBaseWatts;
   const ftmsControl = useFtmsControl({
     trainerDevice,
     targetWatts: ergTargetWatts,
@@ -665,6 +681,20 @@ function App() {
             secondaryLabel: 'Compliance',
             secondaryValue: complianceLabel,
           };
+  const ergCommandedHints: string[] = [];
+  if (isErgRamping) {
+    ergCommandedHints.push('ramp');
+  }
+  if (ergBiasRounded !== 0) {
+    ergCommandedHints.push(`bias ${formatSignedWatts(ergBiasRounded)}`);
+  }
+  const ergCommandedLabel = hasPlan
+    ? ergEnabled
+      ? `${Math.round(ergTargetWatts)}W${
+          ergCommandedHints.length ? ` (${ergCommandedHints.join(', ')})` : ''
+        }`
+      : 'ERG off'
+    : '--';
   const hrZone = getHrZone(displayHr, profile.hrZones);
   const hrZoneStyle = hrZone
     ? ({ '--zone-color': hrZone.color } as CSSProperties)
@@ -775,7 +805,15 @@ function App() {
   };
 
   const handleDraftFieldChange =
-    (field: 'nickname' | 'weightKg' | 'ftpWatts' | 'thresholdHr' | 'maxHr') =>
+    (
+      field:
+        | 'nickname'
+        | 'weightKg'
+        | 'ftpWatts'
+        | 'ergBiasWatts'
+        | 'thresholdHr'
+        | 'maxHr'
+    ) =>
       (event: ChangeEvent<HTMLInputElement>) => {
         const { value } = event.target;
         setDraftProfile((prev) => ({
@@ -1595,6 +1633,10 @@ function App() {
               {powerMeta.secondaryValue}
             </div>
           </div>
+          <div className="metric-sub">
+            <div>Commanded</div>
+            <div className="muted">{ergCommandedLabel}</div>
+          </div>
         </div>
 
         <div
@@ -1834,6 +1876,17 @@ function App() {
                     value={draftProfile.ftpWatts}
                     onChange={handleDraftFieldChange('ftpWatts')}
                     placeholder="e.g. 260"
+                  />
+                </label>
+                <label className="profile-field">
+                  <span>ERG Bias (W)</span>
+                  <input
+                    type="number"
+                    step="1"
+                    inputMode="decimal"
+                    value={draftProfile.ergBiasWatts}
+                    onChange={handleDraftFieldChange('ergBiasWatts')}
+                    placeholder="e.g. +5 or -5"
                   />
                 </label>
                 <label className="profile-field">
