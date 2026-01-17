@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import './App.css';
 import { WorkoutChart } from './components/WorkoutChart';
+import { CoachPanel } from './components/CoachPanel';
 import type { WorkoutPlan, WorkoutSegment } from './data/workout';
 import { useBluetoothDevices } from './hooks/useBluetoothDevices';
 import { useBluetoothTelemetry } from './hooks/useBluetoothTelemetry';
@@ -551,6 +552,10 @@ function App() {
   const compliance = displayPower && targetMid > 0
     ? Math.round((displayPower / targetMid) * 100)
     : 0;
+  
+  // Calculate strain from intensity factor (IF) - normalize to 0-1 range
+  // IF > 1 means high intensity, IF < 0.75 means recovery zone
+  const strain = Math.min(Math.max(ifValue, 0), 1.2);
   const isPowerInRange =
     displayPower !== null &&
     displayPower >= targetLow &&
@@ -1461,6 +1466,16 @@ function App() {
           </div>
           <div className="coach-banner-body">{coachMessage.body}</div>
         </section>
+      ) : null}
+
+      {hasPlan ? (
+        <CoachPanel
+          compliance={compliance / 100}
+          strain={strain}
+          onAcceptSuggestion={(id) => {
+            console.log('Accepted suggestion:', id);
+          }}
+        />
       ) : null}
 
       <section
