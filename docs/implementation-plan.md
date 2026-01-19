@@ -48,7 +48,8 @@
 
 - Smoothing and lag compensation. ✅
 - Dropout detection and gap annotation. ✅
-- Session recorder (raw + smoothed streams).
+- Session recorder (raw + smoothed streams). ✅
+- Session persistence to localStorage. 🔄 (next item)
 
 ### Phase 2.5 - Coach Profiles and Feedback Stream
 

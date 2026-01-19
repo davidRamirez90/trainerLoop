@@ -684,22 +684,30 @@ export const parseWorkoutFile = (
   const fallbackSubtitle = 'Imported workout';
   const extension = fileName.split('.').pop()?.toLowerCase();
 
-  if (extension === 'json' || trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    const parsed = JSON.parse(trimmed);
-    const plan = normalizeWorkoutPlan(parsed, fallbackName, fallbackSubtitle);
-    const fileFtpWatts = coerceFtpValue(plan.ftpWatts);
-    const ftpMeta = resolveFtpMeta(fileFtpWatts, options);
-    return {
-      plan: {
-        ...plan,
-        ftpWatts: ftpMeta.ftpWatts,
-      },
-      meta: {
-        fileFtpWatts: fileFtpWatts === null ? null : Math.round(fileFtpWatts),
-        resolvedFtpWatts: ftpMeta.ftpWatts,
-        ftpSource: ftpMeta.ftpSource,
-      },
-    };
+  if (extension === 'json' || trimmed.startsWith('{')) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      // Not valid JSON, fall through to other parsers
+      parsed = null;
+    }
+    if (parsed && typeof parsed === 'object') {
+      const plan = normalizeWorkoutPlan(parsed, fallbackName, fallbackSubtitle);
+      const fileFtpWatts = coerceFtpValue(plan.ftpWatts);
+      const ftpMeta = resolveFtpMeta(fileFtpWatts, options);
+      return {
+        plan: {
+          ...plan,
+          ftpWatts: ftpMeta.ftpWatts,
+        },
+        meta: {
+          fileFtpWatts: fileFtpWatts === null ? null : Math.round(fileFtpWatts),
+          resolvedFtpWatts: ftpMeta.ftpWatts,
+          ftpSource: ftpMeta.ftpSource,
+        },
+      };
+    }
   }
 
   if (extension === 'zwo' || trimmed.startsWith('<')) {
