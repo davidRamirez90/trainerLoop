@@ -92,19 +92,23 @@ export const useFtmsControl = ({
 
   useEffect(() => {
     if (!trainerDevice) {
-      setStatus('idle');
-      setError(null);
-      hasControlRef.current = false;
-      controlPointRef.current = null;
-      return undefined;
+      const timeoutId = setTimeout(() => {
+        setStatus('idle');
+        setError(null);
+        hasControlRef.current = false;
+        controlPointRef.current = null;
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
 
     let active = true;
     let controlPoint: BluetoothRemoteGATTCharacteristic | null = null;
 
-    setStatus('requesting');
-    setError(null);
-    hasControlRef.current = false;
+    const timeoutId = setTimeout(() => {
+      setStatus('requesting');
+      setError(null);
+      hasControlRef.current = false;
+    }, 0);
 
     const handleResponse = (event: Event) => {
       const target = event.target as BluetoothRemoteGATTCharacteristic | null;
@@ -172,6 +176,7 @@ export const useFtmsControl = ({
 
     return () => {
       active = false;
+      clearTimeout(timeoutId);
       if (controlPoint) {
         controlPoint.removeEventListener('characteristicvaluechanged', handleResponse);
         controlPoint.stopNotifications().catch(() => undefined);
