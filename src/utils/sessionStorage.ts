@@ -1,4 +1,15 @@
 import type { TelemetrySample } from '../types';
+import type { CoachEvent } from '../hooks/useCoach';
+
+// Coach event for session notes
+export interface SessionCoachEvent {
+  id: string;
+  timestamp: number;
+  type: CoachEvent['type'];
+  message: string;
+  category: CoachEvent['category'];
+  suggestionId?: string;
+}
 
 export interface SessionSummary {
   id: string;
@@ -10,6 +21,8 @@ export interface SessionSummary {
   avgCadence: number;
   avgHr: number;
   coachNotes: string;
+  coachProfileId: string;
+  coachEvents: SessionCoachEvent[];
   completed: boolean;
 }
 
@@ -67,7 +80,9 @@ export const buildSessionSummary = (
   samples: TelemetrySample[],
   workoutName: string,
   completed: boolean,
-  coachNotes: string = ''
+  coachNotes: string = '',
+  coachProfileId: string = '',
+  coachEvents: SessionCoachEvent[] = []
 ): SessionSummary => {
   const avgPower = computeAverage(samples, (s) => s.powerWatts, () => true) ?? 0;
   const maxPower = computeMax(samples, (s) => s.powerWatts, () => true) ?? 0;
@@ -88,6 +103,8 @@ export const buildSessionSummary = (
     avgCadence,
     avgHr,
     coachNotes,
+    coachProfileId,
+    coachEvents,
     completed,
   };
 };
@@ -170,6 +187,41 @@ export const updateSessionNotesInStorage = (
   const sessions = loadSessionsFromStorage();
   const updated = sessions.map((s) =>
     s.id === sessionId ? { ...s, coachNotes } : s
+  );
+  saveSessionsToStorage(updated);
+};
+
+// Add a coach event to a session
+export const addCoachEventToSession = (
+  sessionId: string,
+  event: SessionCoachEvent
+): void => {
+  const sessions = loadSessionsFromStorage();
+  const updated = sessions.map((s) =>
+    s.id === sessionId
+      ? { ...s, coachEvents: [...s.coachEvents, event] }
+      : s
+  );
+  saveSessionsToStorage(updated);
+};
+
+// Update coach profile ID for a session
+export const updateSessionCoachProfile = (
+  sessionId: string,
+  coachProfileId: string
+): void => {
+  const sessions = loadSessionsFromStorage();
+  const updated = sessions.map((s) =>
+    s.id === sessionId ? { ...s, coachProfileId } : s
+  );
+  saveSessionsToStorage(updated);
+};
+
+// Clear all coach events for a session
+export const clearSessionCoachEvents = (sessionId: string): void => {
+  const sessions = loadSessionsFromStorage();
+  const updated = sessions.map((s) =>
+    s.id === sessionId ? { ...s, coachEvents: [] } : s
   );
   saveSessionsToStorage(updated);
 };
