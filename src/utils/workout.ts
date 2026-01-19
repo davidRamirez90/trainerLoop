@@ -4,6 +4,10 @@ export const getTotalDurationSec = (segments: WorkoutSegment[]) =>
   segments.reduce((total, segment) => total + segment.durationSec, 0);
 
 export const getSegmentAtTime = (segments: WorkoutSegment[], elapsedSec: number) => {
+  if (segments.length === 0) {
+    return { segment: undefined, index: 0, startSec: 0, endSec: 0 };
+  }
+
   let cursor = 0;
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index];
@@ -15,7 +19,7 @@ export const getSegmentAtTime = (segments: WorkoutSegment[], elapsedSec: number)
     cursor = endSec;
   }
 
-  const lastIndex = Math.max(segments.length - 1, 0);
+  const lastIndex = segments.length - 1;
   const lastSegment = segments[lastIndex];
   return {
     segment: lastSegment,
@@ -48,6 +52,16 @@ export const getTargetRangeAtTime = (segments: WorkoutSegment[], elapsedSec: num
     segments,
     elapsedSec
   );
+  if (!segment) {
+    return {
+      segment: undefined,
+      index: 0,
+      startSec: 0,
+      endSec: 0,
+      elapsedInSegmentSec: 0,
+      targetRange: { low: 0, high: 0 },
+    };
+  }
   const elapsedInSegmentSec = Math.max(
     0,
     Math.min(elapsedSec - startSec, segment.durationSec)

@@ -186,9 +186,12 @@ export const useBluetoothTelemetry = ({
   }, [isRecording]);
 
   useEffect(() => {
-    setSamples([]);
-    lastValuesRef.current = { powerWatts: null, cadenceRpm: null, hrBpm: null };
-    setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
+    const timeoutId = setTimeout(() => {
+      setSamples([]);
+      lastValuesRef.current = { powerWatts: null, cadenceRpm: null, hrBpm: null };
+      setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
+    }, 0);
+    return () => clearTimeout(timeoutId);
   }, [sessionId]);
 
   const updateLatest = useCallback((updates: Partial<LatestTelemetry>) => {
@@ -227,23 +230,27 @@ export const useBluetoothTelemetry = ({
 
   useEffect(() => {
     if (!trainerDevice) {
-      setIsActive(false);
-      setError(null);
-      setLatest((prev) =>
-        hrDeviceRef.current
-          ? { ...prev, powerWatts: null, cadenceRpm: null }
-          : { powerWatts: null, cadenceRpm: null, hrBpm: null }
-      );
-      return undefined;
+      const timeoutId = setTimeout(() => {
+        setIsActive(false);
+        setError(null);
+        setLatest((prev) =>
+          hrDeviceRef.current
+            ? { ...prev, powerWatts: null, cadenceRpm: null }
+            : { powerWatts: null, cadenceRpm: null, hrBpm: null }
+        );
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
 
     let active = true;
     let characteristic: BluetoothRemoteGATTCharacteristic | null = null;
 
-    setError(null);
-    setSamples([]);
-    lastValuesRef.current = { powerWatts: null, cadenceRpm: null, hrBpm: null };
-    setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
+    const timeoutId = setTimeout(() => {
+      setError(null);
+      setSamples([]);
+      lastValuesRef.current = { powerWatts: null, cadenceRpm: null, hrBpm: null };
+      setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
+    }, 0);
 
     const handleIndoorBikeData = (event: Event) => {
       const target = event.target as BluetoothRemoteGATTCharacteristic | null;
@@ -297,6 +304,7 @@ export const useBluetoothTelemetry = ({
 
     return () => {
       active = false;
+      clearTimeout(timeoutId);
       setIsActive(false);
       if (characteristic) {
         characteristic.removeEventListener('characteristicvaluechanged', handleIndoorBikeData);

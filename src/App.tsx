@@ -14,6 +14,7 @@ import { formatDuration } from './utils/time';
 import { buildFitFile } from './utils/fit';
 import { parseWorkoutFile } from './utils/workoutImport';
 import { getTargetRangeAtTime, getTotalDurationSec } from './utils/workout';
+import { buildSessionSummary, addSessionToStorage, type SessionData } from './utils/sessionStorage';
 import type { TelemetrySample } from './types';
 
 const IDLE_SEGMENT: WorkoutSegment = {
@@ -507,6 +508,9 @@ function App() {
     if (!hasPlan || !rawSamples.length) {
       return 0;
     }
+    if (!segment) {
+      return 0;
+    }
     let rangeStart = startSec;
     let rangeEnd = Math.min(activeSec, endSec);
     if (segment.phase === 'recovery' && index > 0) {
@@ -534,7 +538,7 @@ function App() {
     hasPlan,
     index,
     rawSamples,
-    segment.phase,
+    segment,
     startSec,
   ]);
 
@@ -563,10 +567,10 @@ function App() {
 
   const remainingSec = Math.max(totalDurationSec - activeSec, 0);
   const segmentRemainingSec = Math.max(endSec - activeSec, 0);
-  const isRecoveryPhase = hasPlan && segment.phase === 'recovery';
-  const isWarmupPhase = hasPlan && segment.phase === 'warmup';
-  const isCooldownPhase = hasPlan && segment.phase === 'cooldown';
-  const phaseClass = hasPlan ? `phase-${segment.phase}` : 'phase-idle';
+  const isRecoveryPhase = hasPlan && segment?.phase === 'recovery';
+  const isWarmupPhase = hasPlan && segment?.phase === 'warmup';
+  const isCooldownPhase = hasPlan && segment?.phase === 'cooldown';
+  const phaseClass = hasPlan && segment ? `phase-${segment.phase}` : 'phase-idle';
 
   const workSegments = activeSegments.filter((seg) => seg.isWork);
   const totalIntervals = workSegments.length;
@@ -633,7 +637,7 @@ function App() {
 
   const intervalLabel = isFreeRide
     ? 'FREE RIDE'
-    : hasPlan
+    : hasPlan && segment
       ? segment.isWork
         ? 'WORK'
         : segment.phase === 'recovery'
@@ -704,7 +708,7 @@ function App() {
   const hrZoneStyle = hrZone
     ? ({ '--zone-color': hrZone.color } as CSSProperties)
     : undefined;
-  const cadenceTargetRange = hasPlan ? segment.cadenceRange : undefined;
+  const cadenceTargetRange = hasPlan && segment ? segment.cadenceRange : undefined;
   const cadenceTargetLow = cadenceTargetRange?.low ?? null;
   const cadenceTargetHigh = cadenceTargetRange?.high ?? null;
   const isCadenceTargetSingle =
@@ -1092,7 +1096,9 @@ function App() {
   }, [
     autoResumeOnWork,
     canDetectWork,
+    clock,
     clock.start,
+    ftmsControl,
     ftmsControl.startWorkout,
     hasPlan,
     hasWorkTelemetry,
@@ -1127,7 +1133,9 @@ function App() {
   }, [
     autoPauseArmed,
     canDetectWork,
+    clock,
     clock.pause,
+    ftmsControl,
     ftmsControl.pauseWorkout,
     hasPlan,
     hasWorkTelemetry,
@@ -1239,6 +1247,7 @@ function App() {
     const fallbackStart =
       Date.now() - Math.max(elapsedForExport, 0) * 1000;
     const startTimeMs = sessionStartMs ?? fallbackStart;
+    const endTimeMs = Date.now();
     const fitPayload = buildFitFile({
       startTimeMs,
       elapsedSec: elapsedForExport,
@@ -1246,6 +1255,23 @@ function App() {
       samples: exportSamples,
     });
     downloadFitFile(fitPayload, buildFitFilename(planName, startTimeMs));
+
+    // Save session to localStorage
+    const sessionData: SessionData = {
+      ...buildSessionSummary(
+        startTimeMs,
+        endTimeMs,
+        timerSecForExport,
+        exportSamples,
+        planName,
+        isComplete
+      ),
+      startTimeMs,
+      endTimeMs,
+      samples: exportSamples,
+    };
+    addSessionToStorage(sessionData);
+
     handleStop();
   };
 
@@ -1625,7 +1651,7 @@ function App() {
           <div className="metric-header">
             <span>Power</span>
             <span className="metric-tag">
-              {hasPlan ? (segment.isWork ? 'ERG' : 'RES') : '--'}
+              {hasPlan && segment ? (segment.isWork ? 'ERG' : 'RES') : '--'}
             </span>
           </div>
           <div className="metric-value">
