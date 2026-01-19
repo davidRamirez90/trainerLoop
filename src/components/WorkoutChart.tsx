@@ -159,18 +159,12 @@ export const WorkoutChart = ({
   const [hoverState, setHoverState] = useState<HoverState | null>(null);
   const ftpScale = Math.max(ftpWatts, 1);
   const segmentTimeline = useMemo(() => {
-    let cursor = 0;
-    return segments.map((segment, index) => {
-      const startSec = cursor;
-      const endSec = cursor + segment.durationSec;
-      cursor = endSec;
-      return {
-        segment,
-        index,
-        startSec,
-        endSec,
-      };
-    });
+    return segments.reduce((acc, segment, index) => {
+      const startSec = index === 0 ? 0 : acc[index - 1].endSec;
+      const endSec = startSec + segment.durationSec;
+      acc.push({ segment, index, startSec, endSec });
+      return acc;
+    }, [] as Array<{ segment: typeof segments[0]; index: number; startSec: number; endSec: number }>);
   }, [segments]);
   const hrValues = useMemo(() => {
     if (!hrSensorConnected) {

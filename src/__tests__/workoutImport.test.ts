@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeWorkoutPlan, parseWorkoutFile } from '../utils/workoutImport';
+import { parseWorkoutFile, normalizeWorkoutPlan } from '../utils/workoutImport';
 import type { WorkoutPlan } from '../data/workout';
+
 
 describe('workoutImport utilities', () => {
   describe('normalizeWorkoutPlan', () => {
-    const validWorkout: unknown = {
+    const validWorkout: WorkoutPlan = {
       id: 'test-workout',
       name: 'Test Workout',
       subtitle: 'A test workout',

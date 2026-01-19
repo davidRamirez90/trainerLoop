@@ -92,19 +92,28 @@ export const useFtmsControl = ({
 
   useEffect(() => {
     if (!trainerDevice) {
-      setStatus('idle');
-      setError(null);
+      const timeoutId = setTimeout(() => {
+        setStatus('idle');
+        setError(null);
+      }, 0);
       hasControlRef.current = false;
       controlPointRef.current = null;
-      return undefined;
+      return () => clearTimeout(timeoutId);
     }
 
     let active = true;
     let controlPoint: BluetoothRemoteGATTCharacteristic | null = null;
 
-    setStatus('requesting');
-    setError(null);
+    const timeoutId = setTimeout(() => {
+      setStatus('requesting');
+      setError(null);
+    }, 0);
     hasControlRef.current = false;
+
+    return () => {
+      clearTimeout(timeoutId);
+      active = false;
+    };
 
     const handleResponse = (event: Event) => {
       const target = event.target as BluetoothRemoteGATTCharacteristic | null;
@@ -146,6 +155,9 @@ export const useFtmsControl = ({
     };
 
     const setupControlPoint = async () => {
+      if (!trainerDevice) {
+        throw new Error('Trainer device not available.');
+      }
       const server =
         trainerDevice.gatt?.connected
           ? trainerDevice.gatt

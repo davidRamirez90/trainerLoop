@@ -48,10 +48,23 @@ export const getSegmentTargetRange = (
 };
 
 export const getTargetRangeAtTime = (segments: WorkoutSegment[], elapsedSec: number) => {
+  if (segments.length === 0) {
+    return {
+      segment: undefined,
+      index: 0,
+      startSec: 0,
+      endSec: 0,
+      elapsedInSegmentSec: 0,
+      targetRange: { low: 0, high: 0 },
+    };
+  }
   const { segment, index, startSec, endSec } = getSegmentAtTime(
     segments,
     elapsedSec
   );
+  if (!segment) {
+    throw new Error('Segment not found');
+  }
   const elapsedInSegmentSec = Math.max(
     0,
     Math.min(elapsedSec - startSec, segment.durationSec)

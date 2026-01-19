@@ -95,7 +95,7 @@ describe('workout utilities', () => {
         createSegment('seg-2', 600),
       ];
       const result = getSegmentAtTime(segments, 0);
-      expect(result.segment.id).toBe('seg-1');
+      expect(result.segment!.id).toBe('seg-1');
       expect(result.index).toBe(0);
       expect(result.startSec).toBe(0);
       expect(result.endSec).toBe(300);
@@ -107,7 +107,7 @@ describe('workout utilities', () => {
         createSegment('seg-2', 600),
       ];
       const result = getSegmentAtTime(segments, 150);
-      expect(result.segment.id).toBe('seg-1');
+      expect(result.segment!.id).toBe('seg-1');
       expect(result.index).toBe(0);
       expect(result.startSec).toBe(0);
       expect(result.endSec).toBe(300);
@@ -119,7 +119,7 @@ describe('workout utilities', () => {
         createSegment('seg-2', 600),
       ];
       const result = getSegmentAtTime(segments, 300);
-      expect(result.segment.id).toBe('seg-2');
+      expect(result.segment!.id).toBe('seg-2');
       expect(result.index).toBe(1);
       expect(result.startSec).toBe(300);
       expect(result.endSec).toBe(900);
@@ -131,7 +131,7 @@ describe('workout utilities', () => {
         createSegment('seg-2', 600),
       ];
       const result = getSegmentAtTime(segments, 500);
-      expect(result.segment.id).toBe('seg-2');
+      expect(result.segment!.id).toBe('seg-2');
       expect(result.index).toBe(1);
       expect(result.startSec).toBe(300);
       expect(result.endSec).toBe(900);
@@ -143,7 +143,7 @@ describe('workout utilities', () => {
         createSegment('seg-2', 600),
       ];
       const result = getSegmentAtTime(segments, 1500);
-      expect(result.segment.id).toBe('seg-2');
+      expect(result.segment!.id).toBe('seg-2');
       expect(result.index).toBe(1);
       expect(result.startSec).toBe(300);
       expect(result.endSec).toBe(900);

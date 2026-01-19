@@ -186,9 +186,12 @@ export const useBluetoothTelemetry = ({
   }, [isRecording]);
 
   useEffect(() => {
-    setSamples([]);
-    lastValuesRef.current = { powerWatts: null, cadenceRpm: null, hrBpm: null };
-    setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
+    const timeoutId = setTimeout(() => {
+      setSamples([]);
+      lastValuesRef.current = { powerWatts: null, cadenceRpm: null, hrBpm: null };
+      setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
+    }, 0);
+    return () => clearTimeout(timeoutId);
   }, [sessionId]);
 
   const updateLatest = useCallback((updates: Partial<LatestTelemetry>) => {
@@ -240,8 +243,15 @@ export const useBluetoothTelemetry = ({
     let active = true;
     let characteristic: BluetoothRemoteGATTCharacteristic | null = null;
 
-    setError(null);
-    setSamples([]);
+    const timeoutId = setTimeout(() => {
+      setError(null);
+      setSamples([]);
+    }, 0);
+
+    return () => {
+      clearTimeout(timeoutId);
+      active = false;
+    };
     lastValuesRef.current = { powerWatts: null, cadenceRpm: null, hrBpm: null };
     setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
 
@@ -270,6 +280,9 @@ export const useBluetoothTelemetry = ({
     };
 
     const startNotifications = async () => {
+      if (!trainerDevice) {
+        throw new Error('Trainer device not available.');
+      }
       const server =
         trainerDevice.gatt?.connected
           ? trainerDevice.gatt

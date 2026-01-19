@@ -504,7 +504,7 @@ function App() {
   }, [rawSamples]);
 
   const intervalAvgPower = useMemo(() => {
-    if (!hasPlan || !rawSamples.length) {
+    if (!hasPlan || !rawSamples.length || !segment) {
       return 0;
     }
     let rangeStart = startSec;
@@ -534,7 +534,7 @@ function App() {
     hasPlan,
     index,
     rawSamples,
-    segment.phase,
+    segment,
     startSec,
   ]);
 
@@ -563,10 +563,10 @@ function App() {
 
   const remainingSec = Math.max(totalDurationSec - activeSec, 0);
   const segmentRemainingSec = Math.max(endSec - activeSec, 0);
-  const isRecoveryPhase = hasPlan && segment.phase === 'recovery';
-  const isWarmupPhase = hasPlan && segment.phase === 'warmup';
-  const isCooldownPhase = hasPlan && segment.phase === 'cooldown';
-  const phaseClass = hasPlan ? `phase-${segment.phase}` : 'phase-idle';
+  const isRecoveryPhase = hasPlan && segment?.phase === 'recovery';
+  const isWarmupPhase = hasPlan && segment?.phase === 'warmup';
+  const isCooldownPhase = hasPlan && segment?.phase === 'cooldown';
+  const phaseClass = hasPlan ? `phase-${segment?.phase ?? 'idle'}` : 'phase-idle';
 
   const workSegments = activeSegments.filter((seg) => seg.isWork);
   const totalIntervals = workSegments.length;
@@ -633,7 +633,7 @@ function App() {
 
   const intervalLabel = isFreeRide
     ? 'FREE RIDE'
-    : hasPlan
+    : hasPlan && segment
       ? segment.isWork
         ? 'WORK'
         : segment.phase === 'recovery'
@@ -704,7 +704,7 @@ function App() {
   const hrZoneStyle = hrZone
     ? ({ '--zone-color': hrZone.color } as CSSProperties)
     : undefined;
-  const cadenceTargetRange = hasPlan ? segment.cadenceRange : undefined;
+  const cadenceTargetRange = hasPlan && segment ? segment.cadenceRange : undefined;
   const cadenceTargetLow = cadenceTargetRange?.low ?? null;
   const cadenceTargetHigh = cadenceTargetRange?.high ?? null;
   const isCadenceTargetSingle =
@@ -1092,7 +1092,9 @@ function App() {
   }, [
     autoResumeOnWork,
     canDetectWork,
+    clock,
     clock.start,
+    ftmsControl,
     ftmsControl.startWorkout,
     hasPlan,
     hasWorkTelemetry,
@@ -1127,7 +1129,9 @@ function App() {
   }, [
     autoPauseArmed,
     canDetectWork,
+    clock,
     clock.pause,
+    ftmsControl,
     ftmsControl.pauseWorkout,
     hasPlan,
     hasWorkTelemetry,
@@ -1625,7 +1629,7 @@ function App() {
           <div className="metric-header">
             <span>Power</span>
             <span className="metric-tag">
-              {hasPlan ? (segment.isWork ? 'ERG' : 'RES') : '--'}
+              {hasPlan && segment ? (segment.isWork ? 'ERG' : 'RES') : '--'}
             </span>
           </div>
           <div className="metric-value">
