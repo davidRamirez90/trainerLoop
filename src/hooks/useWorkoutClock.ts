@@ -49,12 +49,9 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
       return undefined;
     }
 
-    if (sessionStartRef.current === null) {
-      const now = Date.now();
-      sessionStartRef.current = now;
-      // Use setTimeout to avoid synchronous setState in effect
-      setTimeout(() => setSessionStartMs(now), 0);
-    }
+    const timeoutId = setTimeout(() => {
+      ensureSessionStart();
+    }, 0);
     const intervalId = window.setInterval(() => {
       if (sessionStartRef.current === null) {
         return;
@@ -64,8 +61,11 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
       setElapsedSec(nextElapsed);
     }, TICK_MS);
 
-    return () => window.clearInterval(intervalId);
-  }, [isSessionActive]);
+    return () => {
+      clearTimeout(timeoutId);
+      window.clearInterval(intervalId);
+    };
+  }, [isSessionActive, ensureSessionStart]);
 
   useEffect(() => {
     if (!isRunning) {
@@ -154,8 +154,8 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setActiveSec((prev) => Math.min(prev, totalDurationSec));
+      accumulatedRef.current = Math.min(accumulatedRef.current, totalDurationSec);
     }, 0);
-    accumulatedRef.current = Math.min(accumulatedRef.current, totalDurationSec);
     return () => clearTimeout(timeoutId);
   }, [totalDurationSec]);
 

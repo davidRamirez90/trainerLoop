@@ -14,6 +14,7 @@ import { formatDuration } from './utils/time';
 import { buildFitFile } from './utils/fit';
 import { parseWorkoutFile } from './utils/workoutImport';
 import { getTargetRangeAtTime, getTotalDurationSec } from './utils/workout';
+import { buildSessionSummary, addSessionToStorage, type SessionData } from './utils/sessionStorage';
 import type { TelemetrySample } from './types';
 
 const IDLE_SEGMENT: WorkoutSegment = {
@@ -566,7 +567,7 @@ function App() {
   const isRecoveryPhase = hasPlan && segment?.phase === 'recovery';
   const isWarmupPhase = hasPlan && segment?.phase === 'warmup';
   const isCooldownPhase = hasPlan && segment?.phase === 'cooldown';
-  const phaseClass = hasPlan ? `phase-${segment?.phase ?? 'idle'}` : 'phase-idle';
+  const phaseClass = hasPlan && segment ? `phase-${segment.phase}` : 'phase-idle';
 
   const workSegments = activeSegments.filter((seg) => seg.isWork);
   const totalIntervals = workSegments.length;
@@ -1243,6 +1244,7 @@ function App() {
     const fallbackStart =
       Date.now() - Math.max(elapsedForExport, 0) * 1000;
     const startTimeMs = sessionStartMs ?? fallbackStart;
+    const endTimeMs = Date.now();
     const fitPayload = buildFitFile({
       startTimeMs,
       elapsedSec: elapsedForExport,
@@ -1250,6 +1252,23 @@ function App() {
       samples: exportSamples,
     });
     downloadFitFile(fitPayload, buildFitFilename(planName, startTimeMs));
+
+    // Save session to localStorage
+    const sessionData: SessionData = {
+      ...buildSessionSummary(
+        startTimeMs,
+        endTimeMs,
+        timerSecForExport,
+        exportSamples,
+        planName,
+        isComplete
+      ),
+      startTimeMs,
+      endTimeMs,
+      samples: exportSamples,
+    };
+    addSessionToStorage(sessionData);
+
     handleStop();
   };
 

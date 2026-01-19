@@ -95,9 +95,9 @@ export const useFtmsControl = ({
       const timeoutId = setTimeout(() => {
         setStatus('idle');
         setError(null);
+        hasControlRef.current = false;
+        controlPointRef.current = null;
       }, 0);
-      hasControlRef.current = false;
-      controlPointRef.current = null;
       return () => clearTimeout(timeoutId);
     }
 
@@ -107,8 +107,8 @@ export const useFtmsControl = ({
     const timeoutId = setTimeout(() => {
       setStatus('requesting');
       setError(null);
+      hasControlRef.current = false;
     }, 0);
-    hasControlRef.current = false;
 
     return () => {
       clearTimeout(timeoutId);
@@ -184,6 +184,7 @@ export const useFtmsControl = ({
 
     return () => {
       active = false;
+      clearTimeout(timeoutId);
       if (controlPoint) {
         controlPoint.removeEventListener('characteristicvaluechanged', handleResponse);
         controlPoint.stopNotifications().catch(() => undefined);

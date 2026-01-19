@@ -230,14 +230,16 @@ export const useBluetoothTelemetry = ({
 
   useEffect(() => {
     if (!trainerDevice) {
-      setIsActive(false);
-      setError(null);
-      setLatest((prev) =>
-        hrDeviceRef.current
-          ? { ...prev, powerWatts: null, cadenceRpm: null }
-          : { powerWatts: null, cadenceRpm: null, hrBpm: null }
-      );
-      return undefined;
+      const timeoutId = setTimeout(() => {
+        setIsActive(false);
+        setError(null);
+        setLatest((prev) =>
+          hrDeviceRef.current
+            ? { ...prev, powerWatts: null, cadenceRpm: null }
+            : { powerWatts: null, cadenceRpm: null, hrBpm: null }
+        );
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
 
     let active = true;
@@ -246,14 +248,9 @@ export const useBluetoothTelemetry = ({
     const timeoutId = setTimeout(() => {
       setError(null);
       setSamples([]);
+      lastValuesRef.current = { powerWatts: null, cadenceRpm: null, hrBpm: null };
+      setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
     }, 0);
-
-    return () => {
-      clearTimeout(timeoutId);
-      active = false;
-    };
-    lastValuesRef.current = { powerWatts: null, cadenceRpm: null, hrBpm: null };
-    setLatest({ powerWatts: null, cadenceRpm: null, hrBpm: null });
 
     const handleIndoorBikeData = (event: Event) => {
       const target = event.target as BluetoothRemoteGATTCharacteristic | null;
@@ -310,6 +307,7 @@ export const useBluetoothTelemetry = ({
 
     return () => {
       active = false;
+      clearTimeout(timeoutId);
       setIsActive(false);
       if (characteristic) {
         characteristic.removeEventListener('characteristicvaluechanged', handleIndoorBikeData);
