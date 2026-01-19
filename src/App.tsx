@@ -505,10 +505,7 @@ function App() {
   }, [rawSamples]);
 
   const intervalAvgPower = useMemo(() => {
-    if (!hasPlan || !rawSamples.length) {
-      return 0;
-    }
-    if (!segment) {
+    if (!hasPlan || !rawSamples.length || !segment) {
       return 0;
     }
     let rangeStart = startSec;

@@ -110,6 +110,11 @@ export const useFtmsControl = ({
       hasControlRef.current = false;
     }, 0);
 
+    return () => {
+      clearTimeout(timeoutId);
+      active = false;
+    };
+
     const handleResponse = (event: Event) => {
       const target = event.target as BluetoothRemoteGATTCharacteristic | null;
       const value = target?.value;
@@ -150,6 +155,9 @@ export const useFtmsControl = ({
     };
 
     const setupControlPoint = async () => {
+      if (!trainerDevice) {
+        throw new Error('Trainer device not available.');
+      }
       const server =
         trainerDevice.gatt?.connected
           ? trainerDevice.gatt

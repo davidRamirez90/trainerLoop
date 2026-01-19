@@ -277,6 +277,9 @@ export const useBluetoothTelemetry = ({
     };
 
     const startNotifications = async () => {
+      if (!trainerDevice) {
+        throw new Error('Trainer device not available.');
+      }
       const server =
         trainerDevice.gatt?.connected
           ? trainerDevice.gatt
