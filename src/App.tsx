@@ -14,6 +14,7 @@ import { formatDuration } from './utils/time';
 import { buildFitFile } from './utils/fit';
 import { parseWorkoutFile } from './utils/workoutImport';
 import { getTargetRangeAtTime, getTotalDurationSec } from './utils/workout';
+import { buildSessionSummary, addSessionToStorage, type SessionData } from './utils/sessionStorage';
 import type { TelemetrySample } from './types';
 
 const IDLE_SEGMENT: WorkoutSegment = {
@@ -1239,6 +1240,7 @@ function App() {
     const fallbackStart =
       Date.now() - Math.max(elapsedForExport, 0) * 1000;
     const startTimeMs = sessionStartMs ?? fallbackStart;
+    const endTimeMs = Date.now();
     const fitPayload = buildFitFile({
       startTimeMs,
       elapsedSec: elapsedForExport,
@@ -1246,6 +1248,23 @@ function App() {
       samples: exportSamples,
     });
     downloadFitFile(fitPayload, buildFitFilename(planName, startTimeMs));
+
+    // Save session to localStorage
+    const sessionData: SessionData = {
+      ...buildSessionSummary(
+        startTimeMs,
+        endTimeMs,
+        timerSecForExport,
+        exportSamples,
+        planName,
+        isComplete
+      ),
+      startTimeMs,
+      endTimeMs,
+      samples: exportSamples,
+    };
+    addSessionToStorage(sessionData);
+
     handleStop();
   };
 
