@@ -40,6 +40,8 @@ const createMockSession = (
   avgCadence: 85,
   avgHr: 155,
   coachNotes: '',
+  coachProfileId: null,
+  coachEvents: [],
   completed,
   startTimeMs: Date.now() - 3600000,
   endTimeMs: Date.now(),
@@ -68,7 +70,9 @@ describe('sessionStorage', () => {
         samples,
         'Test Workout',
         true,
-        'Great session!'
+        'Great session!',
+        'coach-alpha',
+        []
       );
 
       expect(summary.id).toBe(`${startTimeMs}-${endTimeMs}`);
@@ -78,6 +82,7 @@ describe('sessionStorage', () => {
       expect(summary.maxPower).toBeGreaterThan(0);
       expect(summary.completed).toBe(true);
       expect(summary.coachNotes).toBe('Great session!');
+      expect(summary.coachProfileId).toBe('coach-alpha');
     });
 
     it('should calculate average power correctly', () => {

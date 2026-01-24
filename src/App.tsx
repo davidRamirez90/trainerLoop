@@ -1,15 +1,19 @@
 import type { ChangeEvent, CSSProperties } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import './App.css';
 import { WorkoutChart } from './components/WorkoutChart';
 import { CoachPanel } from './components/CoachPanel';
 import type { WorkoutPlan, WorkoutSegment } from './data/workout';
+import { useCoachEngine } from './hooks/useCoachEngine';
 import { useBluetoothDevices } from './hooks/useBluetoothDevices';
 import { useBluetoothTelemetry } from './hooks/useBluetoothTelemetry';
 import { useFtmsControl } from './hooks/useFtmsControl';
 import { useTelemetryProcessing } from './hooks/useTelemetryProcessing';
 import { useWorkoutClock } from './hooks/useWorkoutClock';
+import type { CoachSuggestion } from './types/coach';
+import { getCoachProfileById, getCoachProfiles } from './utils/coachProfiles';
+import { buildCoachNotes } from './utils/coachNotes';
 import { formatDuration } from './utils/time';
 import { buildFitFile } from './utils/fit';
 import { parseWorkoutFile } from './utils/workoutImport';
@@ -99,6 +103,11 @@ type FtpChoice = {
   selected: 'workout' | 'profile';
 };
 
+type IntensityOverride = {
+  fromIndex: number;
+  offsetPct: number;
+};
+
 const DEFAULT_HR_ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'];
 const DEFAULT_POWER_ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'];
 const HR_ZONE_COLORS = [
@@ -164,6 +173,7 @@ const sanitizeZones = (zones: ZoneRange[] | undefined, fallback: string[]) => {
 };
 
 const PROFILE_STORAGE_KEY = 'trainerLoop.profile.v1';
+const COACH_PROFILE_STORAGE_KEY = 'trainerLoop.coachProfileId.v1';
 
 const loadProfileFromStorage = (): UserProfile => {
   if (typeof window === 'undefined') {
@@ -197,6 +207,28 @@ const saveProfileToStorage = (profile: UserProfile) => {
   }
 };
 
+const loadCoachProfileIdFromStorage = (): string | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    return window.localStorage.getItem(COACH_PROFILE_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const saveCoachProfileIdToStorage = (profileId: string) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(COACH_PROFILE_STORAGE_KEY, profileId);
+  } catch {
+    // Ignore storage errors.
+  }
+};
+
 const cloneProfile = (profile: UserProfile): UserProfile => ({
   ...profile,
   hrZones: profile.hrZones.map((zone) => ({ ...zone })),
@@ -224,6 +256,18 @@ const formatSignedWatts = (value: number) =>
 
 const clampValue = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
+
+const getIntensityOffsetForIndex = (
+  overrides: IntensityOverride[],
+  index: number
+) => {
+  if (!overrides.length) {
+    return 0;
+  }
+  const sorted = [...overrides].sort((a, b) => a.fromIndex - b.fromIndex);
+  const match = [...sorted].reverse().find((item) => item.fromIndex <= index);
+  return match?.offsetPct ?? 0;
+};
 
 const parseZoneBoundary = (value: string) => {
   const parsed = Number.parseFloat(value);
@@ -311,13 +355,50 @@ function App() {
     buildEmptyProfile()
   );
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const coachProfiles = useMemo(() => getCoachProfiles(), []);
+  const [selectedCoachProfileId, setSelectedCoachProfileId] = useState<string | null>(
+    () => loadCoachProfileIdFromStorage()
+  );
+  const activeCoachProfile = useMemo(
+    () => getCoachProfileById(coachProfiles, selectedCoachProfileId),
+    [coachProfiles, selectedCoachProfileId]
+  );
+  const [intensityOverrides, setIntensityOverrides] = useState<IntensityOverride[]>([]);
+  const [recoveryExtensions, setRecoveryExtensions] = useState<Record<string, number>>({});
   const lastWorkRef = useRef<number | null>(null);
   const resumeTimeoutRef = useRef<number | null>(null);
   const prevRunningRef = useRef(false);
   const stopPromptWasRunningRef = useRef(false);
   const lastRecordedSecRef = useRef<number | null>(null);
   const hasPlan = !!activePlan && activePlan.segments.length > 0;
-  const activeSegments = hasPlan ? activePlan.segments : EMPTY_SEGMENTS;
+  const baseSegments = hasPlan ? activePlan.segments : EMPTY_SEGMENTS;
+  const adjustedSegments = useMemo(() => {
+    if (!baseSegments.length) {
+      return baseSegments;
+    }
+    return baseSegments.map((segment, index) => {
+      const offsetPct = getIntensityOffsetForIndex(intensityOverrides, index);
+      const scale = segment.isWork ? 1 + offsetPct / 100 : 1;
+      const applyScale = (range: { low: number; high: number }) => ({
+        low: range.low * scale,
+        high: range.high * scale,
+      });
+      const extension =
+        segment.phase === 'recovery' ? recoveryExtensions[segment.id] ?? 0 : 0;
+      return {
+        ...segment,
+        durationSec: segment.durationSec + extension,
+        targetRange: segment.isWork
+          ? applyScale(segment.targetRange)
+          : segment.targetRange,
+        rampToRange:
+          segment.isWork && segment.rampToRange
+            ? applyScale(segment.rampToRange)
+            : segment.rampToRange,
+      };
+    });
+  }, [baseSegments, intensityOverrides, recoveryExtensions]);
+  const activeSegments = adjustedSegments;
   const planDurationSec = useMemo(
     () => getTotalDurationSec(activeSegments),
     [activeSegments]
@@ -372,6 +453,27 @@ function App() {
   const sessionElapsedSecRef = useRef(sessionElapsedSec);
   const latestTelemetryRef = useRef(latestTelemetry);
   const isRunningRef = useRef(isRunning);
+
+  useEffect(() => {
+    if (!coachProfiles.length) {
+      return;
+    }
+    const exists = coachProfiles.some(
+      (coach) => coach.id === selectedCoachProfileId
+    );
+    if (!exists) {
+      const fallbackId = coachProfiles[0]?.id ?? null;
+      if (fallbackId) {
+        setSelectedCoachProfileId(fallbackId);
+        saveCoachProfileIdToStorage(fallbackId);
+      }
+    }
+  }, [coachProfiles, selectedCoachProfileId]);
+
+  useEffect(() => {
+    setIntensityOverrides([]);
+    setRecoveryExtensions({});
+  }, [clock.sessionId]);
 
   useEffect(() => {
     sessionElapsedSecRef.current = sessionElapsedSec;
@@ -468,6 +570,7 @@ function App() {
 
   const { low: targetLow, high: targetHigh } = targetRange;
   const targetMid = (targetLow + targetHigh) / 2;
+  const intensityOffsetPct = getIntensityOffsetForIndex(intensityOverrides, index);
   const ergBiasWatts = parseNumber(profile.ergBiasWatts) ?? 0;
   const ergBiasRounded = Math.round(ergBiasWatts);
   const ergTargetBaseWatts = targetMid + ergBiasWatts;
@@ -492,6 +595,101 @@ function App() {
   const latestPower = bluetoothLatest.powerWatts ?? 0;
   const latestCadence = bluetoothLatest.cadenceRpm ?? 0;
   const hasWorkTelemetry = latestPower > 0 || latestCadence > 0;
+
+  const handleCoachAction = useCallback(
+    (suggestion: CoachSuggestion) => {
+      if (!activeCoachProfile) {
+        return;
+      }
+      if (suggestion.action === 'adjust_intensity_up' || suggestion.action === 'adjust_intensity_down') {
+        const percent = suggestion.payload?.percent ?? activeCoachProfile.interventions.intensityAdjustPct.step;
+        const delta = suggestion.action === 'adjust_intensity_up' ? percent : -percent;
+        const fromIndex = suggestion.payload?.segmentIndex ?? index;
+        setIntensityOverrides((prev) => {
+          const currentOffset = getIntensityOffsetForIndex(prev, fromIndex);
+          const nextOffset = clampValue(
+            currentOffset + delta,
+            activeCoachProfile.interventions.intensityAdjustPct.min,
+            activeCoachProfile.interventions.intensityAdjustPct.max
+          );
+          if (nextOffset === currentOffset) {
+            return prev;
+          }
+          return [...prev, { fromIndex, offsetPct: nextOffset }];
+        });
+        return;
+      }
+
+      if (suggestion.action === 'extend_recovery') {
+        const segmentId = suggestion.payload?.segmentId;
+        if (!segmentId) {
+          return;
+        }
+        const step = activeCoachProfile.interventions.recoveryExtendSec.step;
+        const max = activeCoachProfile.interventions.recoveryExtendSec.max;
+        setRecoveryExtensions((prev) => {
+          const current = prev[segmentId] ?? 0;
+          const next = Math.min(current + step, max);
+          if (next === current) {
+            return prev;
+          }
+          return { ...prev, [segmentId]: next };
+        });
+        return;
+      }
+
+      if (suggestion.action === 'skip_remaining_on_intervals') {
+        if (!hasPlan || isFreeRide) {
+          return;
+        }
+        const fromIndex = suggestion.payload?.segmentIndex ?? index;
+        let cooldownIndex: number | null = null;
+        for (let i = Math.max(fromIndex + 1, 0); i < activeSegments.length; i += 1) {
+          if (activeSegments[i].phase === 'cooldown') {
+            cooldownIndex = i;
+            break;
+          }
+        }
+        const startAt = cooldownIndex === null
+          ? planDurationSec
+          : activeSegments.slice(0, cooldownIndex).reduce((sum, seg) => sum + seg.durationSec, 0);
+        clock.seek(startAt);
+      }
+    },
+    [
+      activeCoachProfile,
+      activeSegments,
+      clock,
+      hasPlan,
+      index,
+      isFreeRide,
+      planDurationSec,
+    ]
+  );
+
+  const {
+    suggestions: coachSuggestions,
+    events: coachEvents,
+    acceptSuggestion,
+    rejectSuggestion,
+  } = useCoachEngine({
+    profile: activeCoachProfile,
+    segments: activeSegments,
+    segment,
+    segmentIndex: index,
+    segmentStartSec: startSec,
+    segmentEndSec: endSec,
+    elapsedInSegmentSec,
+    activeSec,
+    isRunning,
+    hasPlan: hasPlan && !isFreeRide,
+    isComplete,
+    targetRange,
+    samples: telemetrySamples,
+    sessionId: clock.sessionId,
+    intensityOffsetPct,
+    onApplyAction: handleCoachAction,
+  });
 
   const avgPower = useMemo(() => {
     if (!rawSamples.length) {
@@ -553,10 +751,6 @@ function App() {
   const compliance = displayPower && targetMid > 0
     ? Math.round((displayPower / targetMid) * 100)
     : 0;
-  
-  // Calculate strain from intensity factor (IF) - normalize to 0-1 range
-  // IF > 1 means high intensity, IF < 0.75 means recovery zone
-  const strain = Math.min(Math.max(ifValue, 0), 1.2);
   const isPowerInRange =
     displayPower !== null &&
     displayPower >= targetLow &&
@@ -808,6 +1002,11 @@ function App() {
     setProfile(nextProfile);
     saveProfileToStorage(nextProfile);
     setIsProfileOpen(false);
+  };
+
+  const handleCoachProfileSelect = (profileId: string) => {
+    setSelectedCoachProfileId(profileId);
+    saveCoachProfileIdToStorage(profileId);
   };
 
   const handleDraftFieldChange =
@@ -1254,6 +1453,7 @@ function App() {
     downloadFitFile(fitPayload, buildFitFilename(planName, startTimeMs));
 
     // Save session to localStorage
+    const coachNotes = buildCoachNotes(coachEvents);
     const sessionData: SessionData = {
       ...buildSessionSummary(
         startTimeMs,
@@ -1261,7 +1461,10 @@ function App() {
         timerSecForExport,
         exportSamples,
         planName,
-        isComplete
+        isComplete,
+        coachNotes,
+        activeCoachProfile?.id ?? null,
+        coachEvents
       ),
       startTimeMs,
       endTimeMs,
@@ -1493,11 +1696,14 @@ function App() {
 
       {hasPlan ? (
         <CoachPanel
-          compliance={compliance / 100}
-          strain={strain}
-          onAcceptSuggestion={(id) => {
-            console.log('Accepted suggestion:', id);
-          }}
+          profile={activeCoachProfile}
+          profiles={coachProfiles}
+          selectedProfileId={selectedCoachProfileId}
+          onSelectProfile={handleCoachProfileSelect}
+          events={coachEvents}
+          suggestions={coachSuggestions}
+          onAcceptSuggestion={acceptSuggestion}
+          onRejectSuggestion={rejectSuggestion}
         />
       ) : null}
 

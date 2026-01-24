@@ -17,6 +17,7 @@ type WorkoutClock = {
   resume: () => void;
   pause: () => void;
   stop: () => void;
+  seek: (nextActiveSec: number) => void;
 };
 
 const TICK_MS = 500;
@@ -151,6 +152,25 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
     setIsRunning(false);
   }, [activeSec, isRunning]);
 
+  const seek = useCallback(
+    (nextActiveSec: number) => {
+      const clamped = Math.min(Math.max(nextActiveSec, 0), totalDurationSec);
+      setActiveSec(clamped);
+      accumulatedRef.current = clamped;
+      if (clamped >= totalDurationSec) {
+        setIsRunning(false);
+        setIsComplete(true);
+        activeStartRef.current = null;
+        return;
+      }
+      setIsComplete(false);
+      if (isRunning) {
+        activeStartRef.current = Date.now();
+      }
+    },
+    [isRunning, totalDurationSec]
+  );
+
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setActiveSec((prev) => Math.min(prev, totalDurationSec));
@@ -173,5 +193,6 @@ export const useWorkoutClock = (segments: WorkoutSegment[]): WorkoutClock => {
     resume,
     pause,
     stop,
+    seek,
   };
 };
