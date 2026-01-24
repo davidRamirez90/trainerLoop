@@ -29,6 +29,13 @@ const LINE_STROKE_ALPHA = 0.85;
 const POWER_SMOOTH_WINDOW_SEC = 3;
 const GAP_FILL = 'rgba(214, 69, 65, 0.12)';
 const GAP_STROKE = 'rgba(214, 69, 65, 0.4)';
+const DEFAULT_HR_RANGE = { min: 80, max: 180 };
+const HR_RANGE_MIN = 40;
+const HR_RANGE_MAX = 220;
+const HR_EARLY_ANCHOR_SEC = 120;
+const HR_EARLY_SAMPLE_COUNT = 30;
+const HR_MIN_SPAN_EASY = 35;
+const HR_MIN_SPAN_WORK = 45;
 
 const clampValue = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -95,6 +102,69 @@ const getCadenceLabel = (segment: WorkoutSegment) => {
   return formatRange(segment.cadenceRange.low, segment.cadenceRange.high, ' rpm');
 };
 
+const ensureHrSpan = (min: number, max: number, minSpan: number) => {
+  if (max - min >= minSpan) {
+    return { min, max };
+  }
+  const mid = (min + max) / 2;
+  return {
+    min: mid - minSpan / 2,
+    max: mid + minSpan / 2,
+  };
+};
+
+const getInitialHrRange = (
+  thresholdHr: number | null,
+  currentHr: number | null,
+  startsEasy: boolean
+) => {
+  const minSpan = startsEasy ? HR_MIN_SPAN_EASY : HR_MIN_SPAN_WORK;
+  const thresholdLow =
+    thresholdHr !== null
+      ? thresholdHr - (startsEasy ? 60 : 50)
+      : null;
+  const thresholdHigh =
+    thresholdHr !== null
+      ? thresholdHr + (startsEasy ? 15 : 30)
+      : null;
+  const currentLow =
+    currentHr !== null
+      ? currentHr - (startsEasy ? 15 : 20)
+      : null;
+  const currentHigh =
+    currentHr !== null
+      ? currentHr + (startsEasy ? 25 : 35)
+      : null;
+
+  const minCandidates = [
+    thresholdLow,
+    currentLow,
+    DEFAULT_HR_RANGE.min,
+  ].filter((value): value is number => value !== null);
+  const maxCandidates = [
+    thresholdHigh,
+    currentHigh,
+    DEFAULT_HR_RANGE.max,
+  ].filter((value): value is number => value !== null);
+
+  let min = Math.min(...minCandidates);
+  let max = Math.max(...maxCandidates);
+  min = clampValue(min, HR_RANGE_MIN, HR_RANGE_MAX);
+  max = clampValue(max, HR_RANGE_MIN, HR_RANGE_MAX);
+  ({ min, max } = ensureHrSpan(min, max, minSpan));
+  min = clampValue(min, HR_RANGE_MIN, HR_RANGE_MAX);
+  max = clampValue(max, HR_RANGE_MIN, HR_RANGE_MAX);
+  if (min === max) {
+    if (min === HR_RANGE_MAX) {
+      min = HR_RANGE_MAX - 1;
+    } else {
+      max = clampValue(max + 1, HR_RANGE_MIN, HR_RANGE_MAX);
+    }
+  }
+
+  return { min, max };
+};
+
 const useChartSize = (ref: React.RefObject<HTMLDivElement | null>) => {
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -132,6 +202,8 @@ type WorkoutChartProps = {
   ftpWatts: number;
   hrSensorConnected: boolean;
   showPower3s: boolean;
+  thresholdHr: number | null;
+  currentHr: number | null;
 };
 
 type HoverState = {
@@ -148,6 +220,8 @@ export const WorkoutChart = ({
   ftpWatts,
   hrSensorConnected,
   showPower3s,
+  thresholdHr,
+  currentHr,
 }: WorkoutChartProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
@@ -184,6 +258,12 @@ export const WorkoutChart = ({
   );
   const showHeartRate = hrSensorConnected && hasHrData;
   const showHeartRateAxis = showHeartRate;
+  const startsEasy =
+    segments[0]?.phase === 'warmup' || segments[0]?.phase === 'recovery';
+  const initialHrRange = useMemo(
+    () => getInitialHrRange(thresholdHr, currentHr, startsEasy),
+    [currentHr, startsEasy, thresholdHr]
+  );
 
   const totalDurationSec = useMemo(() => getTotalDurationSec(segments), [segments]);
   const { yMin, yMax } = useMemo(() => {
@@ -248,22 +328,36 @@ export const WorkoutChart = ({
 
   const { hrMin, hrMax } = useMemo(() => {
     if (!hasHrData) {
-      return { hrMin: 80, hrMax: 180 };
+      return {
+        hrMin: Math.floor(initialHrRange.min),
+        hrMax: Math.ceil(initialHrRange.max),
+      };
     }
     const values = hrValues.filter((value): value is number => value !== null);
     if (!values.length) {
-      return { hrMin: 80, hrMax: 180 };
+      return {
+        hrMin: Math.floor(initialHrRange.min),
+        hrMax: Math.ceil(initialHrRange.max),
+      };
     }
     const minHr = Math.min(...values);
     const maxHr = Math.max(...values);
-    const span = Math.max(1, maxHr - minHr);
-    const paddedMin = Math.max(40, minHr - span * 0.1);
-    const paddedMax = Math.min(220, maxHr + span * 0.1);
+    const shouldAnchor =
+      values.length < HR_EARLY_SAMPLE_COUNT || elapsedSec < HR_EARLY_ANCHOR_SEC;
+    const anchoredMin = shouldAnchor
+      ? Math.min(minHr, initialHrRange.min)
+      : minHr;
+    const anchoredMax = shouldAnchor
+      ? Math.max(maxHr, initialHrRange.max)
+      : maxHr;
+    const span = Math.max(1, anchoredMax - anchoredMin);
+    const paddedMin = clampValue(anchoredMin - span * 0.1, HR_RANGE_MIN, HR_RANGE_MAX);
+    const paddedMax = clampValue(anchoredMax + span * 0.1, HR_RANGE_MIN, HR_RANGE_MAX);
     return {
       hrMin: Math.floor(paddedMin),
       hrMax: Math.ceil(paddedMax),
     };
-  }, [hasHrData, hrValues]);
+  }, [elapsedSec, hasHrData, hrValues, initialHrRange]);
 
   const data = useMemo(() => {
     const times = samples.map((sample) => sample.timeSec);
