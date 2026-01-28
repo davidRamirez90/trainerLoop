@@ -40,6 +40,8 @@ const createMockSession = (
   avgCadence: 85,
   avgHr: 155,
   coachNotes: '',
+  coachProfileId: 'tempo-traditionalist',
+  coachEvents: [],
   completed,
   startTimeMs: Date.now() - 3600000,
   endTimeMs: Date.now(),

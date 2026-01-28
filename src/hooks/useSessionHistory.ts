@@ -1,12 +1,15 @@
 import { useCallback, useState, useEffect } from 'react';
 
-import type { SessionData, SessionSummary } from '../utils/sessionStorage';
+import type { SessionData, SessionSummary, SessionCoachEvent } from '../utils/sessionStorage';
 import {
   loadSessionsFromStorage,
   saveSessionsToStorage,
   addSessionToStorage,
   deleteSessionFromStorage,
   updateSessionNotesInStorage,
+  addCoachEventToSession,
+  updateSessionCoachProfile,
+  clearSessionCoachEvents,
 } from '../utils/sessionStorage';
 
 const MAX_CACHED_SAMPLES = 1000;
@@ -78,6 +81,35 @@ export const useSessionHistory = () => {
     []
   );
 
+  const addCoachEvent = useCallback((sessionId: string, event: SessionCoachEvent) => {
+    addCoachEventToSession(sessionId, event);
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === sessionId
+          ? { ...s, coachEvents: [...s.coachEvents, event] }
+          : s
+      )
+    );
+  }, []);
+
+  const updateCoachProfile = useCallback((sessionId: string, coachProfileId: string) => {
+    updateSessionCoachProfile(sessionId, coachProfileId);
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === sessionId ? { ...s, coachProfileId } : s
+      )
+    );
+  }, []);
+
+  const clearCoachEvents = useCallback((sessionId: string) => {
+    clearSessionCoachEvents(sessionId);
+    setSessions((prev) =>
+      prev.map((s) =>
+        s.id === sessionId ? { ...s, coachEvents: [] } : s
+      )
+    );
+  }, []);
+
   return {
     sessions,
     isLoading,
@@ -86,5 +118,8 @@ export const useSessionHistory = () => {
     updateNotes,
     clearAll,
     getSessionById,
+    addCoachEvent,
+    updateCoachProfile,
+    clearCoachEvents,
   };
 };
