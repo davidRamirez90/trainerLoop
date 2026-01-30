@@ -1,15 +1,22 @@
 import type { ChangeEvent, CSSProperties } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import './App.css';
 import { WorkoutChart } from './components/WorkoutChart';
 import { CoachPanel } from './components/CoachPanel';
+import { CoachSelectorModal } from './components/CoachSelectorModal';
+import { CriticalSuggestionModal } from './components/CriticalSuggestionModal';
+import { ToastNotification, useToast } from './components/ToastNotification';
 import type { WorkoutPlan, WorkoutSegment } from './data/workout';
+import { useCoachEngine } from './hooks/useCoachEngine';
 import { useBluetoothDevices } from './hooks/useBluetoothDevices';
 import { useBluetoothTelemetry } from './hooks/useBluetoothTelemetry';
 import { useFtmsControl } from './hooks/useFtmsControl';
 import { useTelemetryProcessing } from './hooks/useTelemetryProcessing';
 import { useWorkoutClock } from './hooks/useWorkoutClock';
+import type { CoachSuggestion } from './types/coach';
+import { getCoachProfileById, getCoachProfiles } from './utils/coachProfiles';
+import { buildCoachNotes } from './utils/coachNotes';
 import { formatDuration } from './utils/time';
 import { buildFitFile } from './utils/fit';
 import { parseWorkoutFile } from './utils/workoutImport';
@@ -99,6 +106,11 @@ type FtpChoice = {
   selected: 'workout' | 'profile';
 };
 
+type IntensityOverride = {
+  fromIndex: number;
+  offsetPct: number;
+};
+
 const DEFAULT_HR_ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5'];
 const DEFAULT_POWER_ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'];
 const HR_ZONE_COLORS = [
@@ -164,6 +176,7 @@ const sanitizeZones = (zones: ZoneRange[] | undefined, fallback: string[]) => {
 };
 
 const PROFILE_STORAGE_KEY = 'trainerLoop.profile.v1';
+const COACH_PROFILE_STORAGE_KEY = 'trainerLoop.coachProfileId.v1';
 
 const loadProfileFromStorage = (): UserProfile => {
   if (typeof window === 'undefined') {
@@ -197,6 +210,28 @@ const saveProfileToStorage = (profile: UserProfile) => {
   }
 };
 
+const loadCoachProfileIdFromStorage = (): string | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    return window.localStorage.getItem(COACH_PROFILE_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const saveCoachProfileIdToStorage = (profileId: string) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(COACH_PROFILE_STORAGE_KEY, profileId);
+  } catch {
+    // Ignore storage errors.
+  }
+};
+
 const cloneProfile = (profile: UserProfile): UserProfile => ({
   ...profile,
   hrZones: profile.hrZones.map((zone) => ({ ...zone })),
@@ -224,6 +259,18 @@ const formatSignedWatts = (value: number) =>
 
 const clampValue = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
+
+const getIntensityOffsetForIndex = (
+  overrides: IntensityOverride[],
+  index: number
+) => {
+  if (!overrides.length) {
+    return 0;
+  }
+  const sorted = [...overrides].sort((a, b) => a.fromIndex - b.fromIndex);
+  const match = [...sorted].reverse().find((item) => item.fromIndex <= index);
+  return match?.offsetPct ?? 0;
+};
 
 const parseZoneBoundary = (value: string) => {
   const parsed = Number.parseFloat(value);
@@ -311,13 +358,55 @@ function App() {
     buildEmptyProfile()
   );
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isCoachSelectorOpen, setIsCoachSelectorOpen] = useState(false);
+  const coachProfiles = useMemo(() => getCoachProfiles(), []);
+  const [selectedCoachProfileId, setSelectedCoachProfileId] = useState<string | null>(
+    () => loadCoachProfileIdFromStorage()
+  );
+  const activeCoachProfile = useMemo(
+    () => getCoachProfileById(coachProfiles, selectedCoachProfileId),
+    [coachProfiles, selectedCoachProfileId]
+  );
+  const [intensityOverrides, setIntensityOverrides] = useState<IntensityOverride[]>([]);
+  const [recoveryExtensions, setRecoveryExtensions] = useState<Record<string, number>>({});
+  const [segmentShortenings, setSegmentShortenings] = useState<Record<string, number>>({});
+  const [criticalSuggestion, setCriticalSuggestion] = useState<CoachSuggestion | null>(null);
+  const { toasts, success, removeToast } = useToast();
   const lastWorkRef = useRef<number | null>(null);
   const resumeTimeoutRef = useRef<number | null>(null);
   const prevRunningRef = useRef(false);
   const stopPromptWasRunningRef = useRef(false);
   const lastRecordedSecRef = useRef<number | null>(null);
   const hasPlan = !!activePlan && activePlan.segments.length > 0;
-  const activeSegments = hasPlan ? activePlan.segments : EMPTY_SEGMENTS;
+  const baseSegments = hasPlan ? activePlan.segments : EMPTY_SEGMENTS;
+  const adjustedSegments = useMemo(() => {
+    if (!baseSegments.length) {
+      return baseSegments;
+    }
+    return baseSegments.map((segment, index) => {
+      const offsetPct = getIntensityOffsetForIndex(intensityOverrides, index);
+      const scale = segment.isWork ? 1 + offsetPct / 100 : 1;
+      const applyScale = (range: { low: number; high: number }) => ({
+        low: range.low * scale,
+        high: range.high * scale,
+      });
+      const extension =
+        segment.phase === 'recovery' ? recoveryExtensions[segment.id] ?? 0 : 0;
+      const shortening = segmentShortenings[segment.id] ?? 0;
+      return {
+        ...segment,
+        durationSec: Math.max(1, segment.durationSec + extension - shortening),
+        targetRange: segment.isWork
+          ? applyScale(segment.targetRange)
+          : segment.targetRange,
+        rampToRange:
+          segment.isWork && segment.rampToRange
+            ? applyScale(segment.rampToRange)
+            : segment.rampToRange,
+      };
+    });
+  }, [baseSegments, intensityOverrides, recoveryExtensions, segmentShortenings]);
+  const activeSegments = adjustedSegments;
   const planDurationSec = useMemo(
     () => getTotalDurationSec(activeSegments),
     [activeSegments]
@@ -372,6 +461,27 @@ function App() {
   const sessionElapsedSecRef = useRef(sessionElapsedSec);
   const latestTelemetryRef = useRef(latestTelemetry);
   const isRunningRef = useRef(isRunning);
+
+  useEffect(() => {
+    if (!coachProfiles.length) {
+      return;
+    }
+    const exists = coachProfiles.some(
+      (coach) => coach.id === selectedCoachProfileId
+    );
+    if (!exists) {
+      const fallbackId = coachProfiles[0]?.id ?? null;
+      if (fallbackId) {
+        setSelectedCoachProfileId(fallbackId);
+        saveCoachProfileIdToStorage(fallbackId);
+      }
+    }
+  }, [coachProfiles, selectedCoachProfileId]);
+
+  useEffect(() => {
+    setIntensityOverrides([]);
+    setRecoveryExtensions({});
+  }, [clock.sessionId]);
 
   useEffect(() => {
     sessionElapsedSecRef.current = sessionElapsedSec;
@@ -468,6 +578,7 @@ function App() {
 
   const { low: targetLow, high: targetHigh } = targetRange;
   const targetMid = (targetLow + targetHigh) / 2;
+  const intensityOffsetPct = getIntensityOffsetForIndex(intensityOverrides, index);
   const ergBiasWatts = parseNumber(profile.ergBiasWatts) ?? 0;
   const ergBiasRounded = Math.round(ergBiasWatts);
   const ergTargetBaseWatts = targetMid + ergBiasWatts;
@@ -494,70 +605,168 @@ function App() {
   const latestCadence = bluetoothLatest.cadenceRpm ?? 0;
   const hasWorkTelemetry = latestPower > 0 || latestCadence > 0;
 
-  const avgPower = useMemo(() => {
-    if (!rawSamples.length) {
-      return 0;
-    }
-    const total = rawSamples.reduce(
-      (sum, sample) => sum + sample.powerWatts,
-      0
-    );
-    return Math.round(total / rawSamples.length);
-  }, [rawSamples]);
-
-  const intervalAvgPower = useMemo(() => {
-    if (!hasPlan || !rawSamples.length || !segment) {
-      return 0;
-    }
-    let rangeStart = startSec;
-    let rangeEnd = Math.min(activeSec, endSec);
-    if (segment.phase === 'recovery' && index > 0) {
-      const previousSegment = activeSegments[index - 1];
-      if (previousSegment?.isWork) {
-        rangeEnd = startSec;
-        rangeStart = Math.max(0, startSec - previousSegment.durationSec);
+  const handleCoachAction = useCallback(
+    (suggestion: CoachSuggestion) => {
+      if (!activeCoachProfile) {
+        return;
       }
-    }
-    const samplesInRange = rawSamples.filter(
-      (sample) => sample.timeSec >= rangeStart && sample.timeSec <= rangeEnd
-    );
-    if (!samplesInRange.length) {
-      return 0;
-    }
-    const total = samplesInRange.reduce(
-      (sum, sample) => sum + sample.powerWatts,
-      0
-    );
-    return Math.round(total / samplesInRange.length);
-  }, [
-    activeSec,
-    activeSegments,
-    endSec,
-    hasPlan,
-    index,
-    rawSamples,
-    segment,
-    startSec,
-  ]);
+      if (suggestion.action === 'adjust_intensity_up' || suggestion.action === 'adjust_intensity_down') {
+        const percent = suggestion.payload?.percent ?? activeCoachProfile.interventions.intensityAdjustPct.step;
+        const delta = suggestion.action === 'adjust_intensity_up' ? percent : -percent;
+        const fromIndex = suggestion.payload?.segmentIndex ?? index;
+        setIntensityOverrides((prev) => {
+          const currentOffset = getIntensityOffsetForIndex(prev, fromIndex);
+          const nextOffset = clampValue(
+            currentOffset + delta,
+            activeCoachProfile.interventions.intensityAdjustPct.min,
+            activeCoachProfile.interventions.intensityAdjustPct.max
+          );
+          if (nextOffset === currentOffset) {
+            return prev;
+          }
+          return [...prev, { fromIndex, offsetPct: nextOffset }];
+        });
+        const direction = delta > 0 ? 'increased' : 'decreased';
+        success(`Intensity ${direction} by ${Math.abs(percent)}% applied`);
+        return;
+      }
 
-  const normalizedPower = avgPower ? Math.round(avgPower * 1.03) : 0;
-  const tss = avgPower && hasPlan
-    ? Math.round((activeSec / 3600) * Math.pow(avgPower / ftpWatts, 2) * 100)
-    : 0;
-  const kj = avgPower ? Math.round((avgPower * activeSec) / 1000) : 0;
-  const ifValue =
-    ftpWatts > 0 && normalizedPower ? normalizedPower / ftpWatts : 0;
-  const ifLabel = ifValue ? ifValue.toFixed(2) : '--';
-  const tssLabel = tss ? `${tss}` : '--';
-  const ifTssLabel = `${ifLabel} · ${tssLabel}`;
+      if (suggestion.action === 'extend_recovery') {
+        const segmentId = suggestion.payload?.segmentId;
+        if (!segmentId) {
+          return;
+        }
+        const step = activeCoachProfile.interventions.recoveryExtendSec.step;
+        const max = activeCoachProfile.interventions.recoveryExtendSec.max;
+        setRecoveryExtensions((prev) => {
+          const current = prev[segmentId] ?? 0;
+          const next = Math.min(current + step, max);
+          if (next === current) {
+            return prev;
+          }
+          return { ...prev, [segmentId]: next };
+        });
+        success(`Recovery extended by ${step}s`);
+        return;
+      }
+
+      if (suggestion.action === 'skip_remaining_on_intervals') {
+        if (!hasPlan || isFreeRide) {
+          return;
+        }
+        const fromIndex = suggestion.payload?.segmentIndex ?? index;
+        let cooldownIndex: number | null = null;
+        for (let i = Math.max(fromIndex + 1, 0); i < activeSegments.length; i += 1) {
+          if (activeSegments[i].phase === 'cooldown') {
+            cooldownIndex = i;
+            break;
+          }
+        }
+        const startAt = cooldownIndex === null
+          ? planDurationSec
+          : activeSegments.slice(0, cooldownIndex).reduce((sum, seg) => sum + seg.durationSec, 0);
+        clock.seek(startAt);
+        success('Skipped to cooldown');
+      }
+    },
+    [
+      activeCoachProfile,
+      activeSegments,
+      clock,
+      hasPlan,
+      index,
+      isFreeRide,
+      planDurationSec,
+      success,
+    ]
+  );
+
+  // Manual workout controls
+  const handleSkipSegment = useCallback(() => {
+    if (!hasPlan || !segment || !isRunning) {
+      return;
+    }
+    // Skip is disabled for recovery phases
+    if (segment.phase === 'recovery') {
+      return;
+    }
+    const remainingSec = endSec - activeSec;
+    if (remainingSec <= 5) {
+      return;
+    }
+    const shortening = remainingSec - 5;
+    setSegmentShortenings((prev) => ({
+      ...prev,
+      [segment.id]: (prev[segment.id] ?? 0) + shortening,
+    }));
+    success(`Interval shortened to 5s remaining`);
+  }, [hasPlan, segment, isRunning, endSec, activeSec, success]);
+
+  const handleIntensityChange = useCallback(
+    (delta: number) => {
+      if (!hasPlan || !isRunning) {
+        return;
+      }
+      const minOffset = -20;
+      const maxOffset = 20;
+      setIntensityOverrides((prev) => {
+        const currentOffset = getIntensityOffsetForIndex(prev, index);
+        const nextOffset = Math.max(
+          minOffset,
+          Math.min(maxOffset, currentOffset + delta)
+        );
+        if (nextOffset === currentOffset) {
+          return prev;
+        }
+        return [...prev, { fromIndex: index, offsetPct: nextOffset }];
+      });
+      const direction = delta > 0 ? 'increased' : 'decreased';
+      success(`Intensity ${direction} by ${Math.abs(delta)}%`);
+    },
+    [hasPlan, isRunning, index, success]
+  );
+
+  const canSkipSegment =
+    hasPlan && isRunning && segment && segment.phase !== 'recovery';
+  const currentIntensityOffset = getIntensityOffsetForIndex(intensityOverrides, index);
+
+  const {
+    suggestions: coachSuggestions,
+    events: coachEvents,
+    acceptSuggestion,
+    rejectSuggestion,
+  } = useCoachEngine({
+    profile: activeCoachProfile,
+    segments: activeSegments,
+    segment,
+    segmentIndex: index,
+    segmentStartSec: startSec,
+    segmentEndSec: endSec,
+    elapsedInSegmentSec,
+    activeSec,
+    isRunning,
+    hasPlan: hasPlan && !isFreeRide,
+    isComplete,
+    targetRange,
+    samples: telemetrySamples,
+    sessionId: clock.sessionId,
+    intensityOffsetPct,
+    ergEnabled,
+    onApplyAction: handleCoachAction,
+  });
+
+  useEffect(() => {
+    const skipSuggestion = coachSuggestions.find(
+      (s) => s.action === 'skip_remaining_on_intervals' && s.status === 'pending'
+    );
+    if (skipSuggestion) {
+      setCriticalSuggestion(skipSuggestion);
+    }
+  }, [coachSuggestions]);
 
   const compliance = displayPower && targetMid > 0
     ? Math.round((displayPower / targetMid) * 100)
     : 0;
-  
-  // Calculate strain from intensity factor (IF) - normalize to 0-1 range
-  // IF > 1 means high intensity, IF < 0.75 means recovery zone
-  const strain = Math.min(Math.max(ifValue, 0), 1.2);
   const isPowerInRange =
     displayPower !== null &&
     displayPower >= targetLow &&
@@ -597,41 +806,6 @@ function App() {
   const currentIntervalIndex = hasPlan && totalIntervals > 0
     ? Math.max(1, workIndexBySegment[index] || 1)
     : 0;
-
-  const profileName = profile.nickname.trim();
-  const addCoachPrefix = (message: string) => {
-    if (!profileName) {
-      return message;
-    }
-    const trimmed = message.trim();
-    if (!trimmed) {
-      return `${profileName},`;
-    }
-    return `${profileName}, ${trimmed[0].toLowerCase()}${trimmed.slice(1)}`;
-  };
-
-  const coachMessage = !hasPlan
-    ? {
-        title: 'Import a workout',
-        body: addCoachPrefix(
-          'Load a workout file to begin and unlock live coaching.'
-        ),
-      }
-    : compliance >= 97 && compliance <= 105
-      ? {
-          title: 'Great work',
-          body: addCoachPrefix(
-            "Excellent power control. You're nailing the target within 5%."
-          ),
-        }
-      : {
-          title: 'Hold steady',
-          body: addCoachPrefix(
-            'Settle the effort and smooth out the cadence over the next minute.'
-          ),
-        };
-  const showCoachBanner = !hasPlan
-    || (isRunning && (compliance < 97 || compliance > 105));
 
   const intervalLabel = isFreeRide
     ? 'FREE RIDE'
@@ -809,6 +983,11 @@ function App() {
     setProfile(nextProfile);
     saveProfileToStorage(nextProfile);
     setIsProfileOpen(false);
+  };
+
+  const handleCoachProfileSelect = (profileId: string) => {
+    setSelectedCoachProfileId(profileId);
+    saveCoachProfileIdToStorage(profileId);
   };
 
   const handleDraftFieldChange =
@@ -1255,6 +1434,7 @@ function App() {
     downloadFitFile(fitPayload, buildFitFilename(planName, startTimeMs));
 
     // Save session to localStorage
+    const coachNotes = buildCoachNotes(coachEvents);
     const sessionData: SessionData = {
       ...buildSessionSummary(
         startTimeMs,
@@ -1262,7 +1442,10 @@ function App() {
         timerSecForExport,
         exportSamples,
         planName,
-        isComplete
+        isComplete,
+        coachNotes,
+        activeCoachProfile?.id ?? null,
+        coachEvents
       ),
       startTimeMs,
       endTimeMs,
@@ -1362,6 +1545,42 @@ function App() {
       return { ...prev, selected: choice };
     });
   };
+
+  // Calculate override info for current segment
+  const currentSegmentOverride = useMemo(() => {
+    if (!hasPlan || !segment || index < 0) return null;
+
+    // Get intensity offset for current segment
+    let offsetPct = 0;
+    for (const override of intensityOverrides) {
+      if (override.fromIndex <= index) {
+        offsetPct = override.offsetPct;
+      }
+    }
+
+    // Get recovery extension for current segment
+    const extensionSec = recoveryExtensions[segment.id] ?? 0;
+
+    // Get original segment from baseSegments
+    const originalSegment = baseSegments[index];
+    if (!originalSegment) return null;
+
+    const hasIntensityOverride = offsetPct !== 0 && segment.isWork;
+    const hasRecoveryExtension = extensionSec > 0 && segment.phase === 'recovery';
+
+    if (!hasIntensityOverride && !hasRecoveryExtension) return null;
+
+    return {
+      hasIntensityOverride,
+      hasRecoveryExtension,
+      offsetPct,
+      extensionSec,
+      originalTarget: originalSegment.targetRange,
+      adjustedTarget: segment.targetRange,
+      originalDuration: originalSegment.durationSec,
+      adjustedDuration: segment.durationSec,
+    };
+  }, [hasPlan, segment, index, intensityOverrides, recoveryExtensions, baseSegments]);
 
   return (
     <div className={`app ${phaseClass} ${workoutTypeClass}`}>
@@ -1476,29 +1695,23 @@ function App() {
           >
             {ergToggleLabel}
           </button>
+          <button
+            className="session-button"
+            type="button"
+            onClick={() => setIsCoachSelectorOpen(true)}
+          >
+            Coach: {activeCoachProfile?.name ?? 'Select'}
+          </button>
         </div>
       </section>
 
-      {showCoachBanner ? (
-        <section
-          className="panel coach-banner"
-          style={{ '--delay': '0.08s' } as CSSProperties}
-        >
-          <div className="coach-banner-title">
-            <span className="coach-icon" />
-            {coachMessage.title.toUpperCase()}
-          </div>
-          <div className="coach-banner-body">{coachMessage.body}</div>
-        </section>
-      ) : null}
-
       {hasPlan ? (
         <CoachPanel
-          compliance={compliance / 100}
-          strain={strain}
-          onAcceptSuggestion={(id) => {
-            console.log('Accepted suggestion:', id);
-          }}
+          profile={activeCoachProfile}
+          events={coachEvents}
+          suggestions={coachSuggestions}
+          onAcceptSuggestion={acceptSuggestion}
+          onRejectSuggestion={rejectSuggestion}
         />
       ) : null}
 
@@ -1532,6 +1745,8 @@ function App() {
                     ftpWatts={ftpWatts}
                     hrSensorConnected={hrSensorConnected}
                     showPower3s={showPower3s}
+                    intensityOverrides={intensityOverrides}
+                    recoveryExtensions={recoveryExtensions}
                     thresholdHr={thresholdHr}
                     currentHr={displayHr}
                   />
@@ -1623,6 +1838,82 @@ function App() {
         )}
       </section>
 
+      {hasPlan && (
+        <section
+          className="panel workout-controls"
+          style={{ '--delay': '0.15s' } as CSSProperties}
+        >
+          <div className="control-group">
+            <button
+              className="control-button skip"
+              type="button"
+              onClick={handleSkipSegment}
+              disabled={!canSkipSegment}
+              title={
+                !hasPlan
+                  ? 'No workout loaded'
+                  : !isRunning
+                    ? 'Workout not running'
+                    : segment?.phase === 'recovery'
+                      ? 'Cannot skip rest intervals'
+                      : 'End current interval (5s remaining)'
+              }
+            >
+              <span className="control-icon">⏭</span>
+              <span className="control-label">Skip Interval</span>
+            </button>
+          </div>
+          <div className="control-divider" />
+          <div className="control-group intensity">
+            <span className="control-group-label">
+              Intensity {currentIntensityOffset !== 0 && `(${currentIntensityOffset > 0 ? '+' : ''}${currentIntensityOffset}%)`}
+            </span>
+            <div className="control-buttons">
+              <button
+                className="control-button"
+                type="button"
+                onClick={() => handleIntensityChange(-5)}
+                disabled={!hasPlan || !isRunning || currentIntensityOffset <= -20}
+                title="Decrease by 5%"
+              >
+                <span className="control-icon">−</span>
+                <span className="control-label">5%</span>
+              </button>
+              <button
+                className="control-button"
+                type="button"
+                onClick={() => handleIntensityChange(-1)}
+                disabled={!hasPlan || !isRunning || currentIntensityOffset <= -20}
+                title="Decrease by 1%"
+              >
+                <span className="control-icon">−</span>
+                <span className="control-label">1%</span>
+              </button>
+              <button
+                className="control-button"
+                type="button"
+                onClick={() => handleIntensityChange(1)}
+                disabled={!hasPlan || !isRunning || currentIntensityOffset >= 20}
+                title="Increase by 1%"
+              >
+                <span className="control-icon">+</span>
+                <span className="control-label">1%</span>
+              </button>
+              <button
+                className="control-button"
+                type="button"
+                onClick={() => handleIntensityChange(5)}
+                disabled={!hasPlan || !isRunning || currentIntensityOffset >= 20}
+                title="Increase by 5%"
+              >
+                <span className="control-icon">+</span>
+                <span className="control-label">5%</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className={`metrics-row ${phaseClass}`}>
         <div
           className="panel metric-card interval-card primary"
@@ -1641,6 +1932,47 @@ function App() {
             <div>Workout Rem.</div>
             <div className="muted">{remainingLabel}</div>
           </div>
+          {currentSegmentOverride && (
+            <>
+              {currentSegmentOverride.hasIntensityOverride && (
+                <div className="metric-sub override-row">
+                  <div className="override-label">⚡ Target</div>
+                  <div className="override-values">
+                    <span className="original">
+                      {Math.round(currentSegmentOverride.originalTarget.low)}-
+                      {Math.round(currentSegmentOverride.originalTarget.high)}W
+                    </span>
+                    <span className="arrow">→</span>
+                    <span className="adjusted">
+                      {Math.round(currentSegmentOverride.adjustedTarget.low)}-
+                      {Math.round(currentSegmentOverride.adjustedTarget.high)}W
+                    </span>
+                    <span className="offset-badge">
+                      {currentSegmentOverride.offsetPct > 0 ? '+' : ''}
+                      {currentSegmentOverride.offsetPct}%
+                    </span>
+                  </div>
+                </div>
+              )}
+              {currentSegmentOverride.hasRecoveryExtension && (
+                <div className="metric-sub override-row">
+                  <div className="override-label">🕐 Duration</div>
+                  <div className="override-values">
+                    <span className="original">
+                      {formatDuration(currentSegmentOverride.originalDuration)}
+                    </span>
+                    <span className="arrow">→</span>
+                    <span className="adjusted">
+                      {formatDuration(currentSegmentOverride.adjustedDuration)}
+                    </span>
+                    <span className="extension-badge">
+                      +{currentSegmentOverride.extensionSec}s
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           <div className="pill">{intervalLabel}</div>
         </div>
 
@@ -1730,31 +2062,7 @@ function App() {
         </div>
       </section>
 
-      <section className={`secondary-grid ${phaseClass} ${isSteadyWork ? 'steady' : ''}`}>
-        <div
-          className="panel stat-card interval-avg"
-          style={{ '--delay': '0.4s' } as CSSProperties}
-        >
-          <div className="stat-label">Interval Avg</div>
-          <div className="stat-value">{intervalAvgPower || '--'}W</div>
-        </div>
-        <div className="panel stat-card" style={{ '--delay': '0.45s' } as CSSProperties}>
-          <div className="stat-label">Norm Power</div>
-          <div className="stat-value">{normalizedPower || '--'}W</div>
-        </div>
-        <div className="panel stat-card" style={{ '--delay': '0.5s' } as CSSProperties}>
-          <div className="stat-label">IF / TSS</div>
-          <div className="stat-value">{ifTssLabel}</div>
-        </div>
-        <div className="panel stat-card" style={{ '--delay': '0.55s' } as CSSProperties}>
-          <div className="stat-label">KJ</div>
-          <div className="stat-value">{kj || '--'}</div>
-        </div>
-        <div className="panel stat-card" style={{ '--delay': '0.6s' } as CSSProperties}>
-          <div className="stat-label">Intervals</div>
-          <div className="stat-value">{intervalCountLabel}</div>
-        </div>
-      </section>
+
 
       {showCompletionPrompt ? (
         <div className="modal-scrim" role="presentation">
@@ -2199,6 +2507,32 @@ function App() {
           </div>
         </div>
       ) : null}
+
+      {criticalSuggestion && activeCoachProfile && (
+        <CriticalSuggestionModal
+          suggestion={criticalSuggestion}
+          profile={activeCoachProfile}
+          metrics={{ adherencePct: 0, hrDriftPct: 0, cadenceVariance: 0, rejectedSuggestionsCount: 0, failedIntervalsCount: 0 }}
+          onAccept={() => {
+            acceptSuggestion(criticalSuggestion.id);
+            setCriticalSuggestion(null);
+          }}
+          onReject={() => {
+            rejectSuggestion(criticalSuggestion.id);
+            setCriticalSuggestion(null);
+          }}
+        />
+      )}
+
+      <CoachSelectorModal
+        isOpen={isCoachSelectorOpen}
+        profiles={coachProfiles}
+        selectedProfileId={selectedCoachProfileId}
+        onSelectProfile={handleCoachProfileSelect}
+        onClose={() => setIsCoachSelectorOpen(false)}
+      />
+
+      <ToastNotification toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

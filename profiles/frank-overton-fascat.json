@@ -3,6 +3,7 @@
   "id": "frank-overton-fascat",
   "name": "Frank Overton (FasCat)",
   "description": "Sweet Spot methodology with power-based periodization and fatigue-dependent design. Emphasizes aerobic base building through sub-threshold work and systematic recovery weeks.",
+  "tagline": "Sweet Spot systematic",
   "author": "Based on FasCat Coaching philosophy and Frank Overton's methodology",
   "tags": ["sweet-spot", "power-based", "fatigue-dependent", "aerobic-base", "periodization"],
   "voice": {
@@ -29,25 +30,30 @@
     "allowSkipRemainingOnIntervals": true
   },
   "messages": {
-    "encouragement": [
-      "Nice work keeping power steady in the Sweet Spot!",
-      "Smooth cadence. Your aerobic engine is growing.",
-      "That's how you build CTL. Keep it up!",
-      "Power looks solid. This is the work that matters.",
-      "Consistent effort. You're getting faster."
-    ],
     "suggestions": {
       "adjust_intensity_up": [
         "Power is stable and HR looks good. Raise targets by {{percent}}% to hit Sweet Spot more effectively?"
       ],
+      "adjust_intensity_up_rationale": [
+        "Power and cadence are steady in the Sweet Spot with minimal HR drift. You're handling this load well and can push slightly harder while staying productive."
+      ],
       "adjust_intensity_down": [
         "Power below target with HR drift rising. Let's reduce by {{percent}}% to stay in the productive zone."
+      ],
+      "adjust_intensity_down_rationale": [
+        "Power is below Sweet Spot target and HR drift indicates rising fatigue. Reducing intensity will keep you in the productive aerobic zone rather than fighting a losing battle."
       ],
       "extend_recovery": [
         "HR still elevated from previous block. Extend recovery by {{seconds}} seconds to come back fresh?"
       ],
+      "extend_recovery_rationale": [
+        "Your recovery HR is still elevated from the last Sweet Spot effort. Extra recovery time now ensures quality in the remaining intervals rather than digging a deeper hole."
+      ],
       "skip_remaining_on_intervals": [
         "Fatigue is building and power is dropping. Skip remaining intervals and cool down to fight another day?"
+      ],
+      "skip_remaining_on_intervals_rationale": [
+        "Multiple intervals show declining power with elevated HR drift and you've rejected intensity reductions. This indicates significant fatigue. Better to save the remaining CTL for tomorrow's session."
       ]
     },
     "completion": [

@@ -3,6 +3,7 @@
   "id": "aldo-sassi",
   "name": "Aldo Sassi",
   "description": "Italian methodology with three-day algorithm: SFR strength work, anaerobic threshold, and long climbs. Heavy data monitoring with daily feedback and strict anti-doping philosophy.",
+  "tagline": "Italian data-driven precision",
   "author": "Based on Aldo Sassi's coaching philosophy at Mapei Center",
   "tags": ["italian-method", "sfr", "data-driven", "three-day-algorithm", "anti-doping"],
   "voice": {
@@ -29,25 +30,30 @@
     "allowSkipRemainingOnIntervals": false
   },
   "messages": {
-    "encouragement": [
-      "Numbers are where they should be. Keep executing.",
-      "SFR form looks correct. Maintain the low cadence.",
-      "Threshold power is stable. This is the work that wins races.",
-      "Data confirms you're on track. Stay disciplined.",
-      "Consistent execution builds champions."
-    ],
     "suggestions": {
       "adjust_intensity_up": [
         "Power numbers confirm adaptation. Increase by {{percent}}% to progress."
       ],
+      "adjust_intensity_up_rationale": [
+        "Data shows stable power output with HR drift within acceptable parameters. Your numbers confirm adaptation is occurring. Progressive increase maintains the training stimulus without unnecessary risk."
+      ],
       "adjust_intensity_down": [
         "HR drift exceeds parameters. Reduce intensity by {{percent}}% to stay in target zone."
+      ],
+      "adjust_intensity_down_rationale": [
+        "Power data shows target adherence below threshold with HR drift exceeding safe parameters. Continuing at current intensity compromises the quality we monitor. Adjust to preserve the zone integrity."
       ],
       "extend_recovery": [
         "Recovery incomplete based on metrics. Extend by {{seconds}} seconds."
       ],
+      "extend_recovery_rationale": [
+        "HR data indicates incomplete recovery from previous block. The SFR and threshold work requires full recovery between efforts. Extend now to ensure tomorrow's numbers meet standards."
+      ],
       "skip_remaining_on_intervals": [
         "Power dropping significantly. Terminate session and recover properly."
+      ],
+      "skip_remaining_on_intervals_rationale": [
+        "Power decline across multiple intervals with elevated HR drift indicates excessive fatigue. The data shows compromised execution. Terminate now, upload data, and we analyze why this occurred for tomorrow's adjustments."
       ]
     },
     "completion": [

@@ -1,4 +1,5 @@
 import type { TelemetrySample } from '../types';
+import type { CoachEvent } from '../types/coach';
 
 export interface SessionSummary {
   id: string;
@@ -10,6 +11,8 @@ export interface SessionSummary {
   avgCadence: number;
   avgHr: number;
   coachNotes: string;
+  coachProfileId: string | null;
+  coachEvents: CoachEvent[];
   completed: boolean;
 }
 
@@ -67,7 +70,9 @@ export const buildSessionSummary = (
   samples: TelemetrySample[],
   workoutName: string,
   completed: boolean,
-  coachNotes: string = ''
+  coachNotes: string = '',
+  coachProfileId: string | null = null,
+  coachEvents: CoachEvent[] = []
 ): SessionSummary => {
   const avgPower = computeAverage(samples, (s) => s.powerWatts, () => true) ?? 0;
   const maxPower = computeMax(samples, (s) => s.powerWatts, () => true) ?? 0;
@@ -88,6 +93,8 @@ export const buildSessionSummary = (
     avgCadence,
     avgHr,
     coachNotes,
+    coachProfileId,
+    coachEvents,
     completed,
   };
 };
@@ -104,7 +111,10 @@ const isSessionData = (data: unknown): data is SessionData => {
     typeof obj.durationSec === 'number' &&
     typeof obj.avgPower === 'number' &&
     typeof obj.completed === 'boolean' &&
-    Array.isArray(obj.samples)
+    Array.isArray(obj.samples) &&
+    (obj.coachNotes === undefined || typeof obj.coachNotes === 'string') &&
+    (obj.coachProfileId === undefined || typeof obj.coachProfileId === 'string' || obj.coachProfileId === null) &&
+    (obj.coachEvents === undefined || Array.isArray(obj.coachEvents))
   );
 };
 
@@ -121,7 +131,12 @@ export const loadSessionsFromStorage = (): SessionData[] => {
     if (!Array.isArray(parsed)) {
       return [];
     }
-    return parsed.filter(isSessionData);
+    return parsed.filter(isSessionData).map((session) => ({
+      ...session,
+      coachNotes: session.coachNotes ?? '',
+      coachProfileId: session.coachProfileId ?? null,
+      coachEvents: session.coachEvents ?? [],
+    }));
   } catch {
     return [];
   }
