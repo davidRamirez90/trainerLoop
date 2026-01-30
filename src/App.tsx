@@ -5,6 +5,7 @@ import './App.css';
 import { WorkoutChart } from './components/WorkoutChart';
 import { CoachPanel } from './components/CoachPanel';
 import { CriticalSuggestionModal } from './components/CriticalSuggestionModal';
+import { ToastNotification, useToast } from './components/ToastNotification';
 import type { WorkoutPlan, WorkoutSegment } from './data/workout';
 import { useCoachEngine } from './hooks/useCoachEngine';
 import { useBluetoothDevices } from './hooks/useBluetoothDevices';
@@ -367,6 +368,7 @@ function App() {
   const [intensityOverrides, setIntensityOverrides] = useState<IntensityOverride[]>([]);
   const [recoveryExtensions, setRecoveryExtensions] = useState<Record<string, number>>({});
   const [criticalSuggestion, setCriticalSuggestion] = useState<CoachSuggestion | null>(null);
+  const { toasts, success, removeToast } = useToast();
   const lastWorkRef = useRef<number | null>(null);
   const resumeTimeoutRef = useRef<number | null>(null);
   const prevRunningRef = useRef(false);
@@ -619,6 +621,8 @@ function App() {
           }
           return [...prev, { fromIndex, offsetPct: nextOffset }];
         });
+        const direction = delta > 0 ? 'increased' : 'decreased';
+        success(`Intensity ${direction} by ${Math.abs(percent)}% applied`);
         return;
       }
 
@@ -637,6 +641,7 @@ function App() {
           }
           return { ...prev, [segmentId]: next };
         });
+        success(`Recovery extended by ${step}s`);
         return;
       }
 
@@ -656,6 +661,7 @@ function App() {
           ? planDurationSec
           : activeSegments.slice(0, cooldownIndex).reduce((sum, seg) => sum + seg.durationSec, 0);
         clock.seek(startAt);
+        success('Skipped to cooldown');
       }
     },
     [
@@ -666,6 +672,7 @@ function App() {
       index,
       isFreeRide,
       planDurationSec,
+      success,
     ]
   );
 
@@ -1541,6 +1548,42 @@ function App() {
     });
   };
 
+  // Calculate override info for current segment
+  const currentSegmentOverride = useMemo(() => {
+    if (!hasPlan || !segment || index < 0) return null;
+
+    // Get intensity offset for current segment
+    let offsetPct = 0;
+    for (const override of intensityOverrides) {
+      if (override.fromIndex <= index) {
+        offsetPct = override.offsetPct;
+      }
+    }
+
+    // Get recovery extension for current segment
+    const extensionSec = recoveryExtensions[segment.id] ?? 0;
+
+    // Get original segment from baseSegments
+    const originalSegment = baseSegments[index];
+    if (!originalSegment) return null;
+
+    const hasIntensityOverride = offsetPct !== 0 && segment.isWork;
+    const hasRecoveryExtension = extensionSec > 0 && segment.phase === 'recovery';
+
+    if (!hasIntensityOverride && !hasRecoveryExtension) return null;
+
+    return {
+      hasIntensityOverride,
+      hasRecoveryExtension,
+      offsetPct,
+      extensionSec,
+      originalTarget: originalSegment.targetRange,
+      adjustedTarget: segment.targetRange,
+      originalDuration: originalSegment.durationSec,
+      adjustedDuration: segment.durationSec,
+    };
+  }, [hasPlan, segment, index, intensityOverrides, recoveryExtensions, baseSegments]);
+
   return (
     <div className={`app ${phaseClass} ${workoutTypeClass}`}>
       <header className="top-bar">
@@ -1700,6 +1743,8 @@ function App() {
                     ftpWatts={ftpWatts}
                     hrSensorConnected={hrSensorConnected}
                     showPower3s={showPower3s}
+                    intensityOverrides={intensityOverrides}
+                    recoveryExtensions={recoveryExtensions}
                   />
                   {isPaused ? (
                     <div className="chart-overlay paused">
@@ -1807,6 +1852,47 @@ function App() {
             <div>Workout Rem.</div>
             <div className="muted">{remainingLabel}</div>
           </div>
+          {currentSegmentOverride && (
+            <>
+              {currentSegmentOverride.hasIntensityOverride && (
+                <div className="metric-sub override-row">
+                  <div className="override-label">⚡ Target</div>
+                  <div className="override-values">
+                    <span className="original">
+                      {Math.round(currentSegmentOverride.originalTarget.low)}-
+                      {Math.round(currentSegmentOverride.originalTarget.high)}W
+                    </span>
+                    <span className="arrow">→</span>
+                    <span className="adjusted">
+                      {Math.round(currentSegmentOverride.adjustedTarget.low)}-
+                      {Math.round(currentSegmentOverride.adjustedTarget.high)}W
+                    </span>
+                    <span className="offset-badge">
+                      {currentSegmentOverride.offsetPct > 0 ? '+' : ''}
+                      {currentSegmentOverride.offsetPct}%
+                    </span>
+                  </div>
+                </div>
+              )}
+              {currentSegmentOverride.hasRecoveryExtension && (
+                <div className="metric-sub override-row">
+                  <div className="override-label">🕐 Duration</div>
+                  <div className="override-values">
+                    <span className="original">
+                      {formatDuration(currentSegmentOverride.originalDuration)}
+                    </span>
+                    <span className="arrow">→</span>
+                    <span className="adjusted">
+                      {formatDuration(currentSegmentOverride.adjustedDuration)}
+                    </span>
+                    <span className="extension-badge">
+                      +{currentSegmentOverride.extensionSec}s
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           <div className="pill">{intervalLabel}</div>
         </div>
 
@@ -2381,6 +2467,7 @@ function App() {
           }}
         />
       )}
+      <ToastNotification toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }
