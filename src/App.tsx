@@ -598,6 +598,7 @@ function App() {
     bluetoothLatest.hrBpm !== null && bluetoothLatest.hrBpm > 0
       ? Math.round(bluetoothLatest.hrBpm)
       : null;
+  const thresholdHr = parsePositiveNumber(profile.thresholdHr);
   const displayCadence = latestSample ? Math.round(latestSample.cadenceRpm) : null;
   const canDetectWork = trainer.status === 'connected' || bluetoothTelemetry.isActive;
   const latestPower = bluetoothLatest.powerWatts ?? 0;
@@ -1745,6 +1746,8 @@ function App() {
                     showPower3s={showPower3s}
                     intensityOverrides={intensityOverrides}
                     recoveryExtensions={recoveryExtensions}
+                    thresholdHr={thresholdHr}
+                    currentHr={displayHr}
                   />
                   {isPaused ? (
                     <div className="chart-overlay paused">
