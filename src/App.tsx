@@ -367,6 +367,7 @@ function App() {
   );
   const [intensityOverrides, setIntensityOverrides] = useState<IntensityOverride[]>([]);
   const [recoveryExtensions, setRecoveryExtensions] = useState<Record<string, number>>({});
+  const [segmentShortenings, setSegmentShortenings] = useState<Record<string, number>>({});
   const [criticalSuggestion, setCriticalSuggestion] = useState<CoachSuggestion | null>(null);
   const { toasts, success, removeToast } = useToast();
   const lastWorkRef = useRef<number | null>(null);
@@ -389,9 +390,10 @@ function App() {
       });
       const extension =
         segment.phase === 'recovery' ? recoveryExtensions[segment.id] ?? 0 : 0;
+      const shortening = segmentShortenings[segment.id] ?? 0;
       return {
         ...segment,
-        durationSec: segment.durationSec + extension,
+        durationSec: Math.max(1, segment.durationSec + extension - shortening),
         targetRange: segment.isWork
           ? applyScale(segment.targetRange)
           : segment.targetRange,
@@ -401,7 +403,7 @@ function App() {
             : segment.rampToRange,
       };
     });
-  }, [baseSegments, intensityOverrides, recoveryExtensions]);
+  }, [baseSegments, intensityOverrides, recoveryExtensions, segmentShortenings]);
   const activeSegments = adjustedSegments;
   const planDurationSec = useMemo(
     () => getTotalDurationSec(activeSegments),
@@ -676,6 +678,55 @@ function App() {
     ]
   );
 
+  // Manual workout controls
+  const handleSkipSegment = useCallback(() => {
+    if (!hasPlan || !segment || !isRunning) {
+      return;
+    }
+    // Skip is disabled for recovery phases
+    if (segment.phase === 'recovery') {
+      return;
+    }
+    const remainingSec = endSec - activeSec;
+    if (remainingSec <= 5) {
+      return;
+    }
+    const shortening = remainingSec - 5;
+    setSegmentShortenings((prev) => ({
+      ...prev,
+      [segment.id]: (prev[segment.id] ?? 0) + shortening,
+    }));
+    success(`Interval shortened to 5s remaining`);
+  }, [hasPlan, segment, isRunning, endSec, activeSec, success]);
+
+  const handleIntensityChange = useCallback(
+    (delta: number) => {
+      if (!hasPlan || !isRunning) {
+        return;
+      }
+      const minOffset = -20;
+      const maxOffset = 20;
+      setIntensityOverrides((prev) => {
+        const currentOffset = getIntensityOffsetForIndex(prev, index);
+        const nextOffset = Math.max(
+          minOffset,
+          Math.min(maxOffset, currentOffset + delta)
+        );
+        if (nextOffset === currentOffset) {
+          return prev;
+        }
+        return [...prev, { fromIndex: index, offsetPct: nextOffset }];
+      });
+      const direction = delta > 0 ? 'increased' : 'decreased';
+      success(`Intensity ${direction} by ${Math.abs(delta)}%`);
+    },
+    [hasPlan, isRunning, index, success]
+  );
+
+  const canSkipSegment =
+    hasPlan && isRunning && segment && segment.phase !== 'recovery';
+  const currentIntensityOffset = getIntensityOffsetForIndex(intensityOverrides, index);
+
   const {
     suggestions: coachSuggestions,
     events: coachEvents,
@@ -708,63 +759,6 @@ function App() {
       setCriticalSuggestion(skipSuggestion);
     }
   }, [coachSuggestions]);
-
-  const avgPower = useMemo(() => {
-    if (!rawSamples.length) {
-      return 0;
-    }
-    const total = rawSamples.reduce(
-      (sum, sample) => sum + sample.powerWatts,
-      0
-    );
-    return Math.round(total / rawSamples.length);
-  }, [rawSamples]);
-
-  const intervalAvgPower = useMemo(() => {
-    if (!hasPlan || !rawSamples.length || !segment) {
-      return 0;
-    }
-    let rangeStart = startSec;
-    let rangeEnd = Math.min(activeSec, endSec);
-    if (segment.phase === 'recovery' && index > 0) {
-      const previousSegment = activeSegments[index - 1];
-      if (previousSegment?.isWork) {
-        rangeEnd = startSec;
-        rangeStart = Math.max(0, startSec - previousSegment.durationSec);
-      }
-    }
-    const samplesInRange = rawSamples.filter(
-      (sample) => sample.timeSec >= rangeStart && sample.timeSec <= rangeEnd
-    );
-    if (!samplesInRange.length) {
-      return 0;
-    }
-    const total = samplesInRange.reduce(
-      (sum, sample) => sum + sample.powerWatts,
-      0
-    );
-    return Math.round(total / samplesInRange.length);
-  }, [
-    activeSec,
-    activeSegments,
-    endSec,
-    hasPlan,
-    index,
-    rawSamples,
-    segment,
-    startSec,
-  ]);
-
-  const normalizedPower = avgPower ? Math.round(avgPower * 1.03) : 0;
-  const tss = avgPower && hasPlan
-    ? Math.round((activeSec / 3600) * Math.pow(avgPower / ftpWatts, 2) * 100)
-    : 0;
-  const kj = avgPower ? Math.round((avgPower * activeSec) / 1000) : 0;
-  const ifValue =
-    ftpWatts > 0 && normalizedPower ? normalizedPower / ftpWatts : 0;
-  const ifLabel = ifValue ? ifValue.toFixed(2) : '--';
-  const tssLabel = tss ? `${tss}` : '--';
-  const ifTssLabel = `${ifLabel} · ${tssLabel}`;
 
   const compliance = displayPower && targetMid > 0
     ? Math.round((displayPower / targetMid) * 100)
@@ -1834,6 +1828,82 @@ function App() {
         )}
       </section>
 
+      {hasPlan && (
+        <section
+          className="panel workout-controls"
+          style={{ '--delay': '0.15s' } as CSSProperties}
+        >
+          <div className="control-group">
+            <button
+              className="control-button skip"
+              type="button"
+              onClick={handleSkipSegment}
+              disabled={!canSkipSegment}
+              title={
+                !hasPlan
+                  ? 'No workout loaded'
+                  : !isRunning
+                    ? 'Workout not running'
+                    : segment?.phase === 'recovery'
+                      ? 'Cannot skip rest intervals'
+                      : 'End current interval (5s remaining)'
+              }
+            >
+              <span className="control-icon">⏭</span>
+              <span className="control-label">Skip Interval</span>
+            </button>
+          </div>
+          <div className="control-divider" />
+          <div className="control-group intensity">
+            <span className="control-group-label">
+              Intensity {currentIntensityOffset !== 0 && `(${currentIntensityOffset > 0 ? '+' : ''}${currentIntensityOffset}%)`}
+            </span>
+            <div className="control-buttons">
+              <button
+                className="control-button"
+                type="button"
+                onClick={() => handleIntensityChange(-5)}
+                disabled={!hasPlan || !isRunning || currentIntensityOffset <= -20}
+                title="Decrease by 5%"
+              >
+                <span className="control-icon">−</span>
+                <span className="control-label">5%</span>
+              </button>
+              <button
+                className="control-button"
+                type="button"
+                onClick={() => handleIntensityChange(-1)}
+                disabled={!hasPlan || !isRunning || currentIntensityOffset <= -20}
+                title="Decrease by 1%"
+              >
+                <span className="control-icon">−</span>
+                <span className="control-label">1%</span>
+              </button>
+              <button
+                className="control-button"
+                type="button"
+                onClick={() => handleIntensityChange(1)}
+                disabled={!hasPlan || !isRunning || currentIntensityOffset >= 20}
+                title="Increase by 1%"
+              >
+                <span className="control-icon">+</span>
+                <span className="control-label">1%</span>
+              </button>
+              <button
+                className="control-button"
+                type="button"
+                onClick={() => handleIntensityChange(5)}
+                disabled={!hasPlan || !isRunning || currentIntensityOffset >= 20}
+                title="Increase by 5%"
+              >
+                <span className="control-icon">+</span>
+                <span className="control-label">5%</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className={`metrics-row ${phaseClass}`}>
         <div
           className="panel metric-card interval-card primary"
@@ -1982,31 +2052,7 @@ function App() {
         </div>
       </section>
 
-      <section className={`secondary-grid ${phaseClass} ${isSteadyWork ? 'steady' : ''}`}>
-        <div
-          className="panel stat-card interval-avg"
-          style={{ '--delay': '0.4s' } as CSSProperties}
-        >
-          <div className="stat-label">Interval Avg</div>
-          <div className="stat-value">{intervalAvgPower || '--'}W</div>
-        </div>
-        <div className="panel stat-card" style={{ '--delay': '0.45s' } as CSSProperties}>
-          <div className="stat-label">Norm Power</div>
-          <div className="stat-value">{normalizedPower || '--'}W</div>
-        </div>
-        <div className="panel stat-card" style={{ '--delay': '0.5s' } as CSSProperties}>
-          <div className="stat-label">IF / TSS</div>
-          <div className="stat-value">{ifTssLabel}</div>
-        </div>
-        <div className="panel stat-card" style={{ '--delay': '0.55s' } as CSSProperties}>
-          <div className="stat-label">KJ</div>
-          <div className="stat-value">{kj || '--'}</div>
-        </div>
-        <div className="panel stat-card" style={{ '--delay': '0.6s' } as CSSProperties}>
-          <div className="stat-label">Intervals</div>
-          <div className="stat-value">{intervalCountLabel}</div>
-        </div>
-      </section>
+
 
       {showCompletionPrompt ? (
         <div className="modal-scrim" role="presentation">

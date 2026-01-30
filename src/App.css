@@ -1094,43 +1094,93 @@
   color: #f5b77f;
 }
 
-.secondary-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+.workout-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 16px;
+  flex-wrap: wrap;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-group.intensity {
   gap: 12px;
 }
 
-.stat-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-}
-
-.stat-label {
+.control-group-label {
   font-size: 11px;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 1px;
+  white-space: nowrap;
 }
 
-.stat-value {
-  font-size: 18px;
-  font-weight: 600;
+.control-buttons {
+  display: flex;
+  gap: 6px;
 }
 
-.secondary-grid.phase-work .stat-card {
-  opacity: 0.6;
+.control-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 4px;
 }
 
-.secondary-grid.phase-recovery .stat-card.interval-avg,
-.secondary-grid.phase-cooldown .stat-card.interval-avg {
-  border-color: rgba(101, 199, 255, 0.4);
-  box-shadow: 0 16px 30px rgba(12, 18, 28, 0.35);
+.control-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-muted);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
-.secondary-grid.steady.phase-work .stat-card.interval-avg {
-  opacity: 1;
+.control-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.control-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.control-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.control-button.skip {
+  background: rgba(244, 150, 62, 0.15);
+  border-color: rgba(244, 150, 62, 0.3);
+  color: #f5b77f;
+}
+
+.control-button.skip:hover:not(:disabled) {
+  background: rgba(244, 150, 62, 0.25);
+  border-color: rgba(244, 150, 62, 0.5);
+}
+
+.control-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.control-label {
+  font-size: 12px;
 }
 
 .bottom-row {
