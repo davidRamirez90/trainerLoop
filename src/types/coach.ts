@@ -22,7 +22,6 @@ export type CoachSuggestion = {
 };
 
 export type CoachEventKind =
-  | 'encouragement'
   | 'suggestion'
   | 'decision'
   | 'completion';
@@ -69,12 +68,15 @@ export type CoachProfile = {
     allowSkipRemainingOnIntervals: boolean;
   };
   messages: {
-    encouragement: string[];
     suggestions: {
       adjust_intensity_up: string[];
+      adjust_intensity_up_rationale: string[];
       adjust_intensity_down: string[];
+      adjust_intensity_down_rationale: string[];
       extend_recovery: string[];
+      extend_recovery_rationale: string[];
       skip_remaining_on_intervals: string[];
+      skip_remaining_on_intervals_rationale: string[];
     };
     completion: string[];
   };

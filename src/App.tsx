@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { WorkoutChart } from './components/WorkoutChart';
 import { CoachPanel } from './components/CoachPanel';
+import { CriticalSuggestionModal } from './components/CriticalSuggestionModal';
 import type { WorkoutPlan, WorkoutSegment } from './data/workout';
 import { useCoachEngine } from './hooks/useCoachEngine';
 import { useBluetoothDevices } from './hooks/useBluetoothDevices';
@@ -365,6 +366,7 @@ function App() {
   );
   const [intensityOverrides, setIntensityOverrides] = useState<IntensityOverride[]>([]);
   const [recoveryExtensions, setRecoveryExtensions] = useState<Record<string, number>>({});
+  const [criticalSuggestion, setCriticalSuggestion] = useState<CoachSuggestion | null>(null);
   const lastWorkRef = useRef<number | null>(null);
   const resumeTimeoutRef = useRef<number | null>(null);
   const prevRunningRef = useRef(false);
@@ -691,6 +693,15 @@ function App() {
     onApplyAction: handleCoachAction,
   });
 
+  useEffect(() => {
+    const skipSuggestion = coachSuggestions.find(
+      (s) => s.action === 'skip_remaining_on_intervals' && s.status === 'pending'
+    );
+    if (skipSuggestion) {
+      setCriticalSuggestion(skipSuggestion);
+    }
+  }, [coachSuggestions]);
+
   const avgPower = useMemo(() => {
     if (!rawSamples.length) {
       return 0;
@@ -790,41 +801,6 @@ function App() {
   const currentIntervalIndex = hasPlan && totalIntervals > 0
     ? Math.max(1, workIndexBySegment[index] || 1)
     : 0;
-
-  const profileName = profile.nickname.trim();
-  const addCoachPrefix = (message: string) => {
-    if (!profileName) {
-      return message;
-    }
-    const trimmed = message.trim();
-    if (!trimmed) {
-      return `${profileName},`;
-    }
-    return `${profileName}, ${trimmed[0].toLowerCase()}${trimmed.slice(1)}`;
-  };
-
-  const coachMessage = !hasPlan
-    ? {
-        title: 'Import a workout',
-        body: addCoachPrefix(
-          'Load a workout file to begin and unlock live coaching.'
-        ),
-      }
-    : compliance >= 97 && compliance <= 105
-      ? {
-          title: 'Great work',
-          body: addCoachPrefix(
-            "Excellent power control. You're nailing the target within 5%."
-          ),
-        }
-      : {
-          title: 'Hold steady',
-          body: addCoachPrefix(
-            'Settle the effort and smooth out the cadence over the next minute.'
-          ),
-        };
-  const showCoachBanner = !hasPlan
-    || (isRunning && (compliance < 97 || compliance > 105));
 
   const intervalLabel = isFreeRide
     ? 'FREE RIDE'
@@ -1681,19 +1657,6 @@ function App() {
         </div>
       </section>
 
-      {showCoachBanner ? (
-        <section
-          className="panel coach-banner"
-          style={{ '--delay': '0.08s' } as CSSProperties}
-        >
-          <div className="coach-banner-title">
-            <span className="coach-icon" />
-            {coachMessage.title.toUpperCase()}
-          </div>
-          <div className="coach-banner-body">{coachMessage.body}</div>
-        </section>
-      ) : null}
-
       {hasPlan ? (
         <CoachPanel
           profile={activeCoachProfile}
@@ -2402,6 +2365,22 @@ function App() {
           </div>
         </div>
       ) : null}
+
+      {criticalSuggestion && activeCoachProfile && (
+        <CriticalSuggestionModal
+          suggestion={criticalSuggestion}
+          profile={activeCoachProfile}
+          metrics={{ adherencePct: 0, hrDriftPct: 0, cadenceVariance: 0, rejectedSuggestionsCount: 0, failedIntervalsCount: 0 }}
+          onAccept={() => {
+            acceptSuggestion(criticalSuggestion.id);
+            setCriticalSuggestion(null);
+          }}
+          onReject={() => {
+            rejectSuggestion(criticalSuggestion.id);
+            setCriticalSuggestion(null);
+          }}
+        />
+      )}
     </div>
   );
 }

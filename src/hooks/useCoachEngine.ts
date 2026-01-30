@@ -135,8 +135,17 @@ const buildSuggestionMessage = (
   return applyTemplate(pickMessage(templates, fallback), payload);
 };
 
-const buildEncouragementMessage = (profile: CoachProfile) =>
-  pickMessage(profile.messages.encouragement, 'Keep it steady.');
+const buildRationaleMessage = (profile: CoachProfile, action: CoachAction) => {
+  const key = `${action}_rationale` as keyof typeof profile.messages.suggestions;
+  const templates = profile.messages.suggestions[key];
+  const fallbacks: Record<CoachAction, string> = {
+    adjust_intensity_up: 'Metrics indicate you can handle more intensity.',
+    adjust_intensity_down: 'Fatigue indicators suggest reducing intensity.',
+    extend_recovery: 'Recovery metrics indicate more time needed.',
+    skip_remaining_on_intervals: 'Multiple indicators suggest terminating the session.',
+  };
+  return pickMessage(templates, fallbacks[action]);
+};
 
 const buildCompletionMessage = (profile: CoachProfile) =>
   pickMessage(profile.messages.completion, 'Session complete.');
@@ -166,7 +175,6 @@ export const useCoachEngine = ({
 
   const suggestionsRef = useRef<CoachSuggestion[]>([]);
   const lastSuggestionAtRef = useRef<number | null>(null);
-  const nextEncouragementAtRef = useRef<number | null>(null);
   const lastSegmentRef = useRef<{
     id: string;
     index: number;
@@ -287,7 +295,6 @@ export const useCoachEngine = ({
     setSuggestions([]);
     setEvents([]);
     lastSuggestionAtRef.current = null;
-    nextEncouragementAtRef.current = null;
     lastSegmentRef.current = null;
     completedWorkIntervalsRef.current = [];
     completionLoggedRef.current = false;
@@ -337,7 +344,7 @@ export const useCoachEngine = ({
             segmentIndex,
           },
           message: buildSuggestionMessage(profile, 'extend_recovery', { seconds }),
-          rationale: 'Recovery HR is still elevated.',
+          rationale: buildRationaleMessage(profile, 'extend_recovery'),
           createdAtSec: activeSec,
           status: 'pending',
         });
@@ -374,7 +381,7 @@ export const useCoachEngine = ({
             segmentIndex,
           },
           message: buildSuggestionMessage(profile, 'skip_remaining_on_intervals', {}),
-          rationale: 'Repeated under-target intervals with elevated fatigue.',
+          rationale: buildRationaleMessage(profile, 'skip_remaining_on_intervals'),
           createdAtSec: activeSec,
           status: 'pending',
         });
@@ -462,7 +469,7 @@ export const useCoachEngine = ({
         message: buildSuggestionMessage(profile, 'adjust_intensity_down', {
           percent,
         }),
-        rationale: 'Power is below target and fatigue indicators are rising.',
+        rationale: buildRationaleMessage(profile, 'adjust_intensity_down'),
         createdAtSec: activeSec,
         status: 'pending',
       });
@@ -489,7 +496,7 @@ export const useCoachEngine = ({
         message: buildSuggestionMessage(profile, 'adjust_intensity_up', {
           percent,
         }),
-        rationale: 'Stable metrics indicate you can push slightly harder.',
+        rationale: buildRationaleMessage(profile, 'adjust_intensity_up'),
         createdAtSec: activeSec,
         status: 'pending',
       });
@@ -508,52 +515,6 @@ export const useCoachEngine = ({
     samples,
     targetRange,
   ]);
-
-  useEffect(() => {
-    if (!profile || !hasPlan || !isRunning) {
-      return;
-    }
-    if (pendingSuggestion) {
-      return;
-    }
-    if (activeSec < profile.rules.minElapsedSecondsForSuggestions) {
-      return;
-    }
-    const targetMid = getTargetMid(targetRange);
-    const metrics = computeMetrics(
-      samples,
-      Math.max(0, activeSec - STABILITY_WINDOW_SEC),
-      activeSec,
-      targetMid
-    );
-    if (!metrics) {
-      return;
-    }
-    const stable =
-      metrics.adherencePct >= profile.rules.targetAdherencePct.warn &&
-      metrics.cadenceVariance <= profile.rules.cadenceVarianceRpm.warn &&
-      metrics.hrDriftPct <= profile.rules.hrDriftPct.warn;
-    if (!stable) {
-      return;
-    }
-
-    if (nextEncouragementAtRef.current === null) {
-      nextEncouragementAtRef.current =
-        activeSec + 300 + Math.floor(Math.random() * 180);
-    }
-    if (activeSec < (nextEncouragementAtRef.current ?? 0)) {
-      return;
-    }
-
-    addEvent({
-      id: createId(),
-      kind: 'encouragement',
-      timestampSec: activeSec,
-      message: buildEncouragementMessage(profile),
-    });
-    nextEncouragementAtRef.current =
-      activeSec + 300 + Math.floor(Math.random() * 180);
-  }, [activeSec, addEvent, hasPlan, isRunning, pendingSuggestion, profile, samples, targetRange]);
 
   useEffect(() => {
     if (!profile || !hasPlan || !isComplete || completionLoggedRef.current) {

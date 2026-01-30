@@ -29,25 +29,30 @@
     "allowSkipRemainingOnIntervals": true
   },
   "messages": {
-    "encouragement": [
-      "Numbers confirm adaptation. Keep pushing the threshold.",
-      "Power stable at threshold. This is the work that wins.",
-      "Body composition improving. Stay disciplined.",
-      "Threshold power growing. The method works.",
-      "Precise execution. That's how champions are made."
-    ],
     "suggestions": {
       "adjust_intensity_up": [
         "Power well-controlled. Increase by {{percent}}% to extend threshold."
       ],
+      "adjust_intensity_up_rationale": [
+        "Power output is precise and HR drift is minimal at current threshold load. Your body is adapting well to sub-threshold work. Increasing intensity extends time at threshold - the primary driver of adaptation."
+      ],
       "adjust_intensity_down": [
         "HR drift too high. Reduce by {{percent}}% to stay in target zone."
+      ],
+      "adjust_intensity_down_rationale": [
+        "HR drift exceeds threshold zone parameters. We never train above threshold for a reason - it compromises the precise zone training that builds power. Reduce intensity to maintain the method."
       ],
       "extend_recovery": [
         "Recovery incomplete. Extend by {{seconds}} seconds only if necessary."
       ],
+      "extend_recovery_rationale": [
+        "Recovery metrics show incomplete restoration. While we maintain the plan where possible, incomplete recovery between threshold blocks compromises the quality we demand. Extend only what's necessary."
+      ],
       "skip_remaining_on_intervals": [
         "Power dropping significantly. Terminate and analyze why."
+      ],
+      "skip_remaining_on_intervals_rationale": [
+        "Power decline indicates you've exceeded your threshold capacity for today. This is valuable data. We terminate, analyze why - nutrition, sleep, weight, stress - and adjust tomorrow. Never compromise the method by pushing through failure."
       ]
     },
     "completion": [

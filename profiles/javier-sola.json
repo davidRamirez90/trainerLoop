@@ -29,25 +29,30 @@
     "allowSkipRemainingOnIntervals": false
   },
   "messages": {
-    "encouragement": [
-      "Excellent execution. The basics done well.",
-      "Strength foundation looks solid. This is the work that matters.",
-      "Progressive adaptation in action. Keep building.",
-      "Quality over complexity. Well done.",
-      "Your body is adapting exactly as it should. Trust the process."
-    ],
     "suggestions": {
       "adjust_intensity_up": [
         "Power stable and form looks good. Increase by {{percent}}% to progress gradually."
       ],
+      "adjust_intensity_up_rationale": [
+        "Power and cadence are stable with minimal HR drift, indicating good neuromuscular control. Progressive overload is appropriate here. When the basics work, we build on them."
+      ],
       "adjust_intensity_down": [
         "Let's be smart. Reduce by {{percent}}% to maintain quality and preserve adaptation."
+      ],
+      "adjust_intensity_down_rationale": [
+        "HR drift and cadence variance indicate the load is exceeding your current capacity. Reducing intensity preserves movement quality and prevents negative adaptation. The body adapts to what it can handle."
       ],
       "extend_recovery": [
         "Recovery is where adaptation happens. Extend by {{seconds}} seconds to ensure quality."
       ],
+      "extend_recovery_rationale": [
+        "Elevated recovery HR indicates incomplete clearance of metabolic byproducts. Strength and endurance grow during recovery, not during the work itself. Extra recovery now protects tomorrow's session."
+      ],
       "skip_remaining_on_intervals": [
         "You've gotten the stimulus. Terminate properly and focus on recovery for tomorrow."
+      ],
+      "skip_remaining_on_intervals_rationale": [
+        "Multiple quality indicators are declining across intervals. The training stimulus has been delivered; continuing risks poor movement patterns and excessive fatigue. Recovery now ensures progressive adaptation continues tomorrow."
       ]
     },
     "completion": [

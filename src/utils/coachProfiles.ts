@@ -19,12 +19,15 @@ const DEFAULT_PROFILE: CoachProfile = {
     allowSkipRemainingOnIntervals: true,
   },
   messages: {
-    encouragement: ['Nice work. Keep it steady.'],
     suggestions: {
       adjust_intensity_up: ['Looking good. Increase by {{percent}}%?'],
+      adjust_intensity_up_rationale: ['Power and cadence are stable with minimal HR drift. You have capacity for more.'],
       adjust_intensity_down: ['Let us back off by {{percent}}% to stay on track.'],
+      adjust_intensity_down_rationale: ['Power is below target with elevated HR drift or cadence variance. Reducing intensity preserves quality.'],
       extend_recovery: ['Extend recovery by {{seconds}} seconds?'],
+      extend_recovery_rationale: ['Recovery HR is still elevated from the previous effort. Extra recovery ensures quality in upcoming intervals.'],
       skip_remaining_on_intervals: ['Skip the remaining intervals and cool down?'],
+      skip_remaining_on_intervals_rationale: ['Multiple intervals show declining performance with elevated fatigue markers. Terminating now preserves long-term progress.'],
     },
     completion: ['Session complete. Great work.'],
   },
@@ -87,10 +90,6 @@ const normalizeProfile = (input: unknown): CoachProfile | null => {
     messages: {
       ...DEFAULT_PROFILE.messages,
       ...data.messages,
-      encouragement:
-        data.messages?.encouragement?.length
-          ? data.messages.encouragement
-          : DEFAULT_PROFILE.messages.encouragement,
       suggestions: {
         ...DEFAULT_PROFILE.messages.suggestions,
         ...data.messages?.suggestions,

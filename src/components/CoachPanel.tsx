@@ -17,8 +17,6 @@ type CoachPanelProps = {
 
 const formatEventLabel = (event: CoachEvent) => {
   switch (event.kind) {
-    case 'encouragement':
-      return 'ENCOURAGEMENT';
     case 'suggestion':
       return 'SUGGESTION';
     case 'decision':

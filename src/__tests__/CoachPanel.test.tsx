@@ -23,12 +23,15 @@ describe('CoachPanel', () => {
         allowSkipRemainingOnIntervals: true,
       },
       messages: {
-        encouragement: ['Nice work.'],
         suggestions: {
           adjust_intensity_up: ['Increase by {{percent}}%.'],
+          adjust_intensity_up_rationale: ['Raising intensity to match target power.'],
           adjust_intensity_down: ['Reduce by {{percent}}%.'],
+          adjust_intensity_down_rationale: ['Lowering intensity to maintain target power.'],
           extend_recovery: ['Extend by {{seconds}} seconds.'],
+          extend_recovery_rationale: ['Extending recovery for better adaptation.'],
           skip_remaining_on_intervals: ['Skip remaining intervals.'],
+          skip_remaining_on_intervals_rationale: ['Skipping remaining intervals to avoid overreaching.'],
         },
         completion: ['Session complete.'],
       },
