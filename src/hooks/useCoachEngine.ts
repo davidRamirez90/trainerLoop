@@ -25,6 +25,7 @@ type CoachEngineInput = {
   samples: TelemetrySample[];
   sessionId: number;
   intensityOffsetPct: number;
+  ergEnabled?: boolean;
   onApplyAction?: (suggestion: CoachSuggestion) => void;
 };
 
@@ -168,6 +169,7 @@ export const useCoachEngine = ({
   samples,
   sessionId,
   intensityOffsetPct,
+  ergEnabled,
   onApplyAction,
 }: CoachEngineInput) => {
   const [suggestions, setSuggestions] = useState<CoachSuggestion[]>([]);
@@ -455,7 +457,8 @@ export const useCoachEngine = ({
       profile.interventions.intensityAdjustPct.min;
 
     const reduceCondition =
-      recentMetrics.adherencePct <= profile.rules.targetAdherencePct.intervene &&
+      (recentMetrics.adherencePct <= profile.rules.targetAdherencePct.intervene ||
+        ergEnabled) &&
       (driftMetrics.hrDriftPct >= profile.rules.hrDriftPct.intervene ||
         driftMetrics.cadenceVariance >=
           profile.rules.cadenceVarianceRpm.intervene);
@@ -506,6 +509,7 @@ export const useCoachEngine = ({
     addSuggestion,
     canSuggest,
     elapsedInSegmentSec,
+    ergEnabled,
     hasPlan,
     intensityOffsetPct,
     isRunning,

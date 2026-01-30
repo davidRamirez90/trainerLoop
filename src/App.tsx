@@ -751,6 +751,7 @@ function App() {
     samples: telemetrySamples,
     sessionId: clock.sessionId,
     intensityOffsetPct,
+    ergEnabled,
     onApplyAction: handleCoachAction,
   });
 
