@@ -60,9 +60,6 @@ describe('CoachPanel', () => {
     render(
       <CoachPanel
         profile={profile}
-        profiles={[profile]}
-        selectedProfileId={profile.id}
-        onSelectProfile={() => {}}
         events={events}
         suggestions={suggestions}
         onAcceptSuggestion={() => {}}

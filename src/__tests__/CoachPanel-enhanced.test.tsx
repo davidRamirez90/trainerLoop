@@ -63,9 +63,6 @@ describe('CoachPanel - Enhanced Features', () => {
     render(
       <CoachPanel
         profile={mockProfile}
-        profiles={[mockProfile]}
-        selectedProfileId={mockProfile.id}
-        onSelectProfile={() => {}}
         events={events}
         suggestions={suggestions}
         onAcceptSuggestion={() => {}}
@@ -118,9 +115,6 @@ describe('CoachPanel - Enhanced Features', () => {
     render(
       <CoachPanel
         profile={mockProfile}
-        profiles={[mockProfile]}
-        selectedProfileId={mockProfile.id}
-        onSelectProfile={() => {}}
         events={events}
         suggestions={suggestions}
         onAcceptSuggestion={() => {}}
@@ -166,9 +160,6 @@ describe('CoachPanel - Enhanced Features', () => {
     render(
       <CoachPanel
         profile={mockProfile}
-        profiles={[mockProfile]}
-        selectedProfileId={mockProfile.id}
-        onSelectProfile={() => {}}
         events={events}
         suggestions={suggestions}
         onAcceptSuggestion={() => {}}
@@ -209,9 +200,6 @@ describe('CoachPanel - Enhanced Features', () => {
     render(
       <CoachPanel
         profile={mockProfile}
-        profiles={[mockProfile]}
-        selectedProfileId={mockProfile.id}
-        onSelectProfile={() => {}}
         events={events}
         suggestions={suggestions}
         onAcceptSuggestion={mockAccept}
@@ -249,9 +237,6 @@ describe('CoachPanel - Enhanced Features', () => {
     render(
       <CoachPanel
         profile={mockProfile}
-        profiles={[mockProfile]}
-        selectedProfileId={mockProfile.id}
-        onSelectProfile={() => {}}
         events={events}
         suggestions={suggestions}
         onAcceptSuggestion={() => {}}
