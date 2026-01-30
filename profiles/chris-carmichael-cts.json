@@ -3,6 +3,7 @@
   "id": "chris-carmichael-cts",
   "name": "Chris Carmichael (CTS)",
   "description": "Fitness First philosophy with minimal intervention approach. Focuses on guiding athletes to highest possible fitness through efficient, data-informed training that teaches independence from metrics.",
+  "tagline": "Fitness First, educational",
   "author": "Based on Carmichael Training Systems methodology and Chris Carmichael's coaching philosophy",
   "tags": ["fitness-first", "minimal-intervention", "human-first", "efficiency", "time-crunched"],
   "voice": {

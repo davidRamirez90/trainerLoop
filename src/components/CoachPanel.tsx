@@ -6,9 +6,6 @@ import { formatDuration } from '../utils/time';
 
 type CoachPanelProps = {
   profile: CoachProfile | null;
-  profiles: CoachProfile[];
-  selectedProfileId: string | null;
-  onSelectProfile: (profileId: string) => void;
   events: CoachEvent[];
   suggestions: CoachSuggestion[];
   onAcceptSuggestion: (suggestionId: string) => void;
@@ -104,9 +101,6 @@ const formatImpactPreview = (suggestion: CoachSuggestion): string => {
 
 export const CoachPanel = ({
   profile,
-  profiles,
-  selectedProfileId,
-  onSelectProfile,
   events,
   suggestions,
   onAcceptSuggestion,
@@ -130,21 +124,10 @@ export const CoachPanel = ({
           COACH PROFILE
         </div>
         <div className="coach-body">
-          <label className="coach-field">
-            <span>Coach</span>
-            <select
-              value={selectedProfileId ?? profile?.id ?? ''}
-              onChange={(event) => onSelectProfile(event.target.value)}
-            >
-              {profiles.map((coach) => (
-                <option key={coach.id} value={coach.id}>
-                  {coach.name}
-                </option>
-              ))}
-            </select>
-          </label>
           {profile ? (
             <>
+              <div className="coach-name">{profile.name}</div>
+              <div className="coach-tagline">{profile.tagline}</div>
               <div className="coach-meta">{profile.description}</div>
               <div>Voice: {renderVoice(profile)}</div>
               <div>Focus: {renderFocus(profile)}</div>

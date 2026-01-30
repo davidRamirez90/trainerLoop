@@ -5,6 +5,7 @@ const DEFAULT_PROFILE: CoachProfile = {
   id: 'default-coach',
   name: 'Default Coach',
   description: 'A steady, supportive coach.',
+  tagline: 'Balanced and supportive',
   voice: { tone: 'supportive', style: 'concise' },
   rules: {
     targetAdherencePct: { warn: 90, intervene: 80 },

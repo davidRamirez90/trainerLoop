@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import { WorkoutChart } from './components/WorkoutChart';
 import { CoachPanel } from './components/CoachPanel';
+import { CoachSelectorModal } from './components/CoachSelectorModal';
 import { CriticalSuggestionModal } from './components/CriticalSuggestionModal';
 import { ToastNotification, useToast } from './components/ToastNotification';
 import type { WorkoutPlan, WorkoutSegment } from './data/workout';
@@ -357,6 +358,7 @@ function App() {
     buildEmptyProfile()
   );
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isCoachSelectorOpen, setIsCoachSelectorOpen] = useState(false);
   const coachProfiles = useMemo(() => getCoachProfiles(), []);
   const [selectedCoachProfileId, setSelectedCoachProfileId] = useState<string | null>(
     () => loadCoachProfileIdFromStorage()
@@ -1691,15 +1693,19 @@ function App() {
           >
             {ergToggleLabel}
           </button>
+          <button
+            className="session-button"
+            type="button"
+            onClick={() => setIsCoachSelectorOpen(true)}
+          >
+            Coach: {activeCoachProfile?.name ?? 'Select'}
+          </button>
         </div>
       </section>
 
       {hasPlan ? (
         <CoachPanel
           profile={activeCoachProfile}
-          profiles={coachProfiles}
-          selectedProfileId={selectedCoachProfileId}
-          onSelectProfile={handleCoachProfileSelect}
           events={coachEvents}
           suggestions={coachSuggestions}
           onAcceptSuggestion={acceptSuggestion}
@@ -2513,6 +2519,15 @@ function App() {
           }}
         />
       )}
+
+      <CoachSelectorModal
+        isOpen={isCoachSelectorOpen}
+        profiles={coachProfiles}
+        selectedProfileId={selectedCoachProfileId}
+        onSelectProfile={handleCoachProfileSelect}
+        onClose={() => setIsCoachSelectorOpen(false)}
+      />
+
       <ToastNotification toasts={toasts} onRemove={removeToast} />
     </div>
   );

@@ -42,6 +42,7 @@ export type CoachProfile = {
   id: string;
   name: string;
   description: string;
+  tagline?: string;
   author?: string;
   tags?: string[];
   voice?: {
