@@ -194,6 +194,29 @@ const useChartSize = (ref: React.RefObject<HTMLDivElement | null>) => {
   return size;
 };
 
+const getSegmentBadges = (
+  segment: WorkoutSegment,
+  index: number,
+  intensityOverrides?: Array<{ fromIndex: number; offsetPct: number }>,
+  recoveryExtensions?: Record<string, number>
+): { hasIntensityBadge: boolean; hasRecoveryBadge: boolean; offsetPct: number; extensionSec: number } => {
+  let offsetPct = 0;
+  let hasIntensityBadge = false;
+  if (intensityOverrides) {
+    for (const override of intensityOverrides) {
+      if (override.fromIndex <= index) {
+        offsetPct = override.offsetPct;
+        hasIntensityBadge = offsetPct !== 0 && segment.isWork;
+      }
+    }
+  }
+
+  const extensionSec = recoveryExtensions?.[segment.id] ?? 0;
+  const hasRecoveryBadge = extensionSec > 0 && segment.phase === 'recovery';
+
+  return { hasIntensityBadge, hasRecoveryBadge, offsetPct, extensionSec };
+};
+
 type WorkoutChartProps = {
   segments: WorkoutSegment[];
   samples: TelemetrySample[];
@@ -202,6 +225,8 @@ type WorkoutChartProps = {
   ftpWatts: number;
   hrSensorConnected: boolean;
   showPower3s: boolean;
+  intensityOverrides?: Array<{ fromIndex: number; offsetPct: number }>;
+  recoveryExtensions?: Record<string, number>;
   thresholdHr: number | null;
   currentHr: number | null;
 };
@@ -220,6 +245,8 @@ export const WorkoutChart = ({
   ftpWatts,
   hrSensorConnected,
   showPower3s,
+  intensityOverrides,
+  recoveryExtensions,
   thresholdHr,
   currentHr,
 }: WorkoutChartProps) => {
@@ -229,6 +256,8 @@ export const WorkoutChart = ({
   const segmentsRef = useRef(segments);
   const elapsedRef = useRef(elapsedSec);
   const gapsRef = useRef(gaps);
+  const intensityOverridesRef = useRef(intensityOverrides);
+  const recoveryExtensionsRef = useRef(recoveryExtensions);
   const size = useChartSize(containerRef);
   const [hoverState, setHoverState] = useState<HoverState | null>(null);
   const ftpScale = Math.max(ftpWatts, 1);
@@ -450,6 +479,20 @@ export const WorkoutChart = ({
     }
   }, [gaps]);
 
+  useEffect(() => {
+    intensityOverridesRef.current = intensityOverrides;
+    if (plotRef.current) {
+      plotRef.current.redraw();
+    }
+  }, [intensityOverrides]);
+
+  useEffect(() => {
+    recoveryExtensionsRef.current = recoveryExtensions;
+    if (plotRef.current) {
+      plotRef.current.redraw();
+    }
+  }, [recoveryExtensions]);
+
   useLayoutEffect(() => {
     if (!containerRef.current || size.width === 0 || size.height === 0) {
       return;
@@ -467,7 +510,7 @@ export const WorkoutChart = ({
       const yBottom = u.valToPos(yMin, 'y', true);
 
       ctx.save();
-      currentSegments.forEach((segment) => {
+      currentSegments.forEach((segment, index) => {
         const start = cursor;
         const end = cursor + segment.durationSec;
         const x0 = u.valToPos(start, 'x', true);
@@ -517,6 +560,62 @@ export const WorkoutChart = ({
           ctx.moveTo(x0, yHighStart);
           ctx.lineTo(x1, yHighEnd);
           ctx.stroke();
+        }
+
+        const badges = getSegmentBadges(
+          segment,
+          index,
+          intensityOverridesRef.current,
+          recoveryExtensionsRef.current
+        );
+
+        const segmentWidth = x1 - x0;
+        if (segmentWidth > 40) {
+          let badgeX = x1 - 8;
+          const badgeY = u.bbox.top + 12;
+
+          if (badges.hasRecoveryBadge) {
+            const extensionText = `+${badges.extensionSec}s`;
+            ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+            const textWidth = ctx.measureText(extensionText).width;
+            const badgeWidth = textWidth + 8;
+            const badgeHeight = 16;
+            const badgeLeft = badgeX - badgeWidth;
+
+            ctx.fillStyle = 'rgba(46, 204, 113, 0.9)';
+            ctx.beginPath();
+            ctx.roundRect(badgeLeft, badgeY - badgeHeight / 2, badgeWidth, badgeHeight, 3);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(extensionText, badgeLeft + badgeWidth / 2, badgeY);
+
+            badgeX -= badgeWidth + 4;
+          }
+
+          if (badges.hasIntensityBadge) {
+            const sign = badges.offsetPct > 0 ? '+' : '';
+            const intensityText = `${sign}${Math.round(badges.offsetPct)}%`;
+            ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+            const textWidth = ctx.measureText(intensityText).width;
+            const badgeWidth = textWidth + 20;
+            const badgeHeight = 16;
+            const badgeLeft = badgeX - badgeWidth;
+
+            const isIncrease = badges.offsetPct > 0;
+            ctx.fillStyle = isIncrease ? 'rgba(231, 76, 60, 0.9)' : 'rgba(52, 152, 219, 0.9)';
+            ctx.beginPath();
+            ctx.roundRect(badgeLeft, badgeY - badgeHeight / 2, badgeWidth, badgeHeight, 3);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('⚡', badgeLeft + 8, badgeY);
+            ctx.fillText(intensityText, badgeLeft + badgeWidth / 2 + 4, badgeY);
+          }
         }
 
         cursor = end;
