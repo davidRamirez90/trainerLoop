@@ -31,7 +31,6 @@ export function StravaUploadModal({
   const { authenticated, athlete, initiateAuth } = useStravaAuth();
   const [status, setStatus] = useState<UploadStatus>('idle');
   const [error, setError] = useState<string>('');
-  const [uploadId, setUploadId] = useState<number | null>(null);
   const [activityUrl, setActivityUrl] = useState<string>('');
   const [workoutName, setWorkoutName] = useState<string>('');
   const [description, setDescription] = useState<string>('');
@@ -73,7 +72,6 @@ export function StravaUploadModal({
         deviceName: 'Trainer Loop',
       });
 
-      setUploadId(result.id);
       setStatus('processing');
 
       // Poll for upload status
@@ -125,7 +123,7 @@ export function StravaUploadModal({
   const handleDownload = () => {
     if (!fitData) return;
 
-    const blob = new Blob([fitData], { type: 'application/octet-stream' });
+    const blob = new Blob([fitData.buffer as ArrayBuffer], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
