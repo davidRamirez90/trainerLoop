@@ -9,7 +9,7 @@ id = "8ec2d06439cd4552970bbe33b1626511"
 
 # Environment variables (non-sensitive)
 [vars]
-ALLOWED_ORIGIN = "https://trainerloop.pages.dev/"
+ALLOWED_ORIGIN = "https://trainerloop.pages.dev"
 STRAVA_CLIENT_ID = "48864"
 
 # Secrets (set via wrangler secret put)
