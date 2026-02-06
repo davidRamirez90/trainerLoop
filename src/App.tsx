@@ -8,6 +8,7 @@ import { CoachSelectorModal } from './components/CoachSelectorModal';
 import { CriticalSuggestionModal } from './components/CriticalSuggestionModal';
 import { ToastNotification, useToast } from './components/ToastNotification';
 import { StravaUploadModal } from './components/StravaUploadModal';
+import { StravaCallbackPage } from './components/StravaCallbackPage';
 import type { WorkoutPlan, WorkoutSegment } from './data/workout';
 import { useCoachEngine } from './hooks/useCoachEngine';
 import { useBluetoothDevices } from './hooks/useBluetoothDevices';
@@ -334,6 +335,12 @@ const buildZonesFromTemplate = (
 };
 
 function App() {
+  // Handle Strava OAuth callback (detect by query params)
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('code') && urlParams.get('state')) {
+    return <StravaCallbackPage />;
+  }
+
   const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importNotice, setImportNotice] = useState<string | null>(null);

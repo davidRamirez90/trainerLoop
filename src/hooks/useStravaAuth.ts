@@ -69,7 +69,7 @@ export function useStravaAuth() {
         return;
       }
 
-      const redirectUri = `${window.location.origin}/strava-callback`;
+      const redirectUri = window.location.origin;
       
       // Open popup with loading message
       const popup = window.open(
