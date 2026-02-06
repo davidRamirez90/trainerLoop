@@ -1,0 +1,20 @@
+{
+  "name": "strava-auth-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for Strava OAuth and FIT file upload",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241230.0",
+    "typescript": "^5.3.0",
+    "wrangler": "^3.22.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
