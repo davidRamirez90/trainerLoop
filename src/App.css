@@ -2242,3 +2242,26 @@
   background: var(--text-muted);
   border-radius: 50%;
 }
+
+/* Strava button in completion modal */
+.session-button.strava-button {
+  background: linear-gradient(135deg, #fc4c02 0%, #ff6b35 100%);
+  border-color: #fc4c02;
+  color: white;
+}
+
+.session-button.strava-button:hover {
+  background: linear-gradient(135deg, #ff6b35 0%, #fc4c02 100%);
+  box-shadow: 0 4px 12px rgba(252, 76, 2, 0.3);
+}
+
+/* Ensure completion-actions can handle 3+ buttons */
+.modal-footer.completion-actions {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.modal-footer.completion-actions .session-button {
+  flex: 1;
+  min-width: 140px;
+}

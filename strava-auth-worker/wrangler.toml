@@ -5,12 +5,12 @@ compatibility_date = "2024-01-01"
 # KV Namespace for storing OAuth tokens
 [[kv_namespaces]]
 binding = "STRAVA_TOKENS"
-id = "YOUR_KV_NAMESPACE_ID"
+id = "8ec2d06439cd4552970bbe33b1626511"
 
 # Environment variables (non-sensitive)
 [vars]
-ALLOWED_ORIGIN = "http://localhost:5173"
-STRAVA_CLIENT_ID = "YOUR_STRAVA_CLIENT_ID"
+ALLOWED_ORIGIN = "https://trainerloop.pages.dev/"
+STRAVA_CLIENT_ID = "48864"
 
 # Secrets (set via wrangler secret put)
 # STRAVA_CLIENT_SECRET = "your_secret_here"

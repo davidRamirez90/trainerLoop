@@ -7,6 +7,7 @@ import { CoachPanel } from './components/CoachPanel';
 import { CoachSelectorModal } from './components/CoachSelectorModal';
 import { CriticalSuggestionModal } from './components/CriticalSuggestionModal';
 import { ToastNotification, useToast } from './components/ToastNotification';
+import { StravaUploadModal } from './components/StravaUploadModal';
 import type { WorkoutPlan, WorkoutSegment } from './data/workout';
 import { useCoachEngine } from './hooks/useCoachEngine';
 import { useBluetoothDevices } from './hooks/useBluetoothDevices';
@@ -349,6 +350,8 @@ function App() {
   const [showStopPrompt, setShowStopPrompt] = useState(false);
   const [stopPromptElapsedSec, setStopPromptElapsedSec] = useState<number | null>(null);
   const [sessionSamples, setSessionSamples] = useState<TelemetrySample[]>([]);
+  const [showStravaModal, setShowStravaModal] = useState(false);
+  const [completionFitData, setCompletionFitData] = useState<Uint8Array | null>(null);
   const [ergRampStartSec, setErgRampStartSec] = useState<number | null>(null);
   const [ergRampComplete, setErgRampComplete] = useState(false);
   const [profile, setProfile] = useState<UserProfile>(() =>
@@ -1346,6 +1349,20 @@ function App() {
       return;
     }
     if (isComplete) {
+      // Generate FIT file data for potential Strava export
+      const exportSamples = rawSamples.length > 0 ? rawSamples : sessionSamples;
+      const timerSecForExport = activeSec > 0 ? activeSec : sessionElapsedSec;
+      const fallbackStart = Date.now() - Math.max(sessionElapsedSec, 0) * 1000;
+      const startTimeMs = sessionStartMs ?? fallbackStart;
+      
+      const fitPayload = buildFitFile({
+        startTimeMs,
+        elapsedSec: sessionElapsedSec,
+        timerSec: timerSecForExport,
+        samples: exportSamples,
+      });
+      
+      setCompletionFitData(fitPayload);
       setShowCompletionPrompt(true);
       setShowStopPrompt(false);
     }
@@ -2079,7 +2096,7 @@ function App() {
                   Workout complete
                 </div>
                 <div className="modal-subtitle">
-                  Choose to export a FIT file or keep riding in free ride mode.
+                  Export your workout or continue riding.
                 </div>
               </div>
             </div>
@@ -2089,6 +2106,13 @@ function App() {
               </div>
             </div>
             <div className="modal-footer completion-actions">
+              <button
+                className="session-button strava-button"
+                type="button"
+                onClick={() => setShowStravaModal(true)}
+              >
+                Export to Strava
+              </button>
               <button
                 className="session-button"
                 type="button"
@@ -2101,7 +2125,7 @@ function App() {
                 type="button"
                 onClick={() => handleStopAndExport()}
               >
-                Stop & Export FIT
+                Export FIT File
               </button>
             </div>
           </div>
@@ -2123,7 +2147,7 @@ function App() {
                   Stop workout?
                 </div>
                 <div className="modal-subtitle">
-                  Export a FIT file now or keep riding in free ride mode.
+                  Export your workout or continue riding.
                 </div>
               </div>
             </div>
@@ -2133,6 +2157,13 @@ function App() {
               </div>
             </div>
             <div className="modal-footer completion-actions">
+              <button
+                className="session-button strava-button"
+                type="button"
+                onClick={() => setShowStravaModal(true)}
+              >
+                Export to Strava
+              </button>
               <button
                 className="session-button"
                 type="button"
@@ -2154,12 +2185,27 @@ function App() {
                   handleStopAndExport(stopPromptElapsedSec ?? undefined)
                 }
               >
-                Stop & Export FIT
+                Export FIT File
               </button>
             </div>
           </div>
         </div>
       ) : null}
+
+      {showStravaModal && completionFitData && (
+        <StravaUploadModal
+          isOpen={showStravaModal}
+          onClose={() => {
+            setShowStravaModal(false);
+            handleStop();
+          }}
+          plan={activePlan}
+          segments={displaySegments}
+          samples={sessionSamples}
+          fitData={completionFitData}
+          adherencePercent={compliance}
+        />
+      )}
 
       {isProfileOpen ? (
         <div
