@@ -376,7 +376,7 @@ function App() {
   const [segmentShortenings, setSegmentShortenings] = useState<Record<string, number>>({});
   const [criticalSuggestion, setCriticalSuggestion] = useState<CoachSuggestion | null>(null);
   const { toasts, success, removeToast } = useToast();
-  const { authenticated: stravaAuthenticated, athlete: stravaAthlete, loading: stravaLoading, initiateAuth: stravaInitiateAuth, logout: stravaLogout } = useStravaAuth();
+  const { authenticated: stravaAuthenticated, athlete: stravaAthlete, loading: stravaLoading, error: stravaError, initiateAuth: stravaInitiateAuth, logout: stravaLogout } = useStravaAuth();
   const lastWorkRef = useRef<number | null>(null);
   const resumeTimeoutRef = useRef<number | null>(null);
   const prevRunningRef = useRef(false);
@@ -2528,9 +2528,13 @@ function App() {
                 <div className="integration-info">
                   <div className="integration-title">Strava</div>
                   <div className="integration-note">
-                    {stravaAuthenticated
-                      ? `Connected as ${stravaAthlete?.firstname} ${stravaAthlete?.lastname}`
-                      : 'Connect your Strava account to upload workouts directly.'}
+                    {stravaError ? (
+                      <span className="integration-error">{stravaError}</span>
+                    ) : stravaAuthenticated ? (
+                      `Connected as ${stravaAthlete?.firstname} ${stravaAthlete?.lastname}`
+                    ) : (
+                      'Connect your Strava account to upload workouts directly.'
+                    )}
                   </div>
                 </div>
                 <button

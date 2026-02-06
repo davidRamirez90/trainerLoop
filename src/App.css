@@ -640,6 +640,11 @@
   border-color: rgba(244, 150, 62, 0.5);
 }
 
+.integration-error {
+  color: #ef4444;
+  font-size: 12px;
+}
+
 .integration-title {
   font-size: 13px;
   font-weight: 600;

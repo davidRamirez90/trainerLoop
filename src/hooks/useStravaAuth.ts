@@ -19,6 +19,7 @@ export function useStravaAuth() {
     athlete: null,
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Check auth status on mount
   useEffect(() => {
@@ -27,6 +28,7 @@ export function useStravaAuth() {
 
   const checkAuthStatus = async () => {
     try {
+      setError(null);
       const response = await fetch(`${STRAVA_CONFIG.WORKER_URL}/auth/status`, {
         headers: {
           'X-User-ID': getUserId(),
@@ -41,9 +43,14 @@ export function useStravaAuth() {
             athlete: data.data.athlete || null,
           });
         }
+      } else {
+        const errorData = await response.text();
+        console.error('Strava auth status check failed:', response.status, errorData);
+        setError(`Worker error: ${response.status}`);
       }
-    } catch (error) {
-      console.error('Failed to check Strava auth status:', error);
+    } catch (err) {
+      console.error('Failed to check Strava auth status:', err);
+      setError('Worker not reachable. Is the Cloudflare Worker deployed?');
     } finally {
       setLoading(false);
     }
@@ -51,7 +58,20 @@ export function useStravaAuth() {
 
   const initiateAuth = useCallback((): Promise<boolean> => {
     return new Promise((resolve) => {
+      setError(null);
+      
+      // Check if worker URL is configured
+      if (!STRAVA_CONFIG.WORKER_URL || STRAVA_CONFIG.WORKER_URL === 'http://localhost:8787') {
+        const errorMsg = 'Strava Worker not configured. Please set VITE_STRAVA_WORKER_URL in .env.local';
+        console.error(errorMsg);
+        setError(errorMsg);
+        resolve(false);
+        return;
+      }
+
       const redirectUri = `${window.location.origin}/strava-callback`;
+      
+      // Open popup with loading message
       const popup = window.open(
         '',
         'stravaAuth',
@@ -61,9 +81,23 @@ export function useStravaAuth() {
       );
 
       if (!popup) {
+        setError('Popup blocked. Please allow popups for this site.');
         resolve(false);
         return;
       }
+
+      // Show loading state in popup
+      popup.document.write(`
+        <html>
+          <body style="font-family: system-ui, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1a1a1a; color: #fff;">
+            <div style="text-align: center;">
+              <div style="margin-bottom: 16px;">Connecting to Strava...</div>
+              <div style="width: 40px; height: 40px; border: 3px solid #333; border-top: 3px solid #fc4c02; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+              <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+            </div>
+          </body>
+        </html>
+      `);
 
       // Get auth URL from worker
       fetch(
@@ -76,9 +110,15 @@ export function useStravaAuth() {
           },
         }
       )
-        .then((response) => response.json())
+        .then(async (response) => {
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Worker error: ${response.status} - ${errorText}`);
+          }
+          return response.json();
+        })
         .then((data) => {
-          if (data.success) {
+          if (data.success && data.data.authUrl) {
             popup.location.href = data.data.authUrl;
 
             // Listen for message from popup
@@ -91,6 +131,7 @@ export function useStravaAuth() {
                 resolve(true);
               } else if (event.data.type === 'STRAVA_AUTH_ERROR') {
                 window.removeEventListener('message', handleMessage);
+                setError('Authentication failed. Please try again.');
                 resolve(false);
               }
             };
@@ -107,12 +148,14 @@ export function useStravaAuth() {
             }, 1000);
           } else {
             popup.close();
+            setError('Failed to get authorization URL from worker');
             resolve(false);
           }
         })
-        .catch((error) => {
-          console.error('Failed to initiate Strava auth:', error);
+        .catch((err) => {
+          console.error('Failed to initiate Strava auth:', err);
           popup.close();
+          setError(`Worker error: ${err.message}. Is the Cloudflare Worker deployed?`);
           resolve(false);
         });
     });
@@ -120,6 +163,7 @@ export function useStravaAuth() {
 
   const logout = useCallback(async () => {
     try {
+      setError(null);
       await fetch(`${STRAVA_CONFIG.WORKER_URL}/auth/logout`, {
         method: 'POST',
         headers: {
@@ -127,14 +171,16 @@ export function useStravaAuth() {
         },
       });
       setAuthState({ authenticated: false, athlete: null });
-    } catch (error) {
-      console.error('Failed to logout from Strava:', error);
+    } catch (err) {
+      console.error('Failed to logout from Strava:', err);
+      setError('Failed to disconnect from Strava');
     }
   }, []);
 
   return {
     ...authState,
     loading,
+    error,
     initiateAuth,
     logout,
     refreshAuth: checkAuthStatus,
