@@ -28,6 +28,9 @@ type FitExportInput = {
   timerSec?: number;
   samples: TelemetrySample[];
   sport?: number;
+  workoutName?: string;
+  description?: string;
+  deviceName?: string;
 };
 
 const toFitTimestamp = (timestampMs: number) =>
