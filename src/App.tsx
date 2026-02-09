@@ -389,6 +389,7 @@ function App() {
   const prevRunningRef = useRef(false);
   const stopPromptWasRunningRef = useRef(false);
   const lastRecordedSecRef = useRef<number | null>(null);
+  const sessionSavedRef = useRef(false);
   const hasPlan = !!activePlan && activePlan.segments.length > 0;
   const baseSegments = hasPlan ? activePlan.segments : EMPTY_SEGMENTS;
   const adjustedSegments = useMemo(() => {
@@ -1393,6 +1394,9 @@ function App() {
     }
     setStartError(null);
     const isSessionStarting = !isSessionActive;
+    if (isSessionStarting) {
+      sessionSavedRef.current = false;
+    }
     clock.startSession();
     if (canDetectWork && isSessionStarting && !hasWorkTelemetry) {
       setAutoResumeOnWork(true);
@@ -1430,6 +1434,32 @@ function App() {
   };
 
   const handleStop = () => {
+    // Auto-save session if it hasn't been saved yet (prevents data loss)
+    if (!sessionSavedRef.current && sessionStartMs) {
+      const exportSamples = rawSamples.length > 0 ? rawSamples : sessionSamples;
+      const timerSecForExport = activeSec > 0 ? activeSec : sessionElapsedSec;
+      const endTimeMs = Date.now();
+      const coachNotes = buildCoachNotes(coachEvents);
+      const sessionData: SessionData = {
+        ...buildSessionSummary(
+          sessionStartMs,
+          endTimeMs,
+          timerSecForExport,
+          exportSamples,
+          planName,
+          isComplete,
+          coachNotes,
+          activeCoachProfile?.id ?? null,
+          coachEvents
+        ),
+        startTimeMs: sessionStartMs,
+        endTimeMs,
+        samples: exportSamples,
+      };
+      addSessionToStorage(sessionData);
+      sessionSavedRef.current = true;
+    }
+
     clock.stop();
     ftmsControl.stopWorkout();
     setAutoResumeOnWork(false);
@@ -1478,6 +1508,7 @@ function App() {
       samples: exportSamples,
     };
     addSessionToStorage(sessionData);
+    sessionSavedRef.current = true;
 
     handleStop();
   };
