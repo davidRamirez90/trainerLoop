@@ -32,3 +32,7 @@
 
 ## Architecture Overview
 - The app is front-end only. Workout definitions live in `src/data/workout.ts` and simulated telemetry is generated in `src/hooks/useTelemetrySimulation.ts`.
+
+## Critical Reminders
+- **ALWAYS run `npm run build` after making code changes** to verify TypeScript compiles and there are no runtime errors before considering the task complete. This catches type errors, missing imports, and syntax issues that linting might miss.
+- **ALWAYS run `npm run lint` after making code changes** to ensure code follows the project's ESLint rules and catches style issues, unused variables, and potential bugs.

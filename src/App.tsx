@@ -9,6 +9,7 @@ import { CriticalSuggestionModal } from './components/CriticalSuggestionModal';
 import { ToastNotification, useToast } from './components/ToastNotification';
 import { StravaUploadModal } from './components/StravaUploadModal';
 import { StravaCallbackPage } from './components/StravaCallbackPage';
+import { SavedSessionsModal } from './components/SavedSessionsModal';
 import type { WorkoutPlan, WorkoutSegment } from './data/workout';
 import { useCoachEngine } from './hooks/useCoachEngine';
 import { useBluetoothDevices } from './hooks/useBluetoothDevices';
@@ -369,6 +370,7 @@ function App() {
     buildEmptyProfile()
   );
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isSavedSessionsOpen, setIsSavedSessionsOpen] = useState(false);
   const [isCoachSelectorOpen, setIsCoachSelectorOpen] = useState(false);
   const coachProfiles = useMemo(() => getCoachProfiles(), []);
   const [selectedCoachProfileId, setSelectedCoachProfileId] = useState<string | null>(
@@ -1657,6 +1659,15 @@ function App() {
             {liveStatus}
           </div>
           <button
+            className="sessions-button"
+            type="button"
+            aria-label="View saved sessions"
+            onClick={() => setIsSavedSessionsOpen(true)}
+            title="Saved Sessions"
+          >
+            <span aria-hidden="true">💾</span>
+          </button>
+          <button
             className="settings-button"
             type="button"
             aria-label="Open profile settings"
@@ -2246,6 +2257,12 @@ function App() {
           adherencePercent={compliance}
         />
       )}
+
+      <SavedSessionsModal
+        isOpen={isSavedSessionsOpen}
+        onClose={() => setIsSavedSessionsOpen(false)}
+        profileFtp={Number(profile.ftpWatts) || 200}
+      />
 
       {isProfileOpen ? (
         <div
