@@ -146,7 +146,7 @@ export default {
         let accessToken: string;
         try {
           accessToken = await getValidAccessToken(env, userId);
-        } catch (e) {
+        } catch {
           return errorResponse('Not authenticated with Strava', 401, corsOrigin);
         }
 
@@ -190,7 +190,7 @@ export default {
         let accessToken: string;
         try {
           accessToken = await getValidAccessToken(env, userId);
-        } catch (e) {
+        } catch {
           return errorResponse('Not authenticated with Strava', 401, corsOrigin);
         }
 
@@ -209,7 +209,7 @@ export default {
         let accessToken: string;
         try {
           accessToken = await getValidAccessToken(env, userId);
-        } catch (e) {
+        } catch {
           return errorResponse('Not authenticated with Strava', 401, corsOrigin);
         }
 

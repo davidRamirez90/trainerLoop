@@ -24,6 +24,10 @@ export function MiniWorkoutChart({
   width = 400,
   height = 100,
 }: MiniWorkoutChartProps) {
+  // Create gradient with zone colors - stable ID using useId (must be called before any early returns)
+  const baseId = useId();
+  const gradientId = `powerGradient-${baseId.replace(/:/g, '')}`;
+
   if (samples.length === 0 || ftpWatts <= 0) {
     return (
       <svg width={width} height={height} style={{ opacity: 0.3 }}>
@@ -79,10 +83,6 @@ export function MiniWorkoutChart({
       pathD += ` L ${x} ${y}`;
     }
   });
-
-  // Create gradient with zone colors - stable ID using useId
-  const baseId = useId();
-  const gradientId = `powerGradient-${baseId.replace(/:/g, '')}`;
 
   return (
     <svg

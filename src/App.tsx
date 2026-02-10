@@ -6,7 +6,8 @@ import { WorkoutChart } from './components/WorkoutChart';
 import { CoachPanel } from './components/CoachPanel';
 import { CoachSelectorModal } from './components/CoachSelectorModal';
 import { CriticalSuggestionModal } from './components/CriticalSuggestionModal';
-import { ToastNotification, useToast } from './components/ToastNotification';
+import { ToastNotification } from './components/ToastNotification';
+import { useToast } from './hooks/useToast';
 import { StravaUploadModal } from './components/StravaUploadModal';
 import { StravaCallbackPage } from './components/StravaCallbackPage';
 import { SavedSessionsModal } from './components/SavedSessionsModal';
@@ -338,9 +339,7 @@ const buildZonesFromTemplate = (
 function App() {
   // Handle Strava OAuth callback (detect by query params)
   const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('code') && urlParams.get('state')) {
-    return <StravaCallbackPage />;
-  }
+  const isStravaCallback = urlParams.get('code') && urlParams.get('state');
 
   const [activePlan, setActivePlan] = useState<WorkoutPlan | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -1640,6 +1639,10 @@ function App() {
       adjustedDuration: segment.durationSec,
     };
   }, [hasPlan, segment, index, intensityOverrides, recoveryExtensions, baseSegments]);
+
+  if (isStravaCallback) {
+    return <StravaCallbackPage />;
+  }
 
   return (
     <div className={`app ${phaseClass} ${workoutTypeClass}`}>

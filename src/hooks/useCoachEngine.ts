@@ -294,6 +294,8 @@ export const useCoachEngine = ({
   );
 
   useEffect(() => {
+    // Reset state when session changes - intentional reset, not cascading render
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSuggestions([]);
     setEvents([]);
     lastSuggestionAtRef.current = null;
@@ -337,6 +339,7 @@ export const useCoachEngine = ({
         metrics.hrDriftPct >= profile.rules.hrDriftPct.warn
       ) {
         const seconds = profile.interventions.recoveryExtendSec.step;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         addSuggestion({
           id: createId(),
           action: 'extend_recovery',
@@ -398,6 +401,7 @@ export const useCoachEngine = ({
       endSec: segmentEndSec,
       phase: segment.phase,
     };
+    // Suggestions are added based on interval transitions - intentional business logic
   }, [
     activeSec,
     addSuggestion,
@@ -465,6 +469,7 @@ export const useCoachEngine = ({
 
     if (reduceCondition && canAdjustDown) {
       const percent = profile.interventions.intensityAdjustPct.step;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       addSuggestion({
         id: createId(),
         action: 'adjust_intensity_down',
@@ -504,6 +509,7 @@ export const useCoachEngine = ({
         status: 'pending',
       });
     }
+    // Suggestions added based on real-time metrics - intentional business logic
   }, [
     activeSec,
     addSuggestion,
@@ -524,6 +530,7 @@ export const useCoachEngine = ({
     if (!profile || !hasPlan || !isComplete || completionLoggedRef.current) {
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     addEvent({
       id: createId(),
       kind: 'completion',
@@ -531,6 +538,7 @@ export const useCoachEngine = ({
       message: buildCompletionMessage(profile),
     });
     completionLoggedRef.current = true;
+    // Completion event logged once when workout completes - intentional business logic
   }, [activeSec, addEvent, hasPlan, isComplete, profile]);
 
   return {
