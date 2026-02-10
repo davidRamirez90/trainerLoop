@@ -8,6 +8,7 @@ import { CoachSelectorModal } from './components/CoachSelectorModal';
 import { CriticalSuggestionModal } from './components/CriticalSuggestionModal';
 import { ToastNotification } from './components/ToastNotification';
 import { useToast } from './hooks/useToast';
+import { useTheme } from './hooks/useTheme';
 import { StravaUploadModal } from './components/StravaUploadModal';
 import { StravaCallbackPage } from './components/StravaCallbackPage';
 import { SavedSessionsModal } from './components/SavedSessionsModal';
@@ -337,6 +338,9 @@ const buildZonesFromTemplate = (
 };
 
 function App() {
+  // Theme management
+  const { theme, toggleTheme } = useTheme();
+
   // Handle Strava OAuth callback (detect by query params)
   const urlParams = new URLSearchParams(window.location.search);
   const isStravaCallback = urlParams.get('code') && urlParams.get('state');
@@ -1671,6 +1675,15 @@ function App() {
             <span aria-hidden="true">💾</span>
           </button>
           <button
+            className="theme-toggle"
+            type="button"
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
+          </button>
+          <button
             className="settings-button"
             type="button"
             aria-label="Open profile settings"
@@ -1820,6 +1833,7 @@ function App() {
                     recoveryExtensions={recoveryExtensions}
                     thresholdHr={thresholdHr}
                     currentHr={displayHr}
+                    theme={theme}
                   />
                   {isPaused ? (
                     <div className="chart-overlay paused">

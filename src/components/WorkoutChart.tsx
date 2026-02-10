@@ -4,31 +4,60 @@ import uPlot from 'uplot';
 
 import type { WorkoutSegment } from '../data/workout';
 import type { TelemetryGap, TelemetrySample } from '../types';
+import type { Theme } from '../hooks/useTheme';
 import { formatDuration } from '../utils/time';
 import { getTotalDurationSec } from '../utils/workout';
 
 import 'uplot/dist/uPlot.min.css';
 
-const ACTUAL_STROKE = '#65c7ff';
-const POWER_SMOOTH_STROKE = '#a8def7';
-const HR_STROKE = '#D64541';
-const ZONE_STOPS = [
-  { max: 0.55, color: '#6C7A89' },
-  { max: 0.75, color: '#3B8EA5' },
-  { max: 0.88, color: '#5FAF5F' },
-  { max: 0.94, color: '#C9A227' },
-  { max: 1.05, color: '#E57A1F' },
-  { max: 1.2, color: '#D64541' },
-  { max: Number.POSITIVE_INFINITY, color: '#8C2A2A' },
-];
+// Theme-aware color constants
+const CHART_COLORS = {
+  dark: {
+    actualStroke: '#65c7ff',
+    powerSmoothStroke: '#a8def7',
+    hrStroke: '#D64541',
+    zoneStops: [
+      { max: 0.55, color: '#6C7A89' },
+      { max: 0.75, color: '#3B8EA5' },
+      { max: 0.88, color: '#5FAF5F' },
+      { max: 0.94, color: '#C9A227' },
+      { max: 1.05, color: '#E57A1F' },
+      { max: 1.2, color: '#D64541' },
+      { max: Number.POSITIVE_INFINITY, color: '#8C2A2A' },
+    ],
+    gapFill: 'rgba(214, 69, 65, 0.12)',
+    gapStroke: 'rgba(214, 69, 65, 0.4)',
+    gridColor: 'rgba(255, 255, 255, 0.1)',
+    tooltipBg: 'rgba(15, 21, 33, 0.95)',
+    tooltipBorder: 'rgba(38, 52, 71, 0.8)',
+  },
+  light: {
+    actualStroke: '#0066cc',
+    powerSmoothStroke: '#4a90d9',
+    hrStroke: '#dc2626',
+    zoneStops: [
+      { max: 0.55, color: '#4a5568' },
+      { max: 0.75, color: '#2563eb' },
+      { max: 0.88, color: '#059669' },
+      { max: 0.94, color: '#b45309' },
+      { max: 1.05, color: '#ea580c' },
+      { max: 1.2, color: '#dc2626' },
+      { max: Number.POSITIVE_INFINITY, color: '#991b1b' },
+    ],
+    gapFill: 'rgba(220, 38, 38, 0.12)',
+    gapStroke: 'rgba(220, 38, 38, 0.4)',
+    gridColor: 'rgba(0, 0, 0, 0.1)',
+    tooltipBg: 'rgba(255, 255, 255, 0.98)',
+    tooltipBorder: 'rgba(200, 210, 220, 0.8)',
+  },
+};
+
 const ZONE_LABELS = ['Z1', 'Z2', 'Z3', 'Z4', 'Z5', 'Z6', 'Z7'];
 const POLYGON_ALPHA = 0.18;
 const RANGE_FILL_ALPHA = 0.45;
 const RANGE_STROKE_ALPHA = 0.75;
 const LINE_STROKE_ALPHA = 0.85;
 const POWER_SMOOTH_WINDOW_SEC = 3;
-const GAP_FILL = 'rgba(214, 69, 65, 0.12)';
-const GAP_STROKE = 'rgba(214, 69, 65, 0.4)';
 const DEFAULT_HR_RANGE = { min: 80, max: 180 };
 const HR_RANGE_MIN = 40;
 const HR_RANGE_MAX = 220;
@@ -54,12 +83,12 @@ const hexToRgba = (value: string, alpha: number) => {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 };
 
-const getZoneColor = (ratio: number) =>
-  (ZONE_STOPS.find((stop) => ratio <= stop.max) ?? ZONE_STOPS[ZONE_STOPS.length - 1])
+const getZoneColor = (ratio: number, zoneStops: typeof CHART_COLORS.dark.zoneStops) =>
+  (zoneStops.find((stop) => ratio <= stop.max) ?? zoneStops[zoneStops.length - 1])
     .color;
 
-const getZoneLabel = (ratio: number) => {
-  const index = ZONE_STOPS.findIndex((stop) => ratio <= stop.max);
+const getZoneLabel = (ratio: number, zoneStops: typeof CHART_COLORS.dark.zoneStops) => {
+  const index = zoneStops.findIndex((stop) => ratio <= stop.max);
   const safeIndex = index >= 0 ? index : ZONE_LABELS.length - 1;
   return ZONE_LABELS[safeIndex] ?? `Z${safeIndex + 1}`;
 };
@@ -229,6 +258,7 @@ type WorkoutChartProps = {
   recoveryExtensions?: Record<string, number>;
   thresholdHr: number | null;
   currentHr: number | null;
+  theme?: Theme;
 };
 
 type HoverState = {
@@ -249,7 +279,9 @@ export const WorkoutChart = ({
   recoveryExtensions,
   thresholdHr,
   currentHr,
+  theme = 'dark',
 }: WorkoutChartProps) => {
+  const colors = CHART_COLORS[theme];
   const containerRef = useRef<HTMLDivElement>(null);
   const plotRef = useRef<uPlot | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -522,7 +554,7 @@ export const WorkoutChart = ({
         const yLowEnd = u.valToPos(lowEnd, 'y', true);
         const yHighEnd = u.valToPos(highEnd, 'y', true);
         const targetWatts = getSegmentTargetWatts(segment);
-        const zoneColor = getZoneColor(targetWatts / ftpScale);
+        const zoneColor = getZoneColor(targetWatts / ftpScale, colors.zoneStops);
         const zoneFill = hexToRgba(zoneColor, POLYGON_ALPHA);
         const rangeFill = hexToRgba(zoneColor, RANGE_FILL_ALPHA);
         const rangeStroke = hexToRgba(zoneColor, RANGE_STROKE_ALPHA);
@@ -647,8 +679,8 @@ export const WorkoutChart = ({
         return;
       }
       ctx.save();
-      ctx.fillStyle = GAP_FILL;
-      ctx.strokeStyle = GAP_STROKE;
+      ctx.fillStyle = colors.gapFill;
+      ctx.strokeStyle = colors.gapStroke;
       ctx.lineWidth = 1;
 
       currentGaps.forEach((gap) => {
@@ -704,7 +736,7 @@ export const WorkoutChart = ({
           scale: 'hr',
           side: 1,
           show: showHeartRateAxis,
-          stroke: HR_STROKE,
+          stroke: colors.hrStroke,
           grid: { show: false },
           ticks: { stroke: 'rgba(214, 69, 65, 0.45)' },
           values: (_, ticks) => ticks.map((tick) => `${Math.round(tick)}`),
@@ -716,13 +748,13 @@ export const WorkoutChart = ({
         },
         {
           label: 'Power (W)',
-          stroke: ACTUAL_STROKE,
+          stroke: colors.actualStroke,
           width: 2,
           points: { show: false },
         },
         {
           label: 'Power 3s Avg',
-          stroke: POWER_SMOOTH_STROKE,
+          stroke: colors.powerSmoothStroke,
           width: 2,
           show: showPower3s,
           points: { show: false },
@@ -730,7 +762,7 @@ export const WorkoutChart = ({
         {
           label: 'HR',
           scale: 'hr',
-          stroke: HR_STROKE,
+          stroke: colors.hrStroke,
           width: 2,
           show: showHeartRate,
           points: { show: false },
@@ -783,7 +815,7 @@ export const WorkoutChart = ({
     : '--';
   const cadenceLabel = hoveredSegment ? getCadenceLabel(hoveredSegment.segment) : '--';
   const zoneLabel = hoveredSegment && ftpWatts > 0
-    ? getZoneLabel(getSegmentTargetWatts(hoveredSegment.segment) / ftpWatts)
+    ? getZoneLabel(getSegmentTargetWatts(hoveredSegment.segment) / ftpWatts, colors.zoneStops)
     : '--';
 
   return (
