@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import { useState, useCallback, useEffect } from 'react';
 import { useStravaAuth } from '../hooks/useStravaAuth';
 import { uploadActivityToStrava, fitFileToBase64, checkUploadStatus } from '../utils/stravaApi';
@@ -136,161 +135,47 @@ export function StravaUploadModal({
 
   if (!isOpen) return null;
 
-  const overlayStyle: CSSProperties = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  };
-
-  const modalStyle: CSSProperties = {
-    backgroundColor: '#1a1a1a',
-    borderRadius: '12px',
-    padding: '32px',
-    maxWidth: '500px',
-    width: '90%',
-    maxHeight: '90vh',
-    overflow: 'auto',
-    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
-  };
-
-  const titleStyle: CSSProperties = {
-    fontSize: '24px',
-    fontWeight: 700,
-    marginBottom: '24px',
-    color: '#ffffff',
-  };
-
-  const sectionStyle: CSSProperties = {
-    marginBottom: '24px',
-  };
-
-  const labelStyle: CSSProperties = {
-    display: 'block',
-    fontSize: '12px',
-    fontWeight: 600,
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-    color: '#888888',
-    marginBottom: '8px',
-  };
-
-  const inputStyle: CSSProperties = {
-    width: '100%',
-    padding: '12px',
-    backgroundColor: '#2a2a2a',
-    border: '1px solid #444444',
-    borderRadius: '6px',
-    color: '#ffffff',
-    fontSize: '14px',
-    boxSizing: 'border-box',
-  };
-
-  const textareaStyle: CSSProperties = {
-    ...inputStyle,
-    minHeight: '100px',
-    resize: 'vertical',
-    fontFamily: 'inherit',
-  };
-
-  const buttonContainerStyle: CSSProperties = {
-    display: 'flex',
-    gap: '12px',
-    marginTop: '24px',
-  };
-
-  const primaryButtonStyle: CSSProperties = {
-    flex: 1,
-    padding: '14px 24px',
-    backgroundColor: '#fc4c02',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-  };
-
-  const secondaryButtonStyle: CSSProperties = {
-    flex: 1,
-    padding: '14px 24px',
-    backgroundColor: 'transparent',
-    color: '#888888',
-    border: '1px solid #444444',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: 600,
-    cursor: 'pointer',
-  };
-
-  const errorStyle: CSSProperties = {
-    padding: '12px',
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    border: '1px solid rgba(239, 68, 68, 0.5)',
-    borderRadius: '6px',
-    color: '#ef4444',
-    fontSize: '14px',
-    marginBottom: '16px',
-  };
-
-  const successStyle: CSSProperties = {
-    padding: '16px',
-    backgroundColor: 'rgba(34, 197, 94, 0.2)',
-    border: '1px solid rgba(34, 197, 94, 0.5)',
-    borderRadius: '6px',
-    textAlign: 'center' as const,
-  };
-
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-        <h2 style={titleStyle}>Export to Strava</h2>
+    <div className="modal-overlay strava-modal-overlay" onClick={onClose}>
+      <div className="modal-container strava-modal" onClick={(e) => e.stopPropagation()}>
+        <h2 className="strava-modal-title">Export to Strava</h2>
 
-        {error && <div style={errorStyle}>{error}</div>}
+        {error && <div className="strava-error-message">{error}</div>}
 
         {!authenticated ? (
-          <div style={{ textAlign: 'center', padding: '32px 0' }}>
-            <p style={{ color: '#888888', marginBottom: '24px' }}>
+          <div className="strava-connect-section">
+            <p className="strava-connect-text">
               Connect your Strava account to upload this workout directly.
             </p>
             <button
               onClick={handleConnect}
               disabled={status === 'connecting'}
-              style={primaryButtonStyle}
+              className="session-button strava-button primary"
             >
               {status === 'connecting' ? 'Connecting...' : 'Connect to Strava'}
             </button>
           </div>
         ) : status === 'success' ? (
-          <div style={successStyle}>
+          <div className="strava-success-message">
             <svg
               width="48"
               height="48"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#22c55e"
+              stroke="currentColor"
               strokeWidth="2"
-              style={{ marginBottom: '12px' }}
+              className="strava-success-icon"
             >
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
               <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
-            <p style={{ color: '#22c55e', fontWeight: 600, marginBottom: '8px' }}>
-              Upload Complete!
-            </p>
+            <p className="strava-success-text">Upload Complete!</p>
             {activityUrl && (
               <a
                 href={activityUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: '#fc4c02', textDecoration: 'underline' }}
+                className="strava-activity-link"
               >
                 View on Strava
               </a>
@@ -299,72 +184,60 @@ export function StravaUploadModal({
         ) : (
           <>
             {athlete && (
-              <div style={{ ...sectionStyle, display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div className="strava-athlete-section">
                 {athlete.profile && (
                   <img
                     src={athlete.profile}
                     alt={`${athlete.firstname} ${athlete.lastname}`}
-                    style={{ width: 40, height: 40, borderRadius: '50%' }}
+                    className="strava-athlete-avatar"
                   />
                 )}
-                <div>
-                  <div style={{ color: '#ffffff', fontWeight: 600 }}>
+                <div className="strava-athlete-info">
+                  <div className="strava-athlete-name">
                     {athlete.firstname} {athlete.lastname}
                   </div>
-                  <div style={{ color: '#22c55e', fontSize: '12px' }}>✓ Connected</div>
+                  <div className="strava-athlete-status">Connected</div>
                 </div>
               </div>
             )}
 
-            <div style={sectionStyle}>
-              <label style={labelStyle}>Workout Name</label>
+            <div className="strava-form-section">
+              <label className="strava-form-label">Workout Name</label>
               <input
                 type="text"
                 value={workoutName}
                 onChange={(e) => setWorkoutName(e.target.value)}
-                style={inputStyle}
+                className="strava-form-input"
                 disabled={status === 'uploading' || status === 'processing'}
               />
             </div>
 
-            <div style={sectionStyle}>
-              <label style={labelStyle}>Description</label>
+            <div className="strava-form-section">
+              <label className="strava-form-label">Description</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                style={textareaStyle}
+                className="strava-form-textarea"
                 disabled={status === 'uploading' || status === 'processing'}
               />
             </div>
 
             {(status === 'uploading' || status === 'processing') && (
-              <div style={{ ...sectionStyle, textAlign: 'center', padding: '16px' }}>
-                <div
-                  style={{
-                    width: '40px',
-                    height: '40px',
-                    border: '3px solid #333',
-                    borderTop: '3px solid #fc4c02',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite',
-                    margin: '0 auto 12px',
-                  }}
-                />
-                <p style={{ color: '#888888' }}>
+              <div className="strava-loading-section">
+                <div className="strava-loading-spinner" />
+                <p className="strava-loading-text">
                   {status === 'uploading' ? 'Uploading to Strava...' : 'Processing...'}
                 </p>
               </div>
             )}
 
-            <div style={buttonContainerStyle}>
+            <div className="strava-button-group">
               <button
                 onClick={handleUpload}
                 disabled={status === 'uploading' || status === 'processing'}
-                style={{
-                  ...primaryButtonStyle,
-                  opacity: status === 'uploading' || status === 'processing' ? 0.7 : 1,
-                  cursor: status === 'uploading' || status === 'processing' ? 'not-allowed' : 'pointer',
-                }}
+                className={`session-button strava-button primary ${
+                  status === 'uploading' || status === 'processing' ? 'disabled' : ''
+                }`}
               >
                 {status === 'uploading'
                   ? 'Uploading...'
@@ -372,7 +245,7 @@ export function StravaUploadModal({
                   ? 'Processing...'
                   : 'Upload to Strava'}
               </button>
-              <button onClick={handleDownload} style={secondaryButtonStyle}>
+              <button onClick={handleDownload} className="session-button strava-button secondary">
                 Download FIT
               </button>
             </div>
@@ -381,21 +254,10 @@ export function StravaUploadModal({
 
         <button
           onClick={onClose}
-          style={{
-            ...secondaryButtonStyle,
-            marginTop: '12px',
-            width: '100%',
-          }}
+          className="session-button strava-button secondary strava-close-button"
         >
           Close
         </button>
-
-        <style>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
       </div>
     </div>
   );

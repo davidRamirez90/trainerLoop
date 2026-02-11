@@ -1791,7 +1791,6 @@ function App() {
 
       {hasPlan ? (
         <CoachPanel
-          profile={activeCoachProfile}
           events={coachEvents}
           suggestions={coachSuggestions}
           onAcceptSuggestion={acceptSuggestion}

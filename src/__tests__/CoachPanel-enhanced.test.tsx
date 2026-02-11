@@ -2,39 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
 import { CoachPanel } from '../components/CoachPanel';
-import type { CoachEvent, CoachProfile, CoachSuggestion } from '../types/coach';
-
-const mockProfile: CoachProfile = {
-  schemaVersion: 1,
-  id: 'coach-test',
-  name: 'Test Coach',
-  description: 'A test coach profile.',
-  rules: {
-    targetAdherencePct: { warn: 90, intervene: 80 },
-    hrDriftPct: { warn: 4, intervene: 7 },
-    cadenceVarianceRpm: { warn: 8, intervene: 12 },
-    minElapsedSecondsForSuggestions: 300,
-    cooldownSeconds: 240,
-  },
-  interventions: {
-    intensityAdjustPct: { step: 5, min: -15, max: 10 },
-    recoveryExtendSec: { step: 30, max: 120 },
-    allowSkipRemainingOnIntervals: true,
-  },
-  messages: {
-    suggestions: {
-      adjust_intensity_up: ['Increase by {{percent}}%.'],
-      adjust_intensity_up_rationale: ['Power is stable, you can push more.'],
-      adjust_intensity_down: ['Reduce by {{percent}}%.'],
-      adjust_intensity_down_rationale: ['Power is below target with fatigue indicators.'],
-      extend_recovery: ['Extend by {{seconds}} seconds.'],
-      extend_recovery_rationale: ['Recovery HR is still elevated.'],
-      skip_remaining_on_intervals: ['Skip remaining intervals.'],
-      skip_remaining_on_intervals_rationale: ['Multiple intervals show fatigue.'],
-    },
-    completion: ['Session complete.'],
-  },
-};
+import type { CoachEvent, CoachSuggestion } from '../types/coach';
 
 describe('CoachPanel - Enhanced Features', () => {
   it('renders pending suggestions section with rationale', () => {
@@ -62,7 +30,6 @@ describe('CoachPanel - Enhanced Features', () => {
 
     render(
       <CoachPanel
-        profile={mockProfile}
         events={events}
         suggestions={suggestions}
         onAcceptSuggestion={() => {}}
@@ -114,7 +81,6 @@ describe('CoachPanel - Enhanced Features', () => {
 
     render(
       <CoachPanel
-        profile={mockProfile}
         events={events}
         suggestions={suggestions}
         onAcceptSuggestion={() => {}}
@@ -159,7 +125,6 @@ describe('CoachPanel - Enhanced Features', () => {
 
     render(
       <CoachPanel
-        profile={mockProfile}
         events={events}
         suggestions={suggestions}
         onAcceptSuggestion={() => {}}
@@ -199,7 +164,6 @@ describe('CoachPanel - Enhanced Features', () => {
 
     render(
       <CoachPanel
-        profile={mockProfile}
         events={events}
         suggestions={suggestions}
         onAcceptSuggestion={mockAccept}
@@ -236,7 +200,6 @@ describe('CoachPanel - Enhanced Features', () => {
 
     render(
       <CoachPanel
-        profile={mockProfile}
         events={events}
         suggestions={suggestions}
         onAcceptSuggestion={() => {}}

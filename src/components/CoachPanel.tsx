@@ -1,11 +1,10 @@
-import type { ReactNode } from 'react';
+
 import { useMemo } from 'react';
 
-import type { CoachEvent, CoachProfile, CoachSuggestion } from '../types/coach';
+import type { CoachEvent, CoachSuggestion } from '../types/coach';
 import { formatDuration } from '../utils/time';
 
 type CoachPanelProps = {
-  profile: CoachProfile | null;
   events: CoachEvent[];
   suggestions: CoachSuggestion[];
   onAcceptSuggestion: (suggestionId: string) => void;
@@ -23,22 +22,6 @@ const formatEventLabel = (event: CoachEvent) => {
     default:
       return 'COACH';
   }
-};
-
-const renderFocus = (profile: CoachProfile): ReactNode => {
-  const focus = profile.philosophy?.priority?.length
-    ? profile.philosophy.priority
-    : profile.tags ?? [];
-  if (!focus.length) {
-    return 'No focus areas defined.';
-  }
-  return focus.join(', ');
-};
-
-const renderVoice = (profile: CoachProfile): string => {
-  const tone = profile.voice?.tone ?? 'supportive';
-  const style = profile.voice?.style ?? 'concise';
-  return `${tone} · ${style}`;
 };
 
 const getSuggestionIcon = (action: string): string => {
@@ -100,7 +83,6 @@ const formatImpactPreview = (suggestion: CoachSuggestion): string => {
 };
 
 export const CoachPanel = ({
-  profile,
   events,
   suggestions,
   onAcceptSuggestion,
@@ -118,26 +100,6 @@ export const CoachPanel = ({
 
   return (
     <section>
-      <div className="coach-card">
-        <div className="coach-title">
-          <span className="coach-icon" />
-          COACH PROFILE
-        </div>
-        <div className="coach-body">
-          {profile ? (
-            <>
-              <div className="coach-name">{profile.name}</div>
-              <div className="coach-tagline">{profile.tagline}</div>
-              <div className="coach-meta">{profile.description}</div>
-              <div>Voice: {renderVoice(profile)}</div>
-              <div>Focus: {renderFocus(profile)}</div>
-            </>
-          ) : (
-            <div>Loading coach profile...</div>
-          )}
-        </div>
-      </div>
-
       {pendingSuggestions.length > 0 && (
         <div className="coach-card pending-suggestions">
           <div className="coach-title">
@@ -193,17 +155,9 @@ export const CoachPanel = ({
         </div>
       )}
 
-      <div className="coach-feed">
-        {events.length === 0 ? (
-          <div className="coach-card">
-            <div className="coach-title">
-              <span className="coach-icon" />
-              COACH FEED
-            </div>
-            <div className="coach-body">Coach updates will appear here.</div>
-          </div>
-        ) : null}
-        {events.map((event) => {
+      {events.length > 0 && (
+        <div className="coach-feed">
+          {events.map((event) => {
           const suggestion = event.suggestionId
             ? suggestionById.get(event.suggestionId)
             : undefined;
@@ -235,7 +189,8 @@ export const CoachPanel = ({
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
     </section>
   );
 };

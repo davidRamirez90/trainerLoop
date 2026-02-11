@@ -233,8 +233,8 @@
 
 .session-choice-button {
   border-radius: 999px;
-  border: 1px solid rgba(98, 118, 145, 0.6);
-  background: rgba(18, 26, 38, 0.75);
+  border: 1px solid var(--border);
+  background: var(--btn-bg-default);
   color: var(--text-primary);
   font-size: 10px;
   letter-spacing: 0.8px;
@@ -246,17 +246,21 @@
 
 .session-choice-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  border-color: rgba(155, 196, 255, 0.7);
+  border-color: var(--accent-secondary);
 }
 
 .session-choice-button.active {
-  border-color: rgba(155, 196, 255, 0.8);
+  border-color: var(--accent-secondary);
   box-shadow: 0 8px 16px rgba(22, 40, 60, 0.35);
 }
 
 .session-choice-button:disabled {
   cursor: default;
   opacity: 0.7;
+}
+
+[data-theme="light"] .session-choice-button.active {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
 }
 
 .session-actions {
@@ -347,7 +351,7 @@
 .modal-scrim {
   position: fixed;
   inset: 0;
-  background: rgba(6, 10, 16, 0.72);
+  background: var(--overlay-bg);
   display: grid;
   place-items: center;
   z-index: 20;
@@ -357,10 +361,10 @@
 .modal {
   width: min(960px, 92vw);
   max-height: 88vh;
-  background: rgba(13, 18, 28, 0.98);
-  border: 1px solid rgba(38, 52, 71, 0.8);
+  background: var(--modal-bg);
+  border: 1px solid var(--border);
   border-radius: 18px;
-  box-shadow: 0 30px 60px rgba(4, 8, 16, 0.6);
+  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -372,12 +376,13 @@
   justify-content: space-between;
   gap: 16px;
   padding: 18px 20px 12px;
-  border-bottom: 1px solid rgba(38, 52, 71, 0.6);
+  border-bottom: 1px solid var(--border);
 }
 
 .modal-title {
   font-size: 18px;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
 .modal-subtitle {
@@ -390,13 +395,18 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid rgba(38, 52, 71, 0.6);
-  background: rgba(15, 20, 30, 0.8);
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
   color: var(--text-primary);
   font-size: 20px;
   display: grid;
   place-items: center;
   cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.modal-close:hover {
+  background: var(--panel-muted);
 }
 
 .modal-body {
@@ -412,7 +422,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  border-top: 1px solid rgba(38, 52, 71, 0.6);
+  border-top: 1px solid var(--border);
 }
 
 .completion-modal {
@@ -1258,7 +1268,7 @@
   position: relative;
   height: 12px;
   border-radius: 999px;
-  background: rgba(84, 104, 132, 0.3);
+  background: var(--bg-tertiary);
   overflow: hidden;
 }
 
@@ -1276,15 +1286,15 @@
   transform: scaleX(var(--progress));
   transform-origin: left;
   transition: transform 0.4s ease;
-  background: linear-gradient(90deg, rgba(101, 199, 255, 0.4), rgba(244, 150, 62, 0.65));
+  background: linear-gradient(90deg, var(--accent-secondary), var(--accent-warning));
 }
 
 .progress-segment.warmup .progress-fill {
-  background: linear-gradient(90deg, rgba(101, 199, 255, 0.45), rgba(101, 199, 255, 0.2));
+  background: linear-gradient(90deg, var(--accent-secondary), rgba(101, 199, 255, 0.5));
 }
 
 .progress-segment.cooldown .progress-fill {
-  background: linear-gradient(90deg, rgba(84, 209, 160, 0.4), rgba(84, 209, 160, 0.2));
+  background: linear-gradient(90deg, var(--accent-success), rgba(84, 209, 160, 0.5));
 }
 
 .coach-card {
@@ -1389,8 +1399,8 @@
 
 .settings-card {
   border-radius: 14px;
-  border: 1px solid rgba(38, 52, 71, 0.6);
-  background: rgba(12, 18, 28, 0.6);
+  border: 1px solid var(--border);
+  background: var(--panel-muted);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -1428,8 +1438,8 @@
   gap: 16px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(18, 24, 36, 0.5);
-  border: 1px solid rgba(45, 60, 80, 0.6);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
 }
 
 .device-info {
@@ -1624,18 +1634,18 @@
 }
 
 .modal-container {
-  background: rgba(18, 24, 36, 0.95);
-  border: 1px solid rgba(84, 209, 160, 0.4);
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 16px;
   max-width: 500px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow);
 }
 
 .modal-container.critical-modal {
-  border-color: rgba(214, 69, 65, 0.5);
+  border-color: var(--accent-danger);
 }
 
 .modal-header {
@@ -1643,7 +1653,7 @@
   align-items: center;
   gap: 12px;
   padding: 20px 24px;
-  border-bottom: 1px solid rgba(84, 209, 160, 0.2);
+  border-bottom: 1px solid var(--border);
 }
 
 .modal-header h3 {
@@ -1728,7 +1738,7 @@
   display: flex;
   gap: 12px;
   padding: 20px 24px;
-  border-top: 1px solid rgba(84, 209, 160, 0.2);
+  border-top: 1px solid var(--border);
   justify-content: flex-end;
 }
 
@@ -1754,16 +1764,16 @@
 }
 
 .pending-suggestions {
-  border-color: rgba(143, 226, 183, 0.6);
-  background: rgba(32, 54, 44, 0.7);
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.08);
 }
 
 .suggestion-item {
   padding: 16px;
-  background: rgba(10, 24, 20, 0.5);
+  background: var(--panel-muted);
   border-radius: 10px;
   margin-bottom: 12px;
-  border: 1px solid rgba(84, 209, 160, 0.25);
+  border: 1px solid var(--border);
 }
 
 .suggestion-item:last-child {
@@ -1861,10 +1871,10 @@
   align-items: center;
   gap: 12px;
   padding: 14px 18px;
-  background: rgba(18, 24, 36, 0.98);
-  border: 1px solid rgba(84, 209, 160, 0.3);
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow);
   pointer-events: auto;
   animation: toastEnter 0.3s ease-out;
 }
@@ -1925,8 +1935,8 @@
 
 /* Toast type variations */
 .toast-success {
-  border-color: rgba(143, 226, 183, 0.5);
-  background: rgba(32, 54, 44, 0.98);
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.1);
 }
 
 .toast-success .toast-icon {
@@ -1934,17 +1944,17 @@
 }
 
 .toast-warning {
-  border-color: rgba(201, 162, 39, 0.5);
-  background: rgba(54, 48, 20, 0.98);
+  border-color: rgba(217, 119, 6, 0.4);
+  background: rgba(217, 119, 6, 0.1);
 }
 
 .toast-warning .toast-icon {
-  color: #C9A227;
+  color: var(--accent-warning);
 }
 
 .toast-error {
-  border-color: rgba(214, 69, 65, 0.5);
-  background: rgba(54, 28, 28, 0.98);
+  border-color: rgba(220, 38, 38, 0.4);
+  background: rgba(220, 38, 38, 0.1);
 }
 
 .toast-error .toast-icon {
@@ -1952,12 +1962,12 @@
 }
 
 .toast-info {
-  border-color: rgba(101, 199, 255, 0.5);
-  background: rgba(20, 36, 54, 0.98);
+  border-color: rgba(2, 132, 199, 0.4);
+  background: rgba(2, 132, 199, 0.1);
 }
 
 .toast-info .toast-icon {
-  color: var(--accent-primary);
+  color: var(--accent-info);
 }
 
 /* Interval Panel Override Display */
@@ -2017,27 +2027,8 @@
 }
 
 /* Coach Selector Modal Styles */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(6, 10, 16, 0.85);
-  display: grid;
-  place-items: center;
-  z-index: 50;
-  backdrop-filter: blur(8px);
-}
-
-.modal-container {
-  width: min(720px, 92vw);
-  max-height: 88vh;
-  background: rgba(13, 18, 28, 0.98);
-  border: 1px solid rgba(38, 52, 71, 0.8);
-  border-radius: 18px;
-  box-shadow: 0 30px 60px rgba(4, 8, 16, 0.6);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
+/* Note: .modal-overlay and .modal-container base styles are defined earlier */
+/* These are specific overrides for the coach selector modal */
 
 .coach-selector-modal {
   width: min(800px, 94vw);
@@ -2057,31 +2048,31 @@
   gap: 12px;
   padding: 20px 16px;
   border-radius: 14px;
-  border: 2px solid rgba(38, 52, 71, 0.6);
-  background: rgba(15, 22, 34, 0.8);
+  border: 2px solid var(--border);
+  background: var(--panel);
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: center;
 }
 
 .coach-box:hover {
-  border-color: rgba(101, 199, 255, 0.4);
-  background: rgba(20, 30, 46, 0.9);
+  border-color: var(--accent-secondary);
+  background: var(--panel-muted);
   transform: translateY(-2px);
 }
 
 .coach-box.selected {
-  border-color: rgba(143, 226, 183, 0.8);
-  background: rgba(32, 54, 44, 0.6);
-  box-shadow: 0 8px 24px rgba(143, 226, 183, 0.15);
+  border-color: var(--accent-success);
+  background: rgba(34, 197, 94, 0.1);
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.15);
 }
 
 .coach-icon-placeholder {
   width: 56px;
   height: 56px;
   border-radius: 12px;
-  background: rgba(22, 28, 41, 0.8);
-  border: 1px solid rgba(38, 52, 71, 0.6);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
   display: grid;
   place-items: center;
   /* TODO: Replace with .png images in /assets/coaches/ */
@@ -2114,8 +2105,8 @@
   margin-top: 24px;
   padding: 20px;
   border-radius: 14px;
-  border: 1px solid rgba(38, 52, 71, 0.6);
-  background: rgba(15, 22, 34, 0.6);
+  border: 1px solid var(--border);
+  background: var(--panel-muted);
 }
 
 .coach-description-header {
@@ -2343,7 +2334,7 @@
 }
 
 .saved-session-card {
-  background: var(--panel-bg);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
@@ -2352,12 +2343,12 @@
 }
 
 .saved-session-card:hover {
-  border-color: rgba(101, 199, 255, 0.4);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-color: var(--accent-secondary);
+  box-shadow: 0 4px 16px var(--shadow);
 }
 
 .saved-session-card.expanded {
-  border-color: rgba(101, 199, 255, 0.5);
+  border-color: var(--accent-secondary);
 }
 
 .saved-session-header {
@@ -2405,7 +2396,7 @@
 
 .completed-badge {
   background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
+  color: var(--accent-success);
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
@@ -2430,7 +2421,7 @@
 
 .saved-session-chart {
   padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-tertiary);
   border-top: 1px solid var(--border);
 }
 
@@ -2443,7 +2434,7 @@
 .saved-session-details {
   padding: 16px;
   border-top: 1px solid var(--border);
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--bg-tertiary);
 }
 
 .saved-session-details h4 {
@@ -2563,4 +2554,251 @@
   background: var(--btn-bg-toggle-off);
   color: var(--btn-text-secondary);
   border-color: var(--btn-bg-toggle-off);
+}
+
+/* Strava Upload Modal - Theme Aware Styles */
+.strava-modal-overlay {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.strava-modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.strava-modal-title {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  color: var(--text-primary);
+}
+
+.strava-connect-section {
+  text-align: center;
+  padding: 32px 0;
+}
+
+.strava-connect-text {
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+
+.strava-error-message {
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 6px;
+  color: var(--accent-danger);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.strava-success-message {
+  padding: 16px;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 6px;
+  text-align: center;
+}
+
+.strava-success-icon {
+  margin-bottom: 12px;
+  color: var(--accent-success);
+}
+
+.strava-success-text {
+  color: var(--accent-success);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.strava-activity-link {
+  color: var(--accent-warning);
+  text-decoration: underline;
+}
+
+.strava-activity-link:hover {
+  opacity: 0.8;
+}
+
+.strava-athlete-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.strava-athlete-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.strava-athlete-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.strava-athlete-status {
+  color: var(--accent-success);
+  font-size: 12px;
+}
+
+.strava-athlete-status::before {
+  content: "✓ ";
+}
+
+.strava-form-section {
+  margin-bottom: 24px;
+}
+
+.strava-form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.strava-form-input,
+.strava-form-textarea {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.strava-form-textarea {
+  min-height: 100px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.strava-form-input:focus,
+.strava-form-textarea:focus {
+  outline: none;
+  border-color: var(--accent-secondary);
+}
+
+.strava-form-input:disabled,
+.strava-form-textarea:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.strava-loading-section {
+  text-align: center;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.strava-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent-warning);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 12px;
+}
+
+.strava-loading-text {
+  color: var(--text-muted);
+}
+
+.strava-button-group {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.strava-close-button {
+  margin-top: 12px;
+  width: 100%;
+}
+
+/* Light mode overrides for Strava modal */
+[data-theme="light"] .strava-modal-overlay {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .strava-loading-spinner {
+  border-color: var(--border);
+  border-top-color: var(--accent-warning);
+}
+
+/* Light mode overrides for Coach Selector */
+[data-theme="light"] .coach-box.selected {
+  background: rgba(34, 197, 94, 0.15);
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.1);
+}
+
+/* Light mode overrides for Saved Sessions */
+[data-theme="light"] .saved-session-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .completed-badge {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+/* Light mode overrides for modals and coach panel */
+[data-theme="light"] .modal-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .modal-container.critical-modal {
+  border-color: rgba(220, 38, 38, 0.5);
+}
+
+[data-theme="light"] .pending-suggestions {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.05);
+}
+
+[data-theme="light"] .suggestion-item {
+  background: var(--panel-muted);
+  border-color: var(--border);
+}
+
+/* Light mode overrides for toast notifications */
+[data-theme="light"] .toast-success {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+[data-theme="light"] .toast-warning {
+  border-color: rgba(217, 119, 6, 0.3);
+  background: rgba(217, 119, 6, 0.08);
+}
+
+[data-theme="light"] .toast-error {
+  border-color: rgba(220, 38, 38, 0.3);
+  background: rgba(220, 38, 38, 0.08);
+}
+
+[data-theme="light"] .toast-info {
+  border-color: rgba(2, 132, 199, 0.3);
+  background: rgba(2, 132, 199, 0.08);
+}
+
+/* Light mode overrides for progress bars */
+[data-theme="light"] .progress-segment {
+  background: var(--bg-tertiary);
+}
+
+/* Light mode overrides for device settings */
+[data-theme="light"] .settings-card {
+  background: var(--panel-muted);
+}
+
+[data-theme="light"] .device-row {
+  background: var(--bg-tertiary);
 }
