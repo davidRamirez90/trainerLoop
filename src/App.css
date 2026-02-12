@@ -3305,3 +3305,258 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Workout Library Styles */
+.workout-library-page {
+  max-width: 1400px;
+}
+
+.library-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.library-search {
+  flex: 1;
+  min-width: 250px;
+}
+
+.library-search-input {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.library-search-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.library-filters {
+  display: flex;
+  gap: 12px;
+}
+
+.library-sort-select {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.library-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.library-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.library-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-muted);
+}
+
+.library-empty-hint {
+  font-size: 14px;
+  opacity: 0.7;
+  margin-top: 8px;
+}
+
+.library-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.library-card:hover {
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+}
+
+.library-card.selected {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(101, 199, 255, 0.2);
+}
+
+.library-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.library-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.library-card-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.library-card-description {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.library-card-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.library-stat {
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.library-card-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.library-action-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-muted);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.library-action-btn:hover {
+  border-color: var(--accent-primary);
+}
+
+.library-action-btn.primary {
+  background: var(--btn-bg-primary);
+  border-color: var(--accent-primary);
+}
+
+.library-action-btn.danger {
+  color: var(--accent-danger);
+  border-color: rgba(214, 69, 65, 0.4);
+}
+
+.library-action-btn.danger:hover {
+  background: rgba(214, 69, 65, 0.1);
+}
+
+.library-preview {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.library-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.library-preview-header h3 {
+  margin: 0;
+  font-size: 18px;
+  flex: 1;
+}
+
+.library-chart-container {
+  min-height: 300px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+/* Save Dialog specific styles */
+.save-dialog-info {
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.save-dialog-info p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.save-dialog-info strong {
+  color: var(--text-primary);
+}
+
+/* Responsive adjustments for library */
+@media (max-width: 1000px) {
+  .library-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .library-preview {
+    order: -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .library-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .library-search {
+    min-width: auto;
+  }
+  
+  .library-filters {
+    justify-content: space-between;
+  }
+  
+  .library-card-actions {
+    justify-content: stretch;
+  }
+  
+  .library-card-actions .library-action-btn {
+    flex: 1;
+  }
+}

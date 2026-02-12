@@ -1,8 +1,11 @@
 import { useState, useMemo, useCallback } from 'react';
 import type { WorkoutPlan } from '../data/workout';
 import { parseWorkoutText } from '../utils/workoutParser';
+import { addWorkout } from '../utils/workoutLibrary';
+import { downloadZWOFile } from '../utils/zwoExport';
 import { WorkoutChart } from '../components/WorkoutChart';
 import { useTheme } from '../hooks/useTheme';
+import { useToast } from '../hooks/useToast';
 
 interface WorkoutBuilderProps {
   onBack: () => void;
@@ -22,9 +25,12 @@ Cooldown
 
 export function WorkoutBuilder({ onBack, onLoadWorkout, userFtp }: WorkoutBuilderProps) {
   const { theme } = useTheme();
+  const { success, error } = useToast();
   const [workoutName, setWorkoutName] = useState('');
   const [workoutText, setWorkoutText] = useState(DEFAULT_WORKOUT_TEXT);
   const [showPreview, setShowPreview] = useState(true);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [description, setDescription] = useState('');
 
   // Parse workout in real-time
   const parsedResult = useMemo(() => {
@@ -64,8 +70,45 @@ export function WorkoutBuilder({ onBack, onLoadWorkout, userFtp }: WorkoutBuilde
     onLoadWorkout(planWithName);
   }, [plan, workoutName, onLoadWorkout]);
 
+  const handleSaveWorkout = useCallback(() => {
+    if (plan.segments.length === 0 || errors.length > 0) {
+      error('Cannot save workout with errors');
+      return;
+    }
+
+    try {
+      addWorkout({
+        name: workoutName || plan.name,
+        description: description || undefined,
+        ftpWatts: userFtp,
+        plan: {
+          ...plan,
+          name: workoutName || plan.name,
+        },
+      });
+      
+      success('Workout saved to library');
+      setShowSaveDialog(false);
+      setDescription('');
+    } catch {
+      error('Failed to save workout');
+    }
+  }, [plan, workoutName, description, userFtp, errors, success, error]);
+
+  const handleExportZWO = useCallback(() => {
+    if (plan.segments.length === 0) return;
+    
+    try {
+      downloadZWOFile(plan, workoutName || plan.name);
+      success('ZWO file downloaded');
+    } catch {
+      error('Failed to export ZWO file');
+    }
+  }, [plan, workoutName, success, error]);
+
   const hasErrors = errors.length > 0;
   const hasSegments = plan.segments.length > 0;
+  const canSave = hasSegments && !hasErrors;
 
   return (
     <div className="page workout-builder-page">
@@ -106,9 +149,9 @@ export function WorkoutBuilder({ onBack, onLoadWorkout, userFtp }: WorkoutBuilde
             />
             {hasErrors && (
               <div className="builder-errors">
-                {errors.map((error, idx) => (
+                {errors.map((err, idx) => (
                   <div key={idx} className="builder-error">
-                    ⚠️ {error}
+                    ⚠️ {err}
                   </div>
                 ))}
               </div>
@@ -127,17 +170,25 @@ export function WorkoutBuilder({ onBack, onLoadWorkout, userFtp }: WorkoutBuilde
             <button 
               className="btn" 
               type="button"
-              onClick={() => setShowPreview(!showPreview)}
+              disabled={!canSave}
+              onClick={() => setShowSaveDialog(true)}
             >
-              {showPreview ? 'Hide Preview' : 'Show Preview'}
+              Save to Library
             </button>
             <button 
               className="btn" 
               type="button"
-              disabled
-              title="Coming in Phase 4"
+              disabled={!hasSegments}
+              onClick={handleExportZWO}
             >
-              Save to Library
+              Export ZWO
+            </button>
+            <button 
+              className="btn" 
+              type="button"
+              onClick={() => setShowPreview(!showPreview)}
+            >
+              {showPreview ? 'Hide Preview' : 'Show Preview'}
             </button>
           </div>
         </div>
@@ -227,6 +278,87 @@ export function WorkoutBuilder({ onBack, onLoadWorkout, userFtp }: WorkoutBuilde
           </div>
         </div>
       </div>
+
+      {/* Save Dialog */}
+      {showSaveDialog && (
+        <div 
+          className="modal-scrim" 
+          onClick={() => setShowSaveDialog(false)}
+          role="presentation"
+        >
+          <div 
+            className="modal" 
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="save-dialog-title"
+          >
+            <div className="modal-header">
+              <div>
+                <div className="modal-title" id="save-dialog-title">
+                  Save Workout
+                </div>
+                <div className="modal-subtitle">
+                  Add to your workout library for later use
+                </div>
+              </div>
+              <button
+                className="modal-close"
+                type="button"
+                aria-label="Close"
+                onClick={() => setShowSaveDialog(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label htmlFor="save-name">Workout Name</label>
+                <input
+                  id="save-name"
+                  type="text"
+                  value={workoutName || plan.name}
+                  onChange={(e) => setWorkoutName(e.target.value)}
+                  className="builder-input"
+                  placeholder="Enter workout name"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="save-description">Description (optional)</label>
+                <textarea
+                  id="save-description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  className="workout-textarea"
+                  placeholder="Add notes about this workout..."
+                />
+              </div>
+              <div className="save-dialog-info">
+                <p><strong>Duration:</strong> {workoutStats?.totalMinutes} minutes</p>
+                <p><strong>Intervals:</strong> {workoutStats?.intervals} work intervals</p>
+                <p><strong>FTP:</strong> {userFtp}W</p>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="session-button"
+                type="button"
+                onClick={() => setShowSaveDialog(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="session-button primary"
+                type="button"
+                onClick={handleSaveWorkout}
+              >
+                Save Workout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

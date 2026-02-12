@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import './App.css';
 import { WorkoutBuilder } from './pages/WorkoutBuilder';
+import { WorkoutLibrary } from './pages/WorkoutLibrary';
 import { WorkoutChart } from './components/WorkoutChart';
 import { CoachPanel } from './components/CoachPanel';
 import { CoachSelectorModal } from './components/CoachSelectorModal';
@@ -338,7 +339,7 @@ const buildZonesFromTemplate = (
   });
 };
 
-type AppView = 'dashboard' | 'workout' | 'builder';
+type AppView = 'dashboard' | 'workout' | 'builder' | 'library';
 
 function App() {
   // View routing state
@@ -1744,7 +1745,7 @@ function App() {
                 <p>Create custom workouts with text commands</p>
               </div>
             </button>
-            <button className="nav-card" onClick={() => alert('Workout Library coming soon!')} type="button">
+            <button className="nav-card" onClick={() => setCurrentView('library')} type="button">
               <span className="nav-card-icon">📚</span>
               <div className="nav-card-content">
                 <h3>Workout Library</h3>
@@ -1776,11 +1777,24 @@ function App() {
     return (
       <WorkoutBuilder 
         onBack={() => setCurrentView('dashboard')}
-        onLoadWorkout={(plan) => {
+        onLoadWorkout={(plan: WorkoutPlan) => {
           setActivePlan(plan);
           setCurrentView('workout');
         }}
         userFtp={Number(profile.ftpWatts) || 250}
+      />
+    );
+  }
+
+  // Library View
+  if (currentView === 'library') {
+    return (
+      <WorkoutLibrary
+        onBack={() => setCurrentView('dashboard')}
+        onLoadWorkout={(plan: WorkoutPlan) => {
+          setActivePlan(plan);
+          setCurrentView('workout');
+        }}
       />
     );
   }
