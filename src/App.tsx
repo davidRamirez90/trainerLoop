@@ -2,6 +2,7 @@ import type { ChangeEvent, CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import './App.css';
+import { WorkoutBuilder } from './pages/WorkoutBuilder';
 import { WorkoutChart } from './components/WorkoutChart';
 import { CoachPanel } from './components/CoachPanel';
 import { CoachSelectorModal } from './components/CoachSelectorModal';
@@ -337,7 +338,7 @@ const buildZonesFromTemplate = (
   });
 };
 
-type AppView = 'dashboard' | 'workout';
+type AppView = 'dashboard' | 'workout' | 'builder';
 
 function App() {
   // View routing state
@@ -1736,7 +1737,7 @@ function App() {
                 <p>Start training with your connected devices</p>
               </div>
             </button>
-            <button className="nav-card" onClick={() => alert('Workout Builder coming soon!')} type="button">
+            <button className="nav-card" onClick={() => setCurrentView('builder')} type="button">
               <span className="nav-card-icon">📝</span>
               <div className="nav-card-content">
                 <h3>Workout Builder</h3>
@@ -1767,6 +1768,20 @@ function App() {
           </div>
         </section>
       </div>
+    );
+  }
+
+  // Builder View
+  if (currentView === 'builder') {
+    return (
+      <WorkoutBuilder 
+        onBack={() => setCurrentView('dashboard')}
+        onLoadWorkout={(plan) => {
+          setActivePlan(plan);
+          setCurrentView('workout');
+        }}
+        userFtp={Number(profile.ftpWatts) || 250}
+      />
     );
   }
 
