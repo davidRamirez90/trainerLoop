@@ -337,7 +337,12 @@ const buildZonesFromTemplate = (
   });
 };
 
+type AppView = 'dashboard' | 'workout';
+
 function App() {
+  // View routing state
+  const [currentView, setCurrentView] = useState<AppView>('dashboard');
+
   // Theme management
   const { theme, toggleTheme } = useTheme();
 
@@ -1648,11 +1653,135 @@ function App() {
     return <StravaCallbackPage />;
   }
 
+  // Dashboard View
+  if (currentView === 'dashboard') {
+    const ftp = profile.ftpWatts ? `${profile.ftpWatts}W` : 'Not set';
+    const weight = profile.weightKg ? `${profile.weightKg}kg` : '--';
+    const nickname = profile.nickname || 'Athlete';
+    
+    return (
+      <div className="dashboard">
+        <header className="dashboard-header">
+          <div className="user-info">
+            <div className="user-avatar">
+              <span>{nickname[0]?.toUpperCase() || 'A'}</span>
+            </div>
+            <div className="user-details">
+              <h1>{nickname}</h1>
+              <div className="user-stats">
+                <span>FTP: {ftp}</span>
+                <span>Weight: {weight}</span>
+              </div>
+            </div>
+          </div>
+          <div className="header-actions">
+            <button
+              className="theme-toggle"
+              type="button"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              <span aria-hidden="true">{theme === 'dark' ? '☀️' : '🌙'}</span>
+            </button>
+            <button
+              className="settings-button"
+              type="button"
+              onClick={handleProfileOpen}
+              aria-label="Open settings"
+            >
+              <span className="settings-icon" aria-hidden="true" />
+            </button>
+          </div>
+        </header>
+
+        <section className="dashboard-section devices-section">
+          <h2>Devices</h2>
+          <div className="devices-panel">
+            <div className="device-status-row">
+              <div className={`device-status-indicator ${trainer.status === 'connected' ? 'connected' : ''}`} />
+              <span className="device-status-label">Smart Trainer</span>
+              {trainer.status === 'connected' ? (
+                <button className="device-action-btn disconnect" onClick={disconnectTrainer}>
+                  Disconnect
+                </button>
+              ) : (
+                <button className="device-action-btn" onClick={connectTrainer}>
+                  Connect
+                </button>
+              )}
+            </div>
+            <div className="device-status-row">
+              <div className={`device-status-indicator ${hrSensor.status === 'connected' ? 'connected' : ''}`} />
+              <span className="device-status-label">Heart Rate Monitor</span>
+              {hrSensor.status === 'connected' ? (
+                <button className="device-action-btn disconnect" onClick={disconnectHeartRate}>
+                  Disconnect
+                </button>
+              ) : (
+                <button className="device-action-btn" onClick={connectHeartRate}>
+                  Connect
+                </button>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="dashboard-section">
+          <h2>Quick Access</h2>
+          <div className="nav-grid">
+            <button className="nav-card primary" onClick={() => setCurrentView('workout')} type="button">
+              <span className="nav-card-icon">🚴</span>
+              <div className="nav-card-content">
+                <h3>Workout Mode</h3>
+                <p>Start training with your connected devices</p>
+              </div>
+            </button>
+            <button className="nav-card" onClick={() => alert('Workout Builder coming soon!')} type="button">
+              <span className="nav-card-icon">📝</span>
+              <div className="nav-card-content">
+                <h3>Workout Builder</h3>
+                <p>Create custom workouts with text commands</p>
+              </div>
+            </button>
+            <button className="nav-card" onClick={() => alert('Workout Library coming soon!')} type="button">
+              <span className="nav-card-icon">📚</span>
+              <div className="nav-card-content">
+                <h3>Workout Library</h3>
+                <p>Browse and manage your saved workouts</p>
+              </div>
+            </button>
+            <button className="nav-card" onClick={() => setIsSavedSessionsOpen(true)} type="button">
+              <span className="nav-card-icon">📊</span>
+              <div className="nav-card-content">
+                <h3>History</h3>
+                <p>View past sessions and analytics</p>
+              </div>
+            </button>
+            <button className="nav-card" onClick={handleProfileOpen} type="button">
+              <span className="nav-card-icon">⚙️</span>
+              <div className="nav-card-content">
+                <h3>Settings</h3>
+                <p>Configure profile, zones, and integrations</p>
+              </div>
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  // Workout View
   return (
     <div className={`app ${phaseClass} ${workoutTypeClass}`}>
       <header className="top-bar">
         <div className="title-block">
-          <button className="back-button" type="button" aria-label="Back">
+          <button 
+            className="back-button" 
+            type="button" 
+            aria-label="Back to Dashboard"
+            onClick={() => setCurrentView('dashboard')}
+            title="Back to Dashboard"
+          >
             ←
           </button>
           <div>
