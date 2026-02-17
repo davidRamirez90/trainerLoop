@@ -89,18 +89,17 @@ function parsePower(
   const wattsMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*w$/i);
   if (wattsMatch) {
     const watts = parseFloat(wattsMatch[1]);
-    // Add a small range around the target (±5W or 2%)
-    const tolerance = Math.max(5, watts * 0.02);
-    return { low: watts - tolerance, high: watts + tolerance };
+    // Single value = exact target (no tolerance range)
+    return { low: watts, high: watts };
   }
-  
+
   // Percentage: 85%
   const percentMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*%$/);
   if (percentMatch) {
     const percent = parseFloat(percentMatch[1]) / 100;
     const watts = ftpWatts * percent;
-    const tolerance = Math.max(5, watts * 0.02);
-    return { low: watts - tolerance, high: watts + tolerance };
+    // Single value = exact target (no tolerance range)
+    return { low: watts, high: watts };
   }
   
   // Zone notation: Z3, Z2, etc.
@@ -126,12 +125,12 @@ function parsePower(
     }
     // Assume watts if > 50, otherwise percentage
     if (numValue > 50) {
-      const tolerance = Math.max(5, numValue * 0.02);
-      return { low: numValue - tolerance, high: numValue + tolerance };
+      // Single value = exact target (no tolerance range)
+      return { low: numValue, high: numValue };
     } else {
       const watts = ftpWatts * (numValue / 100);
-      const tolerance = Math.max(5, watts * 0.02);
-      return { low: watts - tolerance, high: watts + tolerance };
+      // Single value = exact target (no tolerance range)
+      return { low: watts, high: watts };
     }
   }
   

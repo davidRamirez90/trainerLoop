@@ -342,7 +342,7 @@ export const WorkoutChart = ({
     const minTarget = Math.min(...lows);
     const maxTarget = Math.max(...highs);
     const span = Math.max(1, maxTarget - minTarget);
-    const paddedMin = Math.max(50, minTarget - span * 0.25);
+    const paddedMin = Math.max(0, minTarget - span * 0.25);
     const paddedMax = maxTarget + span * 0.2;
     return {
       yMin: Math.floor(paddedMin),

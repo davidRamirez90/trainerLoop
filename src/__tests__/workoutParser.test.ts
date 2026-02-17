@@ -32,8 +32,8 @@ Cooldown
 
       expect(result.errors).toHaveLength(0);
       expect(result.plan.segments).toHaveLength(2);
-      expect(result.plan.segments[0].targetRange.low).toBeCloseTo(195, 0);
-      expect(result.plan.segments[0].targetRange.high).toBeCloseTo(205, 0);
+      expect(result.plan.segments[0].targetRange.low).toBe(200);
+      expect(result.plan.segments[0].targetRange.high).toBe(200);
     });
 
     it('should parse intervals with power as percentage', () => {
@@ -45,8 +45,8 @@ Cooldown
       const result = parseWorkoutTextWithDefaults(text, 250);
 
       expect(result.errors).toHaveLength(0);
-      expect(result.plan.segments[0].targetRange.low).toBeCloseTo(195, 0);
-      expect(result.plan.segments[0].targetRange.high).toBeCloseTo(205, 0);
+      expect(result.plan.segments[0].targetRange.low).toBe(200);
+      expect(result.plan.segments[0].targetRange.high).toBe(200);
     });
 
     it('should parse intervals with power ranges', () => {
@@ -181,8 +181,8 @@ Block 2 2x
     it('should parse ramp with watts', () => {
       const result = parseWorkoutTextWithDefaults('- Ramp 10m 100-200w', 250);
       expect(result.plan.segments[0].rampToRange).toBeDefined();
-      expect(result.plan.segments[0].targetRange.low).toBe(95);
-      expect(result.plan.segments[0].rampToRange!.high).toBe(205);
+      expect(result.plan.segments[0].targetRange.low).toBe(100);
+      expect(result.plan.segments[0].rampToRange!.high).toBe(200);
     });
   });
 
