@@ -499,8 +499,26 @@ const parseZwo = (
 
     if (tag === 'warmup') {
       const duration = getAttrNumber(child, 'Duration');
-      const low = toWattsWithFallback(getAttrNumber(child, 'PowerLow'));
-      const high = toWattsWithFallback(getAttrNumber(child, 'PowerHigh'));
+      const powerLow = getOptionalAttrNumber(child, 'PowerLow');
+      const powerHigh = getOptionalAttrNumber(child, 'PowerHigh');
+      const power = getOptionalAttrNumber(child, 'Power');
+      let low: number;
+      let high: number;
+      if (powerLow !== null && powerHigh !== null) {
+        low = toWattsWithFallback(powerLow);
+        high = toWattsWithFallback(powerHigh);
+      } else if (power !== null) {
+        low = toWattsWithFallback(power);
+        high = toWattsWithFallback(power);
+      } else if (powerLow !== null) {
+        low = toWattsWithFallback(powerLow);
+        high = toWattsWithFallback(powerLow);
+      } else if (powerHigh !== null) {
+        low = toWattsWithFallback(powerHigh);
+        high = toWattsWithFallback(powerHigh);
+      } else {
+        throw new Error('Missing Power, PowerLow, or PowerHigh attribute in Warmup.');
+      }
       const cadenceRange = getCadenceRange(child);
       createSegment('Warmup', duration, low, high, 'warmup', false, cadenceRange);
       return;
@@ -508,8 +526,26 @@ const parseZwo = (
 
     if (tag === 'cooldown') {
       const duration = getAttrNumber(child, 'Duration');
-      const low = toWattsWithFallback(getAttrNumber(child, 'PowerLow'));
-      const high = toWattsWithFallback(getAttrNumber(child, 'PowerHigh'));
+      const powerLow = getOptionalAttrNumber(child, 'PowerLow');
+      const powerHigh = getOptionalAttrNumber(child, 'PowerHigh');
+      const power = getOptionalAttrNumber(child, 'Power');
+      let low: number;
+      let high: number;
+      if (powerLow !== null && powerHigh !== null) {
+        low = toWattsWithFallback(powerLow);
+        high = toWattsWithFallback(powerHigh);
+      } else if (power !== null) {
+        low = toWattsWithFallback(power);
+        high = toWattsWithFallback(power);
+      } else if (powerLow !== null) {
+        low = toWattsWithFallback(powerLow);
+        high = toWattsWithFallback(powerLow);
+      } else if (powerHigh !== null) {
+        low = toWattsWithFallback(powerHigh);
+        high = toWattsWithFallback(powerHigh);
+      } else {
+        throw new Error('Missing Power, PowerLow, or PowerHigh attribute in Cooldown.');
+      }
       const cadenceRange = getCadenceRange(child);
       createSegment('Cooldown', duration, low, high, 'cooldown', false, cadenceRange);
       return;

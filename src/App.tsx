@@ -392,7 +392,7 @@ function App() {
   );
   const [intensityOverrides, setIntensityOverrides] = useState<IntensityOverride[]>([]);
   const [recoveryExtensions, setRecoveryExtensions] = useState<Record<string, number>>({});
-  const [segmentShortenings, setSegmentShortenings] = useState<Record<string, number>>({});
+  const [segmentShortenings] = useState<Record<string, number>>({});
   const [criticalSuggestion, setCriticalSuggestion] = useState<CoachSuggestion | null>(null);
   const { toasts, success, removeToast } = useToast();
   const { authenticated: stravaAuthenticated, athlete: stravaAthlete, loading: stravaLoading, error: stravaError, initiateAuth: stravaInitiateAuth, logout: stravaLogout } = useStravaAuth();
@@ -719,13 +719,10 @@ function App() {
     if (remainingSec <= 5) {
       return;
     }
-    const shortening = remainingSec - 5;
-    setSegmentShortenings((prev) => ({
-      ...prev,
-      [segment.id]: (prev[segment.id] ?? 0) + shortening,
-    }));
-    success(`Interval shortened to 5s remaining`);
-  }, [hasPlan, segment, isRunning, endSec, activeSec, success]);
+    // Seek to the end of the current segment to skip to the next one
+    clock.seek(endSec);
+    success(`Skipped to next interval`);
+  }, [hasPlan, segment, isRunning, endSec, activeSec, clock, success]);
 
   const handleIntensityChange = useCallback(
     (delta: number) => {

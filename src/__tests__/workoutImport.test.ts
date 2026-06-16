@@ -260,6 +260,48 @@ MINUTES POWER
       expect(result.plan.segments[0].label).toBe('Cooldown');
     });
 
+    it('parses warmup element with Power attribute', () => {
+      const zwoContent = `<?xml version="1.0" encoding="UTF-8"?>
+<workout>
+  <warmup Duration="300" Power="0.5"/>
+</workout>`;
+      const result = parseWorkoutFile('test.zwo', zwoContent);
+      expect(result.plan.segments[0].phase).toBe('warmup');
+      expect(result.plan.segments[0].label).toBe('Warmup');
+      expect(result.plan.segments[0].targetRange.low).toBe(result.plan.segments[0].targetRange.high);
+    });
+
+    it('parses cooldown element with Power attribute', () => {
+      const zwoContent = `<?xml version="1.0" encoding="UTF-8"?>
+<workout>
+  <cooldown Duration="300" Power="0.5"/>
+</workout>`;
+      const result = parseWorkoutFile('test.zwo', zwoContent);
+      expect(result.plan.segments[0].phase).toBe('cooldown');
+      expect(result.plan.segments[0].label).toBe('Cooldown');
+      expect(result.plan.segments[0].targetRange.low).toBe(result.plan.segments[0].targetRange.high);
+    });
+
+    it('parses cooldown element with only PowerLow attribute', () => {
+      const zwoContent = `<?xml version="1.0" encoding="UTF-8"?>
+<workout>
+  <cooldown Duration="300" PowerLow="0.5"/>
+</workout>`;
+      const result = parseWorkoutFile('test.zwo', zwoContent);
+      expect(result.plan.segments[0].phase).toBe('cooldown');
+      expect(result.plan.segments[0].targetRange.low).toBe(result.plan.segments[0].targetRange.high);
+    });
+
+    it('parses cooldown element with only PowerHigh attribute', () => {
+      const zwoContent = `<?xml version="1.0" encoding="UTF-8"?>
+<workout>
+  <cooldown Duration="300" PowerHigh="0.5"/>
+</workout>`;
+      const result = parseWorkoutFile('test.zwo', zwoContent);
+      expect(result.plan.segments[0].phase).toBe('cooldown');
+      expect(result.plan.segments[0].targetRange.low).toBe(result.plan.segments[0].targetRange.high);
+    });
+
     it('throws for invalid XML', () => {
       const zwoContent = `<?xml version="1.0" encoding="UTF-8"?>
 <invalid>`;
@@ -283,6 +325,33 @@ MINUTES POWER
       expect(() => parseWorkoutFile('test.zwo', zwoContent)).toThrow(
         'No workout steps found in this ZWO file.'
       );
+    });
+
+    it('parses complete workout with flat-power cooldown exported from app', () => {
+      // This is the exact structure exported by the app for a flat-power cooldown
+      const zwoContent = `<?xml version="1.0" encoding="UTF-8"?>
+<workout_file>
+  <author>Trainer Loop</author>
+  <name>Sweet Spot 2x10</name>
+  <description></description>
+  <sportType>bike</sportType>
+  <duration>3000</duration>
+  <workout>
+    <SteadyState Duration="720" Power="0.625" Cadence="90"/>
+    <SteadyState Duration="600" Power="0.89" Cadence="88"/>
+    <SteadyState Duration="300" Power="0.575" Cadence="90"/>
+    <SteadyState Duration="600" Power="0.89" Cadence="88"/>
+    <SteadyState Duration="300" Power="0.575" Cadence="90"/>
+    <Cooldown Duration="480" Power="0.655" Cadence="90"/>
+  </workout>
+</workout_file>`;
+      const result = parseWorkoutFile('sweet-spot.zwo', zwoContent);
+      expect(result.plan.segments).toHaveLength(6);
+      expect(result.plan.segments[5].phase).toBe('cooldown');
+      expect(result.plan.segments[5].label).toBe('Cooldown');
+      expect(result.plan.segments[5].durationSec).toBe(480);
+      // Verify cooldown has correct power target (flat power, so low === high)
+      expect(result.plan.segments[5].targetRange.low).toBe(result.plan.segments[5].targetRange.high);
     });
   });
 });
