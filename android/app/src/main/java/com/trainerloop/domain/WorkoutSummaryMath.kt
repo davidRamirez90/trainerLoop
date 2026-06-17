@@ -1,5 +1,6 @@
 package com.trainerloop.domain
 
+import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import kotlin.math.pow
@@ -57,6 +58,46 @@ object WorkoutSummaryMath {
     is WorkoutSegment.Step -> (segment.targetRange.low + segment.targetRange.high) / 2.0
     is WorkoutSegment.Ramp -> (segment.startPower + segment.endPower) / 2.0
     is WorkoutSegment.FreeRide -> 0.0
+  }
+
+  // Sample-based versions for post-ride analysis
+
+  fun averagePower(samples: List<TelemetrySample>): Int {
+    if (samples.isEmpty()) return 0
+    return samples.map { it.powerWatts }.average().toInt()
+  }
+
+  fun maxPower(samples: List<TelemetrySample>): Int {
+    return samples.maxOfOrNull { it.powerWatts } ?: 0
+  }
+
+  fun averageCadence(samples: List<TelemetrySample>): Int {
+    if (samples.isEmpty()) return 0
+    return samples.map { it.cadenceRpm }.average().toInt()
+  }
+
+  fun averageHr(samples: List<TelemetrySample>): Int {
+    if (samples.isEmpty()) return 0
+    return samples.map { it.hrBpm }.average().toInt()
+  }
+
+  fun normalizedPower(samples: List<TelemetrySample>): Int {
+    if (samples.isEmpty()) return 0
+    val windowSize = 30
+    val rolling = samples.windowed(windowSize, 1, partialWindows = true)
+      .map { window -> window.map { it.powerWatts }.average() }
+    val avgFourth = rolling.map { it.pow(4.0) }.average()
+    return avgFourth.pow(0.25).toInt()
+  }
+
+  fun caloriesKcal(avgPower: Int, activeSec: Int): Int {
+    if (activeSec <= 0) return 0
+    return ((avgPower * activeSec) / 1000.0).toInt()
+  }
+
+  fun totalWorkKj(avgPower: Int, activeSec: Int): Int {
+    if (activeSec <= 0) return 0
+    return (avgPower * activeSec) / 1000
   }
 }
 

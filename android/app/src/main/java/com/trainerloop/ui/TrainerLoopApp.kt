@@ -43,8 +43,8 @@ import com.trainerloop.ui.library.WorkoutLibraryScreen
 import com.trainerloop.ui.navigation.Screen
 import com.trainerloop.ui.settings.SettingsScreen
 import com.trainerloop.ui.workout.detail.WorkoutDetailScreen
-import com.trainerloop.ui.summary.SessionSummaryScreen
-import com.trainerloop.ui.summary.SessionSummaryViewModel
+import com.trainerloop.ui.complete.WorkoutCompleteScreen
+import com.trainerloop.ui.complete.WorkoutCompleteViewModelFactory
 import com.trainerloop.ui.workout.WorkoutScreen
 import com.trainerloop.ui.workout.WorkoutViewModelFactory
 
@@ -154,6 +154,7 @@ fun TrainerLoopApp(
             navController.navigate(
               Screen.WorkoutComplete.createRoute(
                 sessionId = data.startTimeMs.toString(),
+                workoutId = data.workoutId,
                 workoutName = data.workoutName,
                 startTimeMs = data.startTimeMs
               )
@@ -166,6 +167,7 @@ fun TrainerLoopApp(
         route = Screen.WorkoutComplete.route,
         arguments = listOf(
           navArgument("sessionId") { type = NavType.StringType },
+          navArgument("workoutId") { type = NavType.StringType },
           navArgument("workoutName") { type = NavType.StringType },
           navArgument("startTimeMs") { type = NavType.LongType }
         )
@@ -173,22 +175,25 @@ fun TrainerLoopApp(
         val context = LocalContext.current
         val app = context.trainerLoopApp
         val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
-        val workoutName = backStackEntry.arguments?.getString("workoutName")?.let {
-          java.net.URLDecoder.decode(it, "UTF-8")
-        } ?: "Workout"
+        val workoutId = backStackEntry.arguments?.getString("workoutId") ?: "unknown"
+        val workoutName = backStackEntry.arguments?.getString("workoutName") ?: "Workout"
         val startTimeMs = backStackEntry.arguments?.getLong("startTimeMs") ?: System.currentTimeMillis()
         val samples = app.pendingSessionSamples ?: emptyList()
         app.pendingSessionSamples = null
 
-        SessionSummaryScreen(
-          viewModel = SessionSummaryViewModel(
-            application = context.applicationContext as Application,
-            sessionId = sessionId,
-            workoutName = workoutName,
-            samples = samples,
-            startTimeMs = startTimeMs
+        WorkoutCompleteScreen(
+          viewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+            factory = WorkoutCompleteViewModelFactory(
+              application = context.applicationContext as Application,
+              sessionId = sessionId,
+              workoutId = workoutId,
+              workoutName = workoutName,
+              samples = samples,
+              startTimeMs = startTimeMs
+            )
           ),
-          onDone = { navController.popBackStack() }
+          onDiscard = { navController.popBackStack(Screen.Home.route, inclusive = false) },
+          onDone = { navController.popBackStack(Screen.Home.route, inclusive = false) }
         )
       }
 

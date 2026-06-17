@@ -16,10 +16,10 @@ sealed class Screen(val route: String) {
   object WorkoutPlayer : Screen("workout_player/{sessionId}") {
     fun createRoute(sessionId: Long): String = "workout_player/$sessionId"
   }
-  object WorkoutComplete : Screen("workout_complete/{sessionId}/{workoutName}/{startTimeMs}") {
-    fun createRoute(sessionId: String, workoutName: String, startTimeMs: Long): String {
+  object WorkoutComplete : Screen("workout_complete/{sessionId}/{workoutId}/{workoutName}/{startTimeMs}") {
+    fun createRoute(sessionId: String, workoutId: String, workoutName: String, startTimeMs: Long): String {
       val encodedName = java.net.URLEncoder.encode(workoutName, "UTF-8")
-      return "workout_complete/$sessionId/$encodedName/$startTimeMs"
+      return "workout_complete/$sessionId/$workoutId/$encodedName/$startTimeMs"
     }
   }
 

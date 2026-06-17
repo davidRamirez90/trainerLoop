@@ -53,6 +53,7 @@ data class WorkoutUiState(
 )
 
 data class WorkoutFinishData(
+  val workoutId: String,
   val workoutName: String,
   val startTimeMs: Long,
   val samples: List<TelemetrySample>
@@ -281,6 +282,7 @@ class WorkoutViewModel(
     val state = _uiState.value
     if (state.samples.isEmpty()) return
     _finishEvent.value = WorkoutFinishData(
+      workoutId = workout.id,
       workoutName = workout.name,
       startTimeMs = System.currentTimeMillis() - state.elapsedSec * 1000L,
       samples = state.samples

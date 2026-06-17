@@ -38,6 +38,11 @@ object FitShareHelper {
       putExtra(Intent.EXTRA_STREAM, uri)
       addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
+    val pm = context.packageManager
+    val activities = pm.queryIntentActivities(intent, 0)
+    if (activities.isEmpty()) {
+      intent.type = "application/octet-stream"
+    }
     context.startActivity(Intent.createChooser(intent, "Export Workout"))
   }
 }
