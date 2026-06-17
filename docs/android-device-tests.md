@@ -102,3 +102,19 @@ Date: _________
 | 38 | Rapid start/stop/restart (3x) | No crashes, session IDs increment | ☐ |
 | 39 | Import a .zwo file | Parses correctly, segments display | ☐ |
 | 40 | Build release APK | APK ≤ 10 MB, installs and runs | ☐ |
+
+## Full Workout Flow Verification (Pixel 2 XL)
+
+1. Home dashboard shows user header and connected-device cards.
+2. Tap a device card → opens Devices screen.
+3. Scan, connect trainer and HR → status shows Connected with battery/live HR.
+4. Return Home; tap Workout Library.
+5. Library shows filters, search, and mini-chart cards.
+6. Select AE-2 Endurance → Workout Detail shows full chart and intervals.
+7. Tap Start Workout → Workout Player opens.
+8. Big metrics (Power, HR, Cadence, Time to Interval) update every second.
+9. Live chart shows target band and actual power line.
+10. Intensity buttons adjust ERG target; Pause/Skip work.
+11. Stop or complete → Workout Complete screen with TSS/IF/NP and chart tabs.
+12. Tap Share FIT → chooser opens; file opens in Garmin Connect / Strava.
+13. Tap Save → session persisted to Room; return Home shows it in Recent Workouts.
