@@ -20,6 +20,7 @@ import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
 import com.trainerloop.ui.connect.ConnectScreen
+import com.trainerloop.ui.library.WorkoutLibraryScreen
 import com.trainerloop.ui.navigation.Screen
 import com.trainerloop.ui.settings.SettingsScreen
 import com.trainerloop.ui.summary.SessionSummaryScreen
@@ -35,7 +36,13 @@ fun TrainerLoopApp(
     startDestination = Screen.Connect.route
   ) {
     composable(Screen.Library.route) {
-      PlaceholderScreen("Workout Library")
+      WorkoutLibraryScreen(
+        onStartWorkout = { workout ->
+          navController.navigate(
+            Screen.Workout.createRoute(sessionId = 1)
+          )
+        }
+      )
     }
 
     composable(
