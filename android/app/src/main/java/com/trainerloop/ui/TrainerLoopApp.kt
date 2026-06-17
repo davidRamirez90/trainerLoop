@@ -21,6 +21,7 @@ import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
 import com.trainerloop.ui.connect.ConnectScreen
 import com.trainerloop.ui.navigation.Screen
+import com.trainerloop.ui.settings.SettingsScreen
 import com.trainerloop.ui.summary.SessionSummaryScreen
 import com.trainerloop.ui.summary.SessionSummaryViewModel
 import com.trainerloop.ui.workout.WorkoutScreen
@@ -77,7 +78,7 @@ fun TrainerLoopApp(
     }
 
     composable(Screen.Settings.route) {
-      PlaceholderScreen("Settings")
+      SettingsScreen()
     }
   }
 }

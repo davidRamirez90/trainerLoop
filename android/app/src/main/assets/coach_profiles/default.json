@@ -1,0 +1,37 @@
+{
+  "id": "default",
+  "name": "Default Coach",
+  "description": "A balanced coach for general training",
+  "voice": { "tone": "supportive", "style": "concise" },
+  "rules": {
+    "targetAdherenceWarn": 95,
+    "targetAdherenceIntervene": 85,
+    "hrDriftWarn": 5,
+    "hrDriftIntervene": 10,
+    "cadenceVarianceWarn": 10,
+    "cadenceVarianceIntervene": 20,
+    "minElapsedSecondsForSuggestions": 10,
+    "cooldownSeconds": 10
+  },
+  "interventions": {
+    "intensityAdjustStepPct": 5,
+    "intensityAdjustMinPct": -20,
+    "intensityAdjustMaxPct": 20,
+    "recoveryExtendStepSec": 30,
+    "recoveryExtendMaxSec": 120,
+    "allowSkipRemainingOnIntervals": false
+  },
+  "messages": {
+    "suggestions": {
+      "adjust_intensity_up": ["Push harder! Increase by {{percent}}%."],
+      "adjust_intensity_up_rationale": ["You're handling this well."],
+      "adjust_intensity_down": ["Ease off by {{percent}}%."],
+      "adjust_intensity_down_rationale": ["Fatigue is showing."],
+      "extend_recovery": ["Take an extra {{seconds}} seconds recovery."],
+      "extend_recovery_rationale": ["Heart rate suggests more rest."],
+      "skip_remaining_on_intervals": ["Consider ending the session."],
+      "skip_remaining_on_intervals_rationale": ["Multiple indicators suggest stopping."]
+    },
+    "completion": ["Great session!"]
+  }
+}
