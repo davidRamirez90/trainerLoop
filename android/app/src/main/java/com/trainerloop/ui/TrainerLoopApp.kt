@@ -164,15 +164,29 @@ fun TrainerLoopApp(
 
       composable(
         route = Screen.WorkoutComplete.route,
-        arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
+        arguments = listOf(
+          navArgument("sessionId") { type = NavType.StringType },
+          navArgument("workoutName") { type = NavType.StringType },
+          navArgument("startTimeMs") { type = NavType.LongType }
+        )
       ) { backStackEntry ->
+        val context = LocalContext.current
+        val app = context.trainerLoopApp
         val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
+        val workoutName = backStackEntry.arguments?.getString("workoutName")?.let {
+          java.net.URLDecoder.decode(it, "UTF-8")
+        } ?: "Workout"
+        val startTimeMs = backStackEntry.arguments?.getLong("startTimeMs") ?: System.currentTimeMillis()
+        val samples = app.pendingSessionSamples ?: emptyList()
+        app.pendingSessionSamples = null
+
         SessionSummaryScreen(
           viewModel = SessionSummaryViewModel(
-            application = androidx.compose.ui.platform.LocalContext.current.applicationContext as Application,
+            application = context.applicationContext as Application,
             sessionId = sessionId,
-            workoutName = "Workout",
-            samples = emptyList()
+            workoutName = workoutName,
+            samples = samples,
+            startTimeMs = startTimeMs
           ),
           onDone = { navController.popBackStack() }
         )

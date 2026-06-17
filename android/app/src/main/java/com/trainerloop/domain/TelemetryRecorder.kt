@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,8 +28,14 @@ class TelemetryRecorder(
   constructor(
     clock: WorkoutClock,
     ftms: FtmsManager,
-    hr: HrManager
-  ) : this(clock, DataProvider(ftms.data, hr.heartRate))
+    hr: HrManager? = null
+  ) : this(
+    clock,
+    DataProvider(
+      data = ftms.data,
+      heartRate = hr?.heartRate ?: MutableStateFlow<Int?>(null).asStateFlow()
+    )
+  )
 
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
@@ -99,5 +106,10 @@ class TelemetryRecorder(
     _latest.value = TelemetrySample(
       timeSec = 0, powerWatts = 0, cadenceRpm = 0, hrBpm = 0, dropout = true
     )
+  }
+
+  fun stop() {
+    collecting = false
+    scope.cancel()
   }
 }

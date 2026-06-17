@@ -62,8 +62,7 @@ private data class WorkoutControlTick(
   val elapsedSec: Int,
   val running: Boolean,
   val ergEnabled: Boolean,
-  val targetRange: TargetRange,
-  val offsetPct: Int
+  val targetRange: TargetRange
 )
 
 class WorkoutViewModel(
@@ -84,9 +83,11 @@ class WorkoutViewModel(
   val finishEvent: StateFlow<WorkoutFinishData?> = _finishEvent.asStateFlow()
 
   private val telemetryRecorder: TelemetryRecorder? =
-    if (ftmsManager != null && hrManager != null) {
+    if (ftmsManager != null) {
       TelemetryRecorder(clock, ftmsManager, hrManager)
     } else null
+
+  private var wasErgEnabled: Boolean = true
 
   private var ergWriteJob: Job? = null
 
@@ -145,10 +146,9 @@ class WorkoutViewModel(
         clock.elapsedSec,
         _uiState.map { it.isRunning }.distinctUntilChanged(),
         _uiState.map { it.isErgEnabled }.distinctUntilChanged(),
-        _uiState.map { it.targetRange }.distinctUntilChanged(),
-        _uiState.map { it.intensityOffsetPct }.distinctUntilChanged()
-      ) { elapsedSec, running, ergEnabled, targetRange, offset ->
-        WorkoutControlTick(elapsedSec, running, ergEnabled, targetRange, offset)
+        _uiState.map { it.targetRange }.distinctUntilChanged()
+      ) { elapsedSec, running, ergEnabled, targetRange ->
+        WorkoutControlTick(elapsedSec, running, ergEnabled, targetRange)
       }.collect { tick ->
         handleControlTick(tick)
       }
@@ -187,8 +187,10 @@ class WorkoutViewModel(
     viewModelScope.launch {
       ftmsControlManager?.stopPause(stop = true)
     }
+    telemetryRecorder?.reset(clock.sessionId.value)
     _uiState.value = _uiState.value.copy(
-      intensityOffsetPct = 0
+      intensityOffsetPct = 0,
+      samples = emptyList()
     )
     _finishEvent.value = null
   }
@@ -254,19 +256,24 @@ class WorkoutViewModel(
 
   private fun handleControlTick(tick: WorkoutControlTick) {
     if (!tick.running || tick.targetRange == TargetRange(0, 0)) return
+
     if (!tick.ergEnabled) {
-      ftmsControlManager?.let { control ->
-        ergWriteJob?.cancel()
-        ergWriteJob = viewModelScope.launch { control.stopPause(stop = false) }
+      if (wasErgEnabled) {
+        ftmsControlManager?.let { control ->
+          ergWriteJob?.cancel()
+          ergWriteJob = viewModelScope.launch { control.stopPause(stop = false) }
+        }
       }
+      wasErgEnabled = false
       return
     }
-    val mid = (tick.targetRange.low + tick.targetRange.high) / 2
-    val factor = 1.0 + tick.offsetPct / 100.0
-    val target = (mid * factor).toInt().coerceIn(0, 2000)
+
+    wasErgEnabled = true
+
+    val target = (tick.targetRange.low + tick.targetRange.high) / 2
     ftmsControlManager?.let { control ->
       ergWriteJob?.cancel()
-      ergWriteJob = viewModelScope.launch { control.setTargetPower(target) }
+      ergWriteJob = viewModelScope.launch { control.setTargetPower(target.coerceIn(0, 2000)) }
     }
   }
 
@@ -332,7 +339,8 @@ class WorkoutViewModel(
 
   override fun onCleared() {
     clock.stop()
-    telemetryRecorder?.reset(clock.sessionId.value)
+    clock.close()
+    telemetryRecorder?.stop()
     super.onCleared()
   }
 
