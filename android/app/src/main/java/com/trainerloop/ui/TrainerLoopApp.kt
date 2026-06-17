@@ -33,27 +33,25 @@ fun TrainerLoopApp(
 ) {
   NavHost(
     navController = navController,
-    startDestination = Screen.Connect.route
+    startDestination = Screen.Devices.route
   ) {
-    composable(Screen.Library.route) {
+    composable(Screen.Workouts.route) {
       WorkoutLibraryScreen(
         onStartWorkout = { workout ->
-          navController.navigate(
-            Screen.Workout.createRoute(sessionId = 1)
-          )
+          navController.navigate("workout_player/1")
         }
       )
     }
 
     composable(
-      route = Screen.WorkoutPreview.route,
+      route = Screen.WorkoutDetail.route,
       arguments = listOf(navArgument("workoutId") { type = NavType.StringType })
     ) {
       PlaceholderScreen("Workout Preview")
     }
 
     composable(
-      route = Screen.Workout.route,
+      route = Screen.WorkoutPlayer.route,
       arguments = listOf(navArgument("sessionId") { type = NavType.IntType })
     ) {
       WorkoutScreen(
@@ -63,7 +61,7 @@ fun TrainerLoopApp(
     }
 
     composable(
-      route = Screen.SessionSummary.route,
+      route = Screen.WorkoutComplete.route,
       arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
     ) { backStackEntry ->
       val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
@@ -78,13 +76,13 @@ fun TrainerLoopApp(
       )
     }
 
-    composable(Screen.Connect.route) {
+    composable(Screen.Devices.route) {
       ConnectScreen(
-        onNavigateToLibrary = { navController.navigate(Screen.Library.route) }
+        onNavigateToLibrary = { navController.navigate(Screen.Workouts.route) }
       )
     }
 
-    composable(Screen.Settings.route) {
+    composable(Screen.Profile.route) {
       SettingsScreen()
     }
   }

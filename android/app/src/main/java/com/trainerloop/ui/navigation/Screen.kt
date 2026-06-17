@@ -1,16 +1,20 @@
 package com.trainerloop.ui.navigation
 
 sealed class Screen(val route: String) {
-  object Library : Screen("library")
-  object WorkoutPreview : Screen("workout_preview/{workoutId}") {
-    fun createRoute(workoutId: String) = "workout_preview/$workoutId"
+  // Bottom tabs
+  object Home : Screen("home")
+  object Workouts : Screen("workouts")
+  object Ride : Screen("ride")
+  object History : Screen("history")
+  object Profile : Screen("profile")
+
+  // Other flows
+  object Devices : Screen("devices")
+  object WorkoutDetail : Screen("workout_detail/{workoutId}")
+  object WorkoutPlayer : Screen("workout_player/{sessionId}")
+  object WorkoutComplete : Screen("workout_complete/{sessionId}/{workoutName}/{startTimeMs}")
+
+  companion object {
+    val bottomTabs = listOf(Home, Workouts, Ride, History, Profile)
   }
-  object Workout : Screen("workout/{sessionId}") {
-    fun createRoute(sessionId: Int) = "workout/$sessionId"
-  }
-  object SessionSummary : Screen("session_summary/{sessionId}") {
-    fun createRoute(sessionId: String) = "session_summary/$sessionId"
-  }
-  object Connect : Screen("connect")
-  object Settings : Screen("settings")
 }
