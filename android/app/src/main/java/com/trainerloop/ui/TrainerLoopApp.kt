@@ -19,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -139,14 +140,17 @@ fun TrainerLoopApp(
         val context = LocalContext.current
         val app = context.trainerLoopApp
         val workout = app.selectedWorkout ?: sampleWorkout
+        val ftmsManager by app.ftmsManager.collectAsState()
+        val hrManager by app.hrManager.collectAsState()
+        val ftmsControlManager by app.ftmsControlManager.collectAsState()
         WorkoutScreen(
           workout = workout,
           viewModel = androidx.lifecycle.viewmodel.compose.viewModel(
             factory = WorkoutViewModelFactory(
               workout = workout,
-              ftmsManager = app.ftmsManager.value,
-              hrManager = app.hrManager.value,
-              ftmsControlManager = app.ftmsControlManager.value
+              ftmsManager = ftmsManager,
+              hrManager = hrManager,
+              ftmsControlManager = ftmsControlManager
             )
           ),
           onSessionFinished = { data ->

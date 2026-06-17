@@ -1,5 +1,6 @@
 package com.trainerloop.ui.library
 
+import java.util.Locale
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -184,7 +185,7 @@ private fun WorkoutCard(
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-          text = "IF ${String.format("%.2f", stats.intensityFactor)}",
+          text = "IF ${String.format(Locale.ROOT, "%.2f", stats.intensityFactor)}",
           style = MaterialTheme.typography.labelSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )

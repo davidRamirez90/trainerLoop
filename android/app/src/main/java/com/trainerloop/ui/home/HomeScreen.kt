@@ -37,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import android.annotation.SuppressLint
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.model.SessionSummary
 import com.trainerloop.ui.theme.Green40
 
+@SuppressLint("MissingPermission")
 @Composable
 fun HomeScreen(
   onNavigateToDevices: () -> Unit,

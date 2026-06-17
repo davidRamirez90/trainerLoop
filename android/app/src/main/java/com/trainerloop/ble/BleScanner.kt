@@ -1,5 +1,6 @@
 package com.trainerloop.ble
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
@@ -34,6 +35,7 @@ class BleScanner(context: Context) {
    * Returns a flow of discovered BLE devices, or null if scanning cannot start
    * (Bluetooth off, permissions missing, or adapter unavailable).
    */
+  @SuppressLint("MissingPermission")
   fun startScan(services: List<UUID>, durationMs: Long = 10_000): Flow<List<BleDevice>>? {
     val scannerRef = scanner ?: return null
     if (!bluetoothAdapter!!.isEnabled) return null
@@ -95,6 +97,7 @@ class BleScanner(context: Context) {
     }
   }
 
+  @SuppressLint("MissingPermission")
   fun stopScan() {
     activeCallback?.let { callback ->
       try {
@@ -106,6 +109,7 @@ class BleScanner(context: Context) {
 
   fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
 
+  @SuppressLint("MissingPermission")
   private fun addResult(devices: MutableMap<String, BleDevice>, result: ScanResult) {
     val device = result.device
     val uuids = result.scanRecord?.serviceUuids?.map { it.uuid } ?: emptyList()

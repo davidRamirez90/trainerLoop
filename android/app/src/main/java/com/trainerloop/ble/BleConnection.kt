@@ -1,5 +1,6 @@
 package com.trainerloop.ble
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
@@ -91,6 +92,7 @@ class BleConnection(
     scope.launch { reconnectWithBackoff() }
   }
 
+  @SuppressLint("MissingPermission")
   private suspend fun reconnectWithBackoff() {
     var attempt = 0
     while (isActiveForReconnect()) {
@@ -144,6 +146,7 @@ class BleConnection(
   }
 
   @Suppress("MissingPermission")
+  @SuppressLint("WrongConstant")
   suspend fun enableNotifications(characteristic: BluetoothGattCharacteristic): Flow<ByteArray> {
     val gattInstance = gatt ?: throw IllegalStateException("Not connected")
     gattInstance.setCharacteristicNotification(characteristic, true)

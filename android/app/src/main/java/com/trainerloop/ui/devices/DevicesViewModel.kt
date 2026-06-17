@@ -1,5 +1,6 @@
 package com.trainerloop.ui.devices
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
@@ -405,6 +406,7 @@ private fun resolveBluetoothDevice(context: Context, address: String): Bluetooth
   }
 }
 
+@SuppressLint("MissingPermission")
 private fun BluetoothDevice.toBleDevice(): BleDevice {
   return BleDevice(
     address = address,

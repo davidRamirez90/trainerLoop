@@ -1,5 +1,6 @@
 package com.trainerloop.ui.workout.detail
 
+import java.util.Locale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -112,7 +113,7 @@ fun WorkoutDetailScreen(
           horizontalArrangement = Arrangement.SpaceEvenly
         ) {
           SummaryPill(label = "Duration", value = formatDuration(viewModel.totalDurationSec))
-          SummaryPill(label = "IF", value = String.format("%.2f", viewModel.stats.intensityFactor))
+          SummaryPill(label = "IF", value = String.format(Locale.ROOT, "%.2f", viewModel.stats.intensityFactor))
           SummaryPill(label = "TSS", value = "${viewModel.stats.tss}")
         }
       }
