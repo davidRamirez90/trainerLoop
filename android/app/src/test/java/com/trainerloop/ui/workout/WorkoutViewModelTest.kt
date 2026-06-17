@@ -173,8 +173,6 @@ class WorkoutViewModelTest {
     return manager
   }
 
-  private fun mockFtmsControlManager(): FtmsControlManager = mockk(relaxed = true)
-
   private fun sampleWorkout(): Workout = Workout(
     id = "test-workout",
     name = "Test Workout",

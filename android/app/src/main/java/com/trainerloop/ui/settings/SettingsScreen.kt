@@ -132,6 +132,7 @@ fun SettingsScreen(
         trailing = {
           CompactNumberField(
             value = uiState.selectedCoach,
+            keyboardType = KeyboardType.Text,
             onValueChange = viewModel::updateSelectedCoach
           )
         }
