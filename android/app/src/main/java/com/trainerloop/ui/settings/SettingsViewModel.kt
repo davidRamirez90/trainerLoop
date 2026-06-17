@@ -10,9 +10,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class SettingsUiState(
+  val name: String = "Rider",
   val ftp: String = "250",
   val weightKg: String = "75.0",
   val maxHr: String = "190",
+  val restingHr: String = "55",
   val ergBias: String = "0",
   val selectedCoach: String = "default",
   val isSaved: Boolean = false
@@ -27,12 +29,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
   init {
     val profile = repository.getProfileSync()
     _uiState.value = SettingsUiState(
+      name = profile.name,
       ftp = profile.ftp.toString(),
       weightKg = profile.weightKg.toString(),
       maxHr = profile.maxHr.toString(),
+      restingHr = profile.restingHr.toString(),
       ergBias = profile.ergBiasPct.toString(),
       selectedCoach = profile.selectedCoachProfileId
     )
+  }
+
+  fun updateName(value: String) {
+    _uiState.value = _uiState.value.copy(name = value, isSaved = false)
   }
 
   fun updateFtp(value: String) {
@@ -47,17 +55,32 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     _uiState.value = _uiState.value.copy(maxHr = value, isSaved = false)
   }
 
+  fun updateRestingHr(value: String) {
+    _uiState.value = _uiState.value.copy(restingHr = value, isSaved = false)
+  }
+
   fun updateErgBias(value: String) {
     _uiState.value = _uiState.value.copy(ergBias = value, isSaved = false)
+  }
+
+  fun updateSelectedCoach(value: String) {
+    _uiState.value = _uiState.value.copy(selectedCoach = value, isSaved = false)
   }
 
   fun save() {
     viewModelScope.launch {
       val state = _uiState.value
-      repository.updateFtp(state.ftp.toIntOrNull() ?: return@launch)
-      repository.updateWeight(state.weightKg.toDoubleOrNull() ?: return@launch)
-      repository.updateMaxHr(state.maxHr.toIntOrNull() ?: return@launch)
-      repository.updateErgBias(state.ergBias.toIntOrNull() ?: 0)
+      repository.updateProfile {
+        it.copy(
+          name = state.name.trim().takeIf { it.isNotBlank() } ?: it.name,
+          ftp = state.ftp.toIntOrNull() ?: it.ftp,
+          weightKg = state.weightKg.toDoubleOrNull() ?: it.weightKg,
+          maxHr = state.maxHr.toIntOrNull() ?: it.maxHr,
+          restingHr = state.restingHr.toIntOrNull() ?: it.restingHr,
+          ergBiasPct = state.ergBias.toIntOrNull() ?: it.ergBiasPct,
+          selectedCoachProfileId = state.selectedCoach
+        )
+      }
       _uiState.value = _uiState.value.copy(isSaved = true)
     }
   }
