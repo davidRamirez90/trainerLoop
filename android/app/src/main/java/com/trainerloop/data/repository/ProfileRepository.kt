@@ -7,13 +7,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class ProfileRepository(context: Context) {
+open class ProfileRepository(context: Context) {
 
   private val prefs: SharedPreferences =
     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
   private val _profile = MutableStateFlow(load())
-  val profile: Flow<UserProfile> = _profile.asStateFlow()
+  open val profile: Flow<UserProfile> = _profile.asStateFlow()
 
   fun getProfileSync(): UserProfile = _profile.value
 
@@ -26,6 +26,10 @@ class ProfileRepository(context: Context) {
 
   suspend fun updateFtp(ftp: Int) {
     updateProfile { it.copy(ftp = ftp) }
+  }
+
+  suspend fun updateName(name: String) {
+    updateProfile { it.copy(name = name) }
   }
 
   suspend fun updateWeight(weightKg: Double) {
@@ -46,6 +50,7 @@ class ProfileRepository(context: Context) {
 
   private fun load(): UserProfile {
     return UserProfile(
+      name = prefs.getString(KEY_NAME, "Rider") ?: "Rider",
       ftp = prefs.getInt(KEY_FTP, 250),
       weightKg = prefs.getFloat(KEY_WEIGHT, 75.0f).toDouble(),
       maxHr = prefs.getInt(KEY_MAX_HR, 190),
@@ -57,6 +62,7 @@ class ProfileRepository(context: Context) {
 
   private fun save(profile: UserProfile) {
     prefs.edit()
+      .putString(KEY_NAME, profile.name)
       .putInt(KEY_FTP, profile.ftp)
       .putFloat(KEY_WEIGHT, profile.weightKg.toFloat())
       .putInt(KEY_MAX_HR, profile.maxHr)
@@ -74,5 +80,6 @@ class ProfileRepository(context: Context) {
     private const val KEY_RESTING_HR = "resting_hr"
     private const val KEY_ERG_BIAS = "erg_bias"
     private const val KEY_COACH_PROFILE = "coach_profile"
+    private const val KEY_NAME = "name"
   }
 }

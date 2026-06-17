@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 class FtmsManager(
   private val context: Context,
-  private val device: BluetoothDevice
+  val device: BluetoothDevice
 ) {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
   private var connection: BleConnection? = null

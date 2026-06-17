@@ -12,27 +12,32 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class TrainerLoopApplication : Application() {
+class TrainerLoopApplication : Application(), ManagerProvider {
 
   private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-  var ftmsManager: FtmsManager? = null
-    private set
-  var hrManager: HrManager? = null
-    private set
-  var ftmsControlManager: FtmsControlManager? = null
-    private set
+  private val _ftmsManager = MutableStateFlow<FtmsManager?>(null)
+  override val ftmsManager: StateFlow<FtmsManager?> = _ftmsManager.asStateFlow()
+
+  private val _hrManager = MutableStateFlow<HrManager?>(null)
+  override val hrManager: StateFlow<HrManager?> = _hrManager.asStateFlow()
+
+  private val _ftmsControlManager = MutableStateFlow<FtmsControlManager?>(null)
+  val ftmsControlManager: StateFlow<FtmsControlManager?> = _ftmsControlManager.asStateFlow()
 
   var selectedWorkout: Workout? = null
   var pendingSessionSamples: List<TelemetrySample>? = null
 
   fun attachTrainer(device: BluetoothDevice) {
-    val previousFtms = ftmsManager
-    val previousControl = ftmsControlManager
-    ftmsManager = FtmsManager(this, device)
-    ftmsControlManager = FtmsControlManager(this, device)
+    val previousFtms = _ftmsManager.value
+    val previousControl = _ftmsControlManager.value
+    _ftmsManager.value = FtmsManager(this, device)
+    _ftmsControlManager.value = FtmsControlManager(this, device)
     appScope.launch {
       previousFtms?.disconnect()
       previousControl?.disconnect()
@@ -40,20 +45,20 @@ class TrainerLoopApplication : Application() {
   }
 
   fun attachHr(device: BluetoothDevice) {
-    val previousHr = hrManager
-    hrManager = HrManager(this, device)
+    val previousHr = _hrManager.value
+    _hrManager.value = HrManager(this, device)
     appScope.launch {
       previousHr?.disconnect()
     }
   }
 
   fun clearDevices() {
-    val previousFtms = ftmsManager
-    val previousControl = ftmsControlManager
-    val previousHr = hrManager
-    ftmsManager = null
-    ftmsControlManager = null
-    hrManager = null
+    val previousFtms = _ftmsManager.value
+    val previousControl = _ftmsControlManager.value
+    val previousHr = _hrManager.value
+    _ftmsManager.value = null
+    _ftmsControlManager.value = null
+    _hrManager.value = null
     appScope.launch {
       previousFtms?.disconnect()
       previousControl?.disconnect()

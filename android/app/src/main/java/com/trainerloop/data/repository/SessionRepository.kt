@@ -8,9 +8,9 @@ import com.trainerloop.data.source.local.SessionEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-class SessionRepository(private val dao: SessionDao) {
+open class SessionRepository(private val dao: SessionDao) {
 
-    fun summaries(): Flow<List<SessionSummary>> =
+    open fun summaries(): Flow<List<SessionSummary>> =
         dao.getAll().map { rows -> rows.map(::toSummary) }
 
     suspend fun save(session: SessionData) {
