@@ -5,13 +5,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.ui.Modifier
 import com.trainerloop.ble.BlePermissions
+import com.trainerloop.ui.TrainerLoopApp
+import com.trainerloop.ui.theme.TrainerLoopTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -34,14 +30,8 @@ class MainActivity : ComponentActivity() {
     }
 
     setContent {
-      MaterialTheme {
-        Surface(
-          modifier = Modifier
-            .fillMaxSize()
-            .safeDrawingPadding()
-        ) {
-          Text("Trainer Loop")
-        }
+      TrainerLoopTheme {
+        TrainerLoopApp()
       }
     }
   }
