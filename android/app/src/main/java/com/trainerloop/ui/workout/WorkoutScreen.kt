@@ -1,5 +1,6 @@
 package com.trainerloop.ui.workout
 
+import android.view.WindowManager
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.model.Workout
 import com.trainerloop.ui.coach.CoachPanel
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.ui.components.IntervalTimeline
 import com.trainerloop.ui.components.MetricCard
 
@@ -36,6 +42,38 @@ fun WorkoutScreen(
   onFinish: () -> Unit
 ) {
   val uiState by viewModel.uiState.collectAsState()
+  val view = LocalView.current
+  val context = LocalContext.current
+
+  // Keep screen on during workout
+  DisposableEffect(uiState.isRunning) {
+    if (uiState.isRunning) {
+      view.keepScreenOn = true
+    } else {
+      view.keepScreenOn = false
+    }
+    onDispose {
+      view.keepScreenOn = false
+    }
+  }
+
+  // Foreground service: start/stop based on running state
+  LaunchedEffect(uiState.isRunning) {
+    if (uiState.isRunning) {
+      val timeStr = formatDuration(uiState.elapsedSec)
+      WorkoutForegroundService.start(context, uiState.currentPowerWatts, timeStr)
+    } else {
+      WorkoutForegroundService.stop(context)
+    }
+  }
+
+  // Update notification periodically during workout
+  LaunchedEffect(uiState.currentPowerWatts, uiState.elapsedSec) {
+    if (uiState.isRunning) {
+      val timeStr = formatDuration(uiState.elapsedSec)
+      WorkoutForegroundService.update(context, uiState.currentPowerWatts, timeStr, true)
+    }
+  }
 
   Column(
     modifier = Modifier
