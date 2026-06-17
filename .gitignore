@@ -28,3 +28,4 @@ dist-ssr
 
 # Subagent task artifacts
 task-*.md
+phase-*.md
