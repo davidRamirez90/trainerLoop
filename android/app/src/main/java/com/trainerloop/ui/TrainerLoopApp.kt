@@ -18,10 +18,12 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -35,10 +37,12 @@ import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
 import com.trainerloop.ui.devices.DevicesScreen
+import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.ui.home.HomeScreen
 import com.trainerloop.ui.library.WorkoutLibraryScreen
 import com.trainerloop.ui.navigation.Screen
 import com.trainerloop.ui.settings.SettingsScreen
+import com.trainerloop.ui.workout.detail.WorkoutDetailScreen
 import com.trainerloop.ui.summary.SessionSummaryScreen
 import com.trainerloop.ui.summary.SessionSummaryViewModel
 import com.trainerloop.ui.workout.WorkoutScreen
@@ -84,14 +88,16 @@ fun TrainerLoopApp(
         HomeScreen(
           onNavigateToDevices = { navController.navigate(Screen.Devices.route) },
           onNavigateToWorkouts = { navController.navigate(Screen.Workouts.route) },
-          onStartFreeRide = { navController.navigate("workout_player/1") }
+          onStartFreeRide = { navController.navigate(Screen.WorkoutPlayer.createRoute(sessionId = 1L)) }
         )
       }
 
       composable(Screen.Workouts.route) {
+        val context = LocalContext.current
         WorkoutLibraryScreen(
-          onStartWorkout = {
-            navController.navigate("workout_player/1")
+          onWorkoutSelected = { workout ->
+            context.trainerLoopApp.selectedWorkout = workout
+            navController.navigate(Screen.WorkoutDetail.createRoute(workout.id))
           }
         )
       }
@@ -112,7 +118,17 @@ fun TrainerLoopApp(
         route = Screen.WorkoutDetail.route,
         arguments = listOf(navArgument("workoutId") { type = NavType.StringType })
       ) {
-        PlaceholderScreen("Workout Preview")
+        val context = LocalContext.current
+        val workout = context.trainerLoopApp.selectedWorkout
+        if (workout == null) {
+          LaunchedEffect(Unit) { navController.popBackStack() }
+          return@composable
+        }
+        WorkoutDetailScreen(
+          workout = workout,
+          onStartWorkout = { navController.navigate(Screen.WorkoutPlayer.createRoute(sessionId = 1L)) },
+          onBack = { navController.popBackStack() }
+        )
       }
 
       composable(

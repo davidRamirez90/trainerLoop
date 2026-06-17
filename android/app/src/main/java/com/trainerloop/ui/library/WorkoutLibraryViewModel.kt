@@ -9,6 +9,7 @@ import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
+import com.trainerloop.domain.WorkoutSummaryMath
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,8 +17,26 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import java.io.File
 
+enum class WorkoutCategory(val label: String) {
+  ALL("All"),
+  ENDURANCE("Endurance"),
+  SWEET_SPOT("Sweet Spot"),
+  THRESHOLD("Threshold"),
+  VO2_MAX("VO2 Max")
+}
+
+data class WorkoutListItem(
+  val workout: Workout,
+  val category: WorkoutCategory,
+  val stats: com.trainerloop.domain.WorkoutStats
+)
+
 data class LibraryUiState(
-  val workouts: List<Workout> = emptyList(),
+  val searchQuery: String = "",
+  val selectedCategory: WorkoutCategory = WorkoutCategory.ALL,
+  val workouts: List<WorkoutListItem> = emptyList(),
+  val filteredWorkouts: List<WorkoutListItem> = emptyList(),
+  val categories: List<WorkoutCategory> = WorkoutCategory.entries,
   val isLoading: Boolean = false,
   val error: String? = null
 )
@@ -33,10 +52,36 @@ class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(appli
     loadWorkouts()
   }
 
+  fun onSearchQueryChange(query: String) {
+    _uiState.value = _uiState.value.copy(searchQuery = query)
+    applyFilter()
+  }
+
+  fun onCategorySelected(category: WorkoutCategory) {
+    _uiState.value = _uiState.value.copy(selectedCategory = category)
+    applyFilter()
+  }
+
   private fun loadWorkouts() {
-    val builtIn = builtInWorkouts()
-    val imported = loadImportedWorkouts()
-    _uiState.value = LibraryUiState(workouts = builtIn + imported)
+    val builtIn = builtInWorkouts().map { it.toListItem() }
+    val imported = loadImportedWorkouts().map { it.toListItem() }
+    val all = builtIn + imported
+    _uiState.value = _uiState.value.copy(workouts = all)
+    applyFilter()
+  }
+
+  private fun applyFilter() {
+    val state = _uiState.value
+    val query = state.searchQuery.trim().lowercase()
+    val filtered = state.workouts.filter { item ->
+      val matchesCategory = state.selectedCategory == WorkoutCategory.ALL ||
+        item.category == state.selectedCategory
+      val matchesSearch = query.isEmpty() ||
+        item.workout.name.lowercase().contains(query) ||
+        item.workout.description?.lowercase()?.contains(query) == true
+      matchesCategory && matchesSearch
+    }
+    _uiState.value = state.copy(filteredWorkouts = filtered)
   }
 
   fun importWorkout(uri: Uri) {
@@ -48,6 +93,7 @@ class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(appli
       if (result != null) {
         saveImportedWorkout(result)
         loadWorkouts()
+        _uiState.value = _uiState.value.copy(isLoading = false)
       } else {
         _uiState.value = _uiState.value.copy(
           isLoading = false,
@@ -59,6 +105,31 @@ class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(appli
 
   fun clearError() {
     _uiState.value = _uiState.value.copy(error = null)
+  }
+
+  private fun Workout.toListItem(): WorkoutListItem {
+    return WorkoutListItem(
+      workout = this,
+      category = categorize(this),
+      stats = WorkoutSummaryMath.workoutStats(this)
+    )
+  }
+
+  private fun categorize(workout: Workout): WorkoutCategory {
+    return when (workout.id) {
+      "endurance" -> WorkoutCategory.ENDURANCE
+      "sweet_spot" -> WorkoutCategory.SWEET_SPOT
+      "pyramid" -> WorkoutCategory.THRESHOLD
+      else -> {
+        val ifactor = WorkoutSummaryMath.workoutStats(workout).intensityFactor
+        when {
+          ifactor < 0.75 -> WorkoutCategory.ENDURANCE
+          ifactor < 0.90 -> WorkoutCategory.SWEET_SPOT
+          ifactor < 1.05 -> WorkoutCategory.THRESHOLD
+          else -> WorkoutCategory.VO2_MAX
+        }
+      }
+    }
   }
 
   private fun saveImportedWorkout(imported: ImportedWorkout) {

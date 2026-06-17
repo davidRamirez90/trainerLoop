@@ -13,29 +13,37 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.model.Workout
+import com.trainerloop.ui.components.WorkoutMiniChart
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutLibraryScreen(
-  onStartWorkout: (Workout) -> Unit,
+  onWorkoutSelected: (Workout) -> Unit,
   viewModel: WorkoutLibraryViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsState()
-  val context = LocalContext.current
 
   val importLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.OpenDocument()
@@ -52,7 +60,8 @@ fun WorkoutLibraryScreen(
   ) {
     Row(
       modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically
     ) {
       Text(
         text = "Workouts",
@@ -65,6 +74,32 @@ fun WorkoutLibraryScreen(
       }
     }
 
+    Spacer(modifier = Modifier.height(12.dp))
+
+    OutlinedTextField(
+      value = uiState.searchQuery,
+      onValueChange = viewModel::onSearchQueryChange,
+      modifier = Modifier.fillMaxWidth(),
+      placeholder = { Text("Search workouts") },
+      leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+      singleLine = true
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+      uiState.categories.forEach { category ->
+        FilterChip(
+          selected = uiState.selectedCategory == category,
+          onClick = { viewModel.onCategorySelected(category) },
+          label = { Text(category.label) }
+        )
+      }
+    }
+
     Spacer(modifier = Modifier.height(16.dp))
 
     if (uiState.isLoading) {
@@ -72,12 +107,13 @@ fun WorkoutLibraryScreen(
     }
 
     LazyColumn(
-      verticalArrangement = Arrangement.spacedBy(8.dp)
+      modifier = Modifier.weight(1f),
+      verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-      items(uiState.workouts) { workout ->
+      items(uiState.filteredWorkouts, key = { it.workout.id }) { item ->
         WorkoutCard(
-          workout = workout,
-          onClick = { onStartWorkout(workout) }
+          item = item,
+          onClick = { onWorkoutSelected(item.workout) }
         )
       }
     }
@@ -99,9 +135,12 @@ fun WorkoutLibraryScreen(
 
 @Composable
 private fun WorkoutCard(
-  workout: Workout,
+  item: WorkoutListItem,
   onClick: () -> Unit
 ) {
+  val workout = item.workout
+  val stats = item.stats
+
   Card(
     modifier = Modifier
       .fillMaxWidth()
@@ -115,9 +154,18 @@ private fun WorkoutCard(
         .fillMaxWidth()
         .padding(12.dp)
     ) {
+      WorkoutMiniChart(
+        workout = workout,
+        modifier = Modifier.fillMaxWidth(),
+        chartHeight = 60.dp
+      )
+
+      Spacer(modifier = Modifier.height(8.dp))
+
       Text(
         text = workout.name,
-        style = MaterialTheme.typography.titleMedium
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold
       )
       if (workout.description != null) {
         Text(
@@ -126,11 +174,26 @@ private fun WorkoutCard(
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
       }
-      Text(
-        text = "${workout.segments.size} segments \u2022 ${formatDuration(workout.segments.sumOf { it.durationSec })}",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+      ) {
+        Text(
+          text = "${formatDuration(stats.durationSec)}",
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+          text = "IF ${String.format("%.2f", stats.intensityFactor)}",
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+          text = "TSS ${stats.tss}",
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+      }
     }
   }
 }
