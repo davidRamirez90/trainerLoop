@@ -1,5 +1,6 @@
 package com.trainerloop.ui
 
+import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +21,8 @@ import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
 import com.trainerloop.ui.connect.ConnectScreen
 import com.trainerloop.ui.navigation.Screen
+import com.trainerloop.ui.summary.SessionSummaryScreen
+import com.trainerloop.ui.summary.SessionSummaryViewModel
 import com.trainerloop.ui.workout.WorkoutScreen
 
 @Composable
@@ -54,8 +57,17 @@ fun TrainerLoopApp(
     composable(
       route = Screen.SessionSummary.route,
       arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
-    ) {
-      PlaceholderScreen("Session Summary")
+    ) { backStackEntry ->
+      val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
+      SessionSummaryScreen(
+        viewModel = SessionSummaryViewModel(
+          application = androidx.compose.ui.platform.LocalContext.current.applicationContext as Application,
+          sessionId = sessionId,
+          workoutName = "Workout",
+          samples = emptyList()
+        ),
+        onDone = { navController.popBackStack() }
+      )
     }
 
     composable(Screen.Connect.route) {
