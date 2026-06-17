@@ -4,17 +4,35 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import com.trainerloop.ble.BlePermissions
 
 class MainActivity : ComponentActivity() {
+
+  private val permissionLauncher = registerForActivityResult(
+    ActivityResultContracts.RequestMultiplePermissions()
+  ) { results ->
+    val allGranted = results.all { it.value }
+    if (allGranted && !BlePermissions.isLocationEnabled(this)) {
+      // Location services are still disabled on Android 11; the connect screen
+      // will surface this to the user before scanning.
+    }
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
+
+    if (!BlePermissions.hasPermissions(this)) {
+      permissionLauncher.launch(BlePermissions.REQUIRED)
+    }
+
     setContent {
       MaterialTheme {
         Surface(
