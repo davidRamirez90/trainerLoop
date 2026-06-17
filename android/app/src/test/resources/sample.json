@@ -1,0 +1,24 @@
+{
+  "id": "sample-json-workout",
+  "name": "Sample JSON Workout",
+  "subtitle": "Imported JSON workout",
+  "ftpWatts": 250,
+  "segments": [
+    {
+      "id": "seg-1",
+      "label": "Warmup",
+      "durationSec": 300,
+      "targetRange": { "low": 100, "high": 150 },
+      "phase": "warmup",
+      "isWork": false
+    },
+    {
+      "id": "seg-2",
+      "label": "Interval",
+      "durationSec": 600,
+      "targetRange": { "low": 200, "high": 250 },
+      "phase": "work",
+      "isWork": true
+    }
+  ]
+}

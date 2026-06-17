@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<workout_file>
+  <author>Trainer Loop</author>
+  <name>Sample ZWO Workout</name>
+  <description>Imported ZWO workout</description>
+  <sportType>bike</sportType>
+  <workout>
+    <warmup Duration="300" PowerLow="0.4" PowerHigh="0.6" Cadence="90"/>
+    <SteadyState Duration="600" Power="0.89" Cadence="88"/>
+    <Cooldown Duration="300" PowerLow="0.5" PowerHigh="0.4" Cadence="90"/>
+  </workout>
+</workout_file>
