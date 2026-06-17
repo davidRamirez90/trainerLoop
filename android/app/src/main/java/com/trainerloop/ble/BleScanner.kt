@@ -1,5 +1,6 @@
 package com.trainerloop.ble
 
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
@@ -9,25 +10,34 @@ import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.ParcelUuid
 import com.trainerloop.ble.model.BleDevice
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+import java.io.IOException
 import java.util.UUID
 
 class BleScanner(context: Context) {
 
-  private val scanner: BluetoothLeScanner? by lazy {
+  private val bluetoothAdapter: BluetoothAdapter? by lazy {
     val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
-    bluetoothManager?.adapter?.bluetoothLeScanner
+    bluetoothManager?.adapter
+  }
+
+  private val scanner: BluetoothLeScanner? by lazy {
+    bluetoothAdapter?.bluetoothLeScanner
   }
 
   private var activeCallback: ScanCallback? = null
 
-  fun scan(services: List<UUID>, durationMs: Long = 10_000): Flow<List<BleDevice>> {
-    val scannerRef = scanner ?: return emptyFlow()
+  /**
+   * Returns a flow of discovered BLE devices, or null if scanning cannot start
+   * (Bluetooth off, permissions missing, or adapter unavailable).
+   */
+  fun startScan(services: List<UUID>, durationMs: Long = 10_000): Flow<List<BleDevice>>? {
+    val scannerRef = scanner ?: return null
+    if (!bluetoothAdapter!!.isEnabled) return null
+
     return callbackFlow {
       val devices = mutableMapOf<String, BleDevice>()
 
@@ -43,7 +53,7 @@ class BleScanner(context: Context) {
         }
 
         override fun onScanFailed(errorCode: Int) {
-          cancel("BLE scan failed with error code $errorCode")
+          close(IOException("BLE scan failed with error code $errorCode"))
         }
       }
 
@@ -63,7 +73,12 @@ class BleScanner(context: Context) {
         .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
         .build()
 
-      scannerRef.startScan(filters, settings, callback)
+      try {
+        scannerRef.startScan(filters, settings, callback)
+      } catch (e: SecurityException) {
+        close(IOException("BLE scan permission denied: ${e.message}"))
+        return@callbackFlow
+      }
 
       val timeoutJob = launch {
         kotlinx.coroutines.delay(durationMs)
@@ -72,7 +87,9 @@ class BleScanner(context: Context) {
 
       awaitClose {
         timeoutJob.cancel()
-        scannerRef.stopScan(callback)
+        try {
+          scannerRef.stopScan(callback)
+        } catch (_: Exception) {}
         activeCallback = null
       }
     }
@@ -80,10 +97,14 @@ class BleScanner(context: Context) {
 
   fun stopScan() {
     activeCallback?.let { callback ->
-      scanner?.stopScan(callback)
+      try {
+        scanner?.stopScan(callback)
+      } catch (_: Exception) {}
       activeCallback = null
     }
   }
+
+  fun isBluetoothEnabled(): Boolean = bluetoothAdapter?.isEnabled == true
 
   private fun addResult(devices: MutableMap<String, BleDevice>, result: ScanResult) {
     val device = result.device

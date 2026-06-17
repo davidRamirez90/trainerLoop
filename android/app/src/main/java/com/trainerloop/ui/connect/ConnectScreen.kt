@@ -1,6 +1,7 @@
 package com.trainerloop.ui.connect
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +25,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.ble.model.BleDevice
@@ -52,6 +54,13 @@ fun ConnectScreen(
     )
 
     Spacer(modifier = Modifier.height(16.dp))
+
+    // Status indicators
+    StatusRow(label = "Bluetooth", ok = uiState.isBluetoothOn)
+    StatusRow(label = "Location", ok = uiState.isLocationOn)
+    StatusRow(label = "Permissions", ok = uiState.hasPermissions)
+
+    Spacer(modifier = Modifier.height(8.dp))
 
     // Scan controls
     Row(
@@ -153,6 +162,30 @@ fun ConnectScreen(
       }
     ) {
       Text(error)
+    }
+  }
+}
+
+@Composable
+private fun StatusRow(label: String, ok: Boolean) {
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.SpaceBetween
+  ) {
+    Text(
+      text = label,
+      style = MaterialTheme.typography.bodySmall
+    )
+    Box(
+      modifier = Modifier
+        .padding(start = 8.dp)
+        .height(12.dp)
+    ) {
+      Text(
+        text = if (ok) "✓" else "✗",
+        style = MaterialTheme.typography.bodySmall,
+        color = if (ok) Color(0xFF4CAF78) else Color(0xFFE53935)
+      )
     }
   }
 }
