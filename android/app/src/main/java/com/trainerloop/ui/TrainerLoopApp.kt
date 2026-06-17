@@ -13,6 +13,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.trainerloop.ui.connect.ConnectScreen
 import com.trainerloop.ui.navigation.Screen
 
 @Composable
@@ -21,7 +22,7 @@ fun TrainerLoopApp(
 ) {
   NavHost(
     navController = navController,
-    startDestination = Screen.Library.route
+    startDestination = Screen.Connect.route
   ) {
     composable(Screen.Library.route) {
       PlaceholderScreen("Workout Library")
@@ -49,7 +50,9 @@ fun TrainerLoopApp(
     }
 
     composable(Screen.Connect.route) {
-      PlaceholderScreen("Device Connection")
+      ConnectScreen(
+        onNavigateToLibrary = { navController.navigate(Screen.Library.route) }
+      )
     }
 
     composable(Screen.Settings.route) {
