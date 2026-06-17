@@ -2,13 +2,13 @@ package com.trainerloop.ble
 
 import android.bluetooth.BluetoothDevice
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 
 object FtmsCommands {
   private const val OPCODE_REQUEST_CONTROL: Byte = 0x00
@@ -61,10 +61,23 @@ class FtmsControlManager(
     conn.connect().getOrElse { return Result.failure(it) }
     conn.discoverServices().getOrElse { return Result.failure(it) }
 
+    setupControlPoint(conn)
+
+    // Auto-resubscribe and re-request control on reconnect
+    conn.onReconnected = {
+      conn.discoverServices()
+      setupControlPoint(conn)
+    }
+
+    _isConnected.value = true
+    return Result.success(Unit)
+  }
+
+  private suspend fun setupControlPoint(conn: BleConnection) {
     val cpChar = conn.getCharacteristic(
       BleConstants.FTMS_SERVICE,
       BleConstants.FITNESS_MACHINE_CONTROL_POINT
-    ) ?: return Result.failure(Exception("Control point characteristic not found"))
+    ) ?: return
 
     val responseFlow = conn.enableNotifications(cpChar)
     scope.launch {
@@ -73,10 +86,6 @@ class FtmsControlManager(
 
     _status.value = FtmsControlStatus.REQUESTING
     conn.writeCharacteristic(cpChar, FtmsCommands.requestControl())
-      .getOrElse { return Result.failure(it) }
-
-    _isConnected.value = true
-    return Result.success(Unit)
   }
 
   suspend fun disconnect() {
@@ -106,7 +115,8 @@ class FtmsControlManager(
     return false
   }
 
-  suspend fun startResume(): Boolean = sendCommand(FtmsCommands.startResume(), "Trainer start failed.")
+  suspend fun startResume(): Boolean =
+    sendCommand(FtmsCommands.startResume(), "Trainer start failed.")
 
   suspend fun stopPause(stop: Boolean): Boolean =
     sendCommand(FtmsCommands.stopPause(stop), if (stop) "Trainer stop failed." else "Trainer pause failed.")
@@ -144,15 +154,9 @@ class FtmsControlManager(
           _error.value = "Trainer denied control."
         }
       }
-      0x05 -> { // Set Target Power
-        if (!success) _error.value = "Trainer rejected target power."
-      }
-      0x07 -> { // Start/Resume
-        if (!success) _error.value = "Trainer rejected start command."
-      }
-      0x08 -> { // Stop/Pause
-        if (!success) _error.value = "Trainer rejected stop command."
-      }
+      0x05 -> { if (!success) _error.value = "Trainer rejected target power." }
+      0x07 -> { if (!success) _error.value = "Trainer rejected start command." }
+      0x08 -> { if (!success) _error.value = "Trainer rejected stop command." }
     }
   }
 

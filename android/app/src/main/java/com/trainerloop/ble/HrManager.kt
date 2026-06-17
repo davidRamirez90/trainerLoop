@@ -31,10 +31,23 @@ class HrManager(
     conn.connect().getOrElse { return Result.failure(it) }
     conn.discoverServices().getOrElse { return Result.failure(it) }
 
+    subscribeToNotifications(conn)
+
+    // Auto-resubscribe on reconnect
+    conn.onReconnected = {
+      conn.discoverServices()
+      subscribeToNotifications(conn)
+    }
+
+    _isConnected.value = true
+    return Result.success(Unit)
+  }
+
+  private fun subscribeToNotifications(conn: BleConnection) {
     val dataChar = conn.getCharacteristic(BleConstants.HEART_RATE_SERVICE, BleConstants.HEART_RATE_MEASUREMENT)
     if (dataChar != null) {
-      val notificationFlow = conn.enableNotifications(dataChar)
       scope.launch {
+        val notificationFlow = conn.enableNotifications(dataChar)
         notificationFlow.collect { bytes ->
           val hr = HeartRateMeasurementParser.parse(bytes)
           if (hr != null) {
@@ -43,9 +56,6 @@ class HrManager(
         }
       }
     }
-
-    _isConnected.value = true
-    return Result.success(Unit)
   }
 
   suspend fun disconnect() {

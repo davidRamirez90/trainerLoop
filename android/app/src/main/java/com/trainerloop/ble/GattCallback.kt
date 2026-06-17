@@ -6,12 +6,16 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.launch
 import java.util.UUID
 
-class GattCallback : BluetoothGattCallback() {
+class GattCallback(
+  private val scope: CoroutineScope? = null
+) : BluetoothGattCallback() {
 
   private var connectionDeferred = CompletableDeferred<Boolean>()
   private var servicesDeferred = CompletableDeferred<Boolean>()
@@ -33,6 +37,8 @@ class GattCallback : BluetoothGattCallback() {
   fun resetReadDeferred() { readDeferred = CompletableDeferred() }
   fun resetDescriptorWriteDeferred() { descriptorWriteDeferred = CompletableDeferred() }
 
+  var onUnexpectedDisconnect: (() -> Unit)? = null
+
   private var _status = BluetoothProfile.STATE_DISCONNECTED
   val status: Int get() = _status
 
@@ -44,14 +50,26 @@ class GattCallback : BluetoothGattCallback() {
       } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
         if (!connectionDeferred.isCompleted) {
           connectionDeferred.complete(false)
+        } else {
+          scope?.launch {
+            onUnexpectedDisconnect?.invoke()
+          }
         }
         closeAllChannels()
       }
     } else {
       if (!connectionDeferred.isCompleted) {
-        connectionDeferred.completeExceptionally(
-          GattException("Connection state change failed with status $status")
-        )
+        if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+          connectionDeferred.complete(false)
+        } else {
+          connectionDeferred.completeExceptionally(
+            GattException("Connection state change failed with status $status")
+          )
+        }
+      } else {
+        scope?.launch {
+          onUnexpectedDisconnect?.invoke()
+        }
       }
       closeAllChannels()
     }

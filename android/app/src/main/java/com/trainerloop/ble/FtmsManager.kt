@@ -41,7 +41,20 @@ class FtmsManager(
     conn.connect().getOrElse { return Result.failure(it) }
     conn.discoverServices().getOrElse { return Result.failure(it) }
 
-    // Read device info
+    readDeviceInfo(conn)
+    subscribeToNotifications(conn)
+
+    // Auto-resubscribe on reconnect
+    conn.onReconnected = {
+      conn.discoverServices()
+      subscribeToNotifications(conn)
+    }
+
+    _isConnected.value = true
+    return Result.success(Unit)
+  }
+
+  private fun readDeviceInfo(conn: BleConnection) {
     scope.launch {
       _manufacturer.value = conn.read(BleConstants.DEVICE_INFO_SERVICE, BleConstants.MANUFACTURER_NAME) {
         it.decodeToString().trimEnd('\u0000')
@@ -57,12 +70,13 @@ class FtmsManager(
         it[0].toInt() and 0xFF
       }
     }
+  }
 
-    // Subscribe to Indoor Bike Data
+  private fun subscribeToNotifications(conn: BleConnection) {
     val dataChar = conn.getCharacteristic(BleConstants.FTMS_SERVICE, BleConstants.INDOOR_BIKE_DATA)
     if (dataChar != null) {
-      val notificationFlow = conn.enableNotifications(dataChar)
       scope.launch {
+        val notificationFlow = conn.enableNotifications(dataChar)
         notificationFlow.collect { bytes ->
           val parsed = IndoorBikeDataParser.parse(bytes)
           if (parsed != null) {
@@ -71,9 +85,6 @@ class FtmsManager(
         }
       }
     }
-
-    _isConnected.value = true
-    return Result.success(Unit)
   }
 
   suspend fun disconnect() {
