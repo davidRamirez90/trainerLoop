@@ -52,6 +52,25 @@ class TrainerLoopApplication : Application(), ManagerProvider {
     }
   }
 
+  fun clearTrainer() {
+    val previousFtms = _ftmsManager.value
+    val previousControl = _ftmsControlManager.value
+    _ftmsManager.value = null
+    _ftmsControlManager.value = null
+    appScope.launch {
+      previousFtms?.disconnect()
+      previousControl?.disconnect()
+    }
+  }
+
+  fun clearHr() {
+    val previousHr = _hrManager.value
+    _hrManager.value = null
+    appScope.launch {
+      previousHr?.disconnect()
+    }
+  }
+
   fun clearDevices() {
     val previousFtms = _ftmsManager.value
     val previousControl = _ftmsControlManager.value

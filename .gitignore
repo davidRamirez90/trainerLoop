@@ -25,3 +25,6 @@ dist-ssr
 
 # Worktrees
 .worktrees
+
+# Subagent task artifacts
+task-*.md

@@ -34,7 +34,7 @@ import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
-import com.trainerloop.ui.connect.ConnectScreen
+import com.trainerloop.ui.devices.DevicesScreen
 import com.trainerloop.ui.home.HomeScreen
 import com.trainerloop.ui.library.WorkoutLibraryScreen
 import com.trainerloop.ui.navigation.Screen
@@ -142,8 +142,8 @@ fun TrainerLoopApp(
       }
 
       composable(Screen.Devices.route) {
-        ConnectScreen(
-          onNavigateToLibrary = { navController.navigate(Screen.Workouts.route) }
+        DevicesScreen(
+          onBack = { navController.popBackStack() }
         )
       }
     }
