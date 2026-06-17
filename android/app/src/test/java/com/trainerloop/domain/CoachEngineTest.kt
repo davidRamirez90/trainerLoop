@@ -95,7 +95,7 @@ class CoachEngineTest {
     engine.reject(engine.pendingSuggestion.value!!.id)
 
     engine.tick(input(segmentIndex = 0, elapsedInSegmentSec = 50, activeSec = 50, samples = lowPowerHighDriftSamples(endSec = 50, count = 31), sessionId = 1))
-    assertEquals(0, engine.suggestions.value.filter { it.status == SuggestionStatus.PENDING }.size)
+    assertEquals(1, engine.suggestions.value.size)
   }
 
   @Test
@@ -181,10 +181,10 @@ class CoachEngineTest {
   }
 
   private fun input(
-    elapsedSec: Int = 0,
     activeSec: Int = 0,
     isRunning: Boolean = true,
     isComplete: Boolean = false,
+    hasPlan: Boolean = true,
     sessionId: Int = 1,
     segmentIndex: Int = 0,
     elapsedInSegmentSec: Int = 0,
@@ -195,10 +195,10 @@ class CoachEngineTest {
     intensityOffsetPct: Int = 0,
     ergEnabled: Boolean = false
   ): CoachEngine.Input = CoachEngine.Input(
-    elapsedSec = elapsedSec,
     activeSec = activeSec,
     isRunning = isRunning,
     isComplete = isComplete,
+    hasPlan = hasPlan,
     sessionId = sessionId,
     segmentIndex = segmentIndex,
     elapsedInSegmentSec = elapsedInSegmentSec,

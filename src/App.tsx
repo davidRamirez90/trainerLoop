@@ -1722,6 +1722,16 @@ function App() {
                 </button>
               )}
             </div>
+            {trainer.status === 'connected' && (
+              <button
+                className="device-continue-btn"
+                type="button"
+                onClick={() => setCurrentView('workout')}
+              >
+                Continue to Workout Mode
+                <span aria-hidden="true">→</span>
+              </button>
+            )}
           </div>
         </section>
 

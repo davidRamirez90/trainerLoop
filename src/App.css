@@ -2929,6 +2929,37 @@
   color: var(--accent-warning);
 }
 
+.device-continue-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--accent-primary);
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.device-continue-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(101, 199, 255, 0.25);
+}
+
+.device-continue-btn span {
+  transition: transform 0.2s ease;
+}
+
+.device-continue-btn:hover span {
+  transform: translateX(3px);
+}
+
 .nav-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

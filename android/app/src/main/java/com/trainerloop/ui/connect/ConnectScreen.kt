@@ -149,6 +149,17 @@ fun ConnectScreen(
         )
       }
     }
+
+    val canContinue = uiState.connectedTrainer != null
+    if (canContinue) {
+      Spacer(modifier = Modifier.height(16.dp))
+      Button(
+        onClick = onNavigateToLibrary,
+        modifier = Modifier.fillMaxWidth()
+      ) {
+        Text("Continue to Workout Library")
+      }
+    }
   }
 
   // Error snackbar

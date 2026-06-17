@@ -33,10 +33,10 @@ class CoachEngine(
   private var completionLogged = false
 
   data class Input(
-    val elapsedSec: Int,
     val activeSec: Int,
     val isRunning: Boolean,
     val isComplete: Boolean,
+    val hasPlan: Boolean,
     val sessionId: Int,
     val segmentIndex: Int,
     val elapsedInSegmentSec: Int,
@@ -121,7 +121,7 @@ class CoachEngine(
         }
       }
 
-      if (currentSegment.phase == SegmentPhase.RECOVERY && metrics != null && canSuggest(input.activeSec)) {
+      if (currentSegment.phase == SegmentPhase.RECOVERY && metrics != null && canSuggest(input)) {
         if (metrics.adherencePct <= profile.rules.targetAdherenceIntervene &&
           metrics.hrDriftPct >= profile.rules.hrDriftWarn
         ) {
@@ -166,7 +166,7 @@ class CoachEngine(
     }
     if (!meetsFailure) return
     if (rejectedDownSuggestions.takeLast(2).size < 2) return
-    if (!canSuggest(input.activeSec)) return
+    if (!canSuggest(input)) return
 
     val action = CoachAction.SkipRemainingOnIntervals
     addSuggestion(
@@ -183,7 +183,7 @@ class CoachEngine(
 
   private fun evaluateWorkSegment(input: Input) {
     if (input.elapsedInSegmentSec < ADHERENCE_WINDOW_SEC) return
-    if (!canSuggest(input.activeSec)) return
+    if (!canSuggest(input)) return
 
     val targetMid = (input.targetRange.low + input.targetRange.high) / 2.0
     val recent = computeMetrics(
@@ -256,11 +256,13 @@ class CoachEngine(
     }
   }
 
-  private fun canSuggest(activeSec: Int): Boolean {
-    if (activeSec < profile.rules.minElapsedSecondsForSuggestions) return false
+  private fun canSuggest(input: Input): Boolean {
+    if (!input.hasPlan) return false
+    if (!input.isRunning) return false
+    if (input.activeSec < profile.rules.minElapsedSecondsForSuggestions) return false
     if (_pendingSuggestion.value != null) return false
     val lastAt = lastSuggestionAtSec
-    if (lastAt != null && activeSec - lastAt < profile.rules.cooldownSeconds) return false
+    if (lastAt != null && input.activeSec - lastAt < profile.rules.cooldownSeconds) return false
     return true
   }
 
