@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.model.Workout
+import com.trainerloop.ui.coach.CoachPanel
 import com.trainerloop.ui.components.IntervalTimeline
 import com.trainerloop.ui.components.MetricCard
 
@@ -135,6 +136,17 @@ fun WorkoutScreen(
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.error
       )
+    }
+
+    // Coach panel (collapsible — shown when there's a suggestion)
+    if (uiState.pendingSuggestion != null || uiState.coachEvents.isNotEmpty()) {
+      CoachPanel(
+        pendingSuggestion = uiState.pendingSuggestion,
+        events = uiState.coachEvents,
+        onAccept = { uiState.pendingSuggestion?.let { viewModel.acceptSuggestion(it.id) } },
+        onReject = { uiState.pendingSuggestion?.let { viewModel.rejectSuggestion(it.id) } }
+      )
+      Spacer(modifier = Modifier.height(8.dp))
     }
 
     Spacer(modifier = Modifier.weight(1f))
