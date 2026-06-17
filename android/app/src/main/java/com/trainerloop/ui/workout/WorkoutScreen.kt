@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalView
 import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.ui.components.IntervalTimeline
 import com.trainerloop.ui.components.MetricCard
+import com.trainerloop.ui.workout.WorkoutFinishData
 
 @Composable
 fun WorkoutScreen(
@@ -39,11 +40,19 @@ fun WorkoutScreen(
   viewModel: WorkoutViewModel = viewModel(
     factory = WorkoutViewModelFactory(workout)
   ),
-  onFinish: () -> Unit
+  onSessionFinished: (WorkoutFinishData) -> Unit
 ) {
   val uiState by viewModel.uiState.collectAsState()
+  val finishData by viewModel.finishEvent.collectAsState()
   val view = LocalView.current
   val context = LocalContext.current
+
+  LaunchedEffect(finishData) {
+    finishData?.let {
+      viewModel.consumeFinishEvent()
+      onSessionFinished(it)
+    }
+  }
 
   // Keep screen on during workout
   DisposableEffect(uiState.isRunning) {
@@ -238,7 +247,7 @@ fun WorkoutScreen(
       }
       if (uiState.isComplete) {
         Button(
-          onClick = onFinish,
+          onClick = { viewModel.maybeEmitFinish() },
           modifier = Modifier.weight(1f)
         ) {
           Text("Finish")

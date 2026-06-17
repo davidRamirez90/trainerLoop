@@ -2,6 +2,9 @@ package com.trainerloop.ui.workout
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trainerloop.ble.FtmsControlManager
+import com.trainerloop.ble.FtmsManager
+import com.trainerloop.ble.HrManager
 import com.trainerloop.data.model.CoachEvent
 import com.trainerloop.data.model.CoachInterventions
 import com.trainerloop.data.model.CoachMessages
@@ -14,12 +17,17 @@ import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.repository.SessionRepository
 import com.trainerloop.domain.CoachEngine
+import com.trainerloop.domain.TelemetryRecorder
 import com.trainerloop.domain.WorkoutClock
 import com.trainerloop.domain.WorkoutMath
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 data class WorkoutUiState(
@@ -44,8 +52,25 @@ data class WorkoutUiState(
   val coachEvents: List<CoachEvent> = emptyList()
 )
 
+data class WorkoutFinishData(
+  val workoutName: String,
+  val startTimeMs: Long,
+  val samples: List<TelemetrySample>
+)
+
+private data class WorkoutControlTick(
+  val elapsedSec: Int,
+  val running: Boolean,
+  val ergEnabled: Boolean,
+  val targetRange: TargetRange,
+  val offsetPct: Int
+)
+
 class WorkoutViewModel(
   private val workout: Workout,
+  private val ftmsManager: FtmsManager? = null,
+  private val hrManager: HrManager? = null,
+  private val ftmsControlManager: FtmsControlManager? = null,
   private val sessionRepository: SessionRepository? = null
 ) : ViewModel() {
 
@@ -55,11 +80,37 @@ class WorkoutViewModel(
   private val _uiState = MutableStateFlow(WorkoutUiState())
   val uiState: StateFlow<WorkoutUiState> = _uiState.asStateFlow()
 
-  private var pendingSamples = mutableListOf<TelemetrySample>()
+  private val _finishEvent = MutableStateFlow<WorkoutFinishData?>(null)
+  val finishEvent: StateFlow<WorkoutFinishData?> = _finishEvent.asStateFlow()
+
+  private val telemetryRecorder: TelemetryRecorder? =
+    if (ftmsManager != null && hrManager != null) {
+      TelemetryRecorder(clock, ftmsManager, hrManager)
+    } else null
+
+  private var ergWriteJob: Job? = null
 
   init {
+    telemetryRecorder?.startCollecting()
+
     viewModelScope.launch {
-      clock.elapsedSec.collect { elapsed ->
+      telemetryRecorder?.latest?.collect { sample ->
+        _uiState.value = _uiState.value.copy(
+          currentPowerWatts = sample.powerWatts,
+          currentCadenceRpm = sample.cadenceRpm,
+          currentHrBpm = sample.hrBpm
+        )
+      }
+    }
+
+    viewModelScope.launch {
+      telemetryRecorder?.samples?.collect { samples ->
+        _uiState.value = _uiState.value.copy(samples = samples)
+      }
+    }
+
+    viewModelScope.launch {
+      clock.elapsedSec.collect {
         updateFromClock()
         tickCoach()
       }
@@ -72,7 +123,10 @@ class WorkoutViewModel(
     viewModelScope.launch {
       clock.isComplete.collect { complete ->
         _uiState.value = _uiState.value.copy(isComplete = complete)
-        if (complete) tickCoach()
+        if (complete) {
+          tickCoach()
+          maybeEmitFinish()
+        }
       }
     }
     viewModelScope.launch {
@@ -85,28 +139,58 @@ class WorkoutViewModel(
         _uiState.value = _uiState.value.copy(pendingSuggestion = suggestion)
       }
     }
+
+    viewModelScope.launch {
+      combine(
+        clock.elapsedSec,
+        _uiState.map { it.isRunning }.distinctUntilChanged(),
+        _uiState.map { it.isErgEnabled }.distinctUntilChanged(),
+        _uiState.map { it.targetRange }.distinctUntilChanged(),
+        _uiState.map { it.intensityOffsetPct }.distinctUntilChanged()
+      ) { elapsedSec, running, ergEnabled, targetRange, offset ->
+        WorkoutControlTick(elapsedSec, running, ergEnabled, targetRange, offset)
+      }.collect { tick ->
+        handleControlTick(tick)
+      }
+    }
   }
 
   fun start() {
     clock.start()
     updateFromClock()
+    viewModelScope.launch {
+      if (ftmsControlManager?.status?.value == com.trainerloop.ble.FtmsControlStatus.READY) {
+        ftmsControlManager.startResume()
+      }
+    }
   }
 
   fun pause() {
     clock.pause()
+    viewModelScope.launch {
+      ftmsControlManager?.stopPause(stop = false)
+    }
   }
 
   fun resume() {
     clock.resume()
     updateFromClock()
+    viewModelScope.launch {
+      if (ftmsControlManager?.status?.value == com.trainerloop.ble.FtmsControlStatus.READY) {
+        ftmsControlManager.startResume()
+      }
+    }
   }
 
   fun stop() {
     clock.stop()
+    viewModelScope.launch {
+      ftmsControlManager?.stopPause(stop = true)
+    }
     _uiState.value = _uiState.value.copy(
-      samples = emptyList(),
       intensityOffsetPct = 0
     )
+    _finishEvent.value = null
   }
 
   fun seek(seconds: Int) {
@@ -114,21 +198,15 @@ class WorkoutViewModel(
     updateFromClock()
   }
 
-  fun setTelemetry(power: Int, cadence: Int, hr: Int) {
-    val state = _uiState.value
-    val sample = TelemetrySample(
-      timeSec = state.elapsedSec,
-      powerWatts = power,
-      cadenceRpm = cadence,
-      hrBpm = hr
-    )
-    pendingSamples.add(sample)
-    _uiState.value = state.copy(
-      currentPowerWatts = power,
-      currentCadenceRpm = cadence,
-      currentHrBpm = hr,
-      samples = pendingSamples.toList()
-    )
+  fun skipSegment() {
+    val nextSegmentStart = _uiState.value.segmentEndSec
+    if (nextSegmentStart < WorkoutMath.totalDurationSec(workout.segments)) {
+      seek(nextSegmentStart)
+    }
+  }
+
+  fun consumeFinishEvent() {
+    _finishEvent.value = null
   }
 
   fun toggleErg() {
@@ -149,6 +227,18 @@ class WorkoutViewModel(
     _uiState.value = _uiState.value.copy(intensityOffsetPct = newOffset)
   }
 
+  fun fineIntensityUp() {
+    val current = _uiState.value.intensityOffsetPct
+    val newOffset = (current + 1).coerceAtMost(20)
+    _uiState.value = _uiState.value.copy(intensityOffsetPct = newOffset)
+  }
+
+  fun fineIntensityDown() {
+    val current = _uiState.value.intensityOffsetPct
+    val newOffset = (current - 1).coerceAtLeast(-20)
+    _uiState.value = _uiState.value.copy(intensityOffsetPct = newOffset)
+  }
+
   // Coach suggestion handlers
   fun acceptSuggestion(suggestionId: String) {
     viewModelScope.launch {
@@ -162,21 +252,36 @@ class WorkoutViewModel(
     }
   }
 
+  private fun handleControlTick(tick: WorkoutControlTick) {
+    if (!tick.running || tick.targetRange == TargetRange(0, 0)) return
+    if (!tick.ergEnabled) {
+      ftmsControlManager?.let { control ->
+        ergWriteJob?.cancel()
+        ergWriteJob = viewModelScope.launch { control.stopPause(stop = false) }
+      }
+      return
+    }
+    val mid = (tick.targetRange.low + tick.targetRange.high) / 2
+    val factor = 1.0 + tick.offsetPct / 100.0
+    val target = (mid * factor).toInt().coerceIn(0, 2000)
+    ftmsControlManager?.let { control ->
+      ergWriteJob?.cancel()
+      ergWriteJob = viewModelScope.launch { control.setTargetPower(target) }
+    }
+  }
+
+  fun maybeEmitFinish() {
+    val state = _uiState.value
+    if (state.samples.isEmpty()) return
+    _finishEvent.value = WorkoutFinishData(
+      workoutName = workout.name,
+      startTimeMs = System.currentTimeMillis() - state.elapsedSec * 1000L,
+      samples = state.samples
+    )
+  }
+
   private fun tickCoach() {
     val state = _uiState.value
-    // Build a synthetic TelemetrySample for each tick so the coach
-    // can evaluate adherence. For real usage, samples come from BLE.
-    if (state.elapsedSec > 0 && pendingSamples.lastOrNull()?.timeSec != state.elapsedSec) {
-      val sample = TelemetrySample(
-        timeSec = state.elapsedSec,
-        powerWatts = state.currentPowerWatts,
-        cadenceRpm = state.currentCadenceRpm,
-        hrBpm = state.currentHrBpm
-      )
-      pendingSamples.add(sample)
-      _uiState.value = state.copy(samples = pendingSamples.toList())
-    }
-
     viewModelScope.launch {
       coachEngine.tick(
         CoachEngine.Input(
@@ -227,6 +332,7 @@ class WorkoutViewModel(
 
   override fun onCleared() {
     clock.stop()
+    telemetryRecorder?.reset(clock.sessionId.value)
     super.onCleared()
   }
 

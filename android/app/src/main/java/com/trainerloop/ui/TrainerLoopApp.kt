@@ -46,6 +46,7 @@ import com.trainerloop.ui.workout.detail.WorkoutDetailScreen
 import com.trainerloop.ui.summary.SessionSummaryScreen
 import com.trainerloop.ui.summary.SessionSummaryViewModel
 import com.trainerloop.ui.workout.WorkoutScreen
+import com.trainerloop.ui.workout.WorkoutViewModelFactory
 
 @Composable
 fun TrainerLoopApp(
@@ -135,9 +136,29 @@ fun TrainerLoopApp(
         route = Screen.WorkoutPlayer.route,
         arguments = listOf(navArgument("sessionId") { type = NavType.IntType })
       ) {
+        val context = LocalContext.current
+        val app = context.trainerLoopApp
+        val workout = app.selectedWorkout ?: sampleWorkout
         WorkoutScreen(
-          workout = sampleWorkout,
-          onFinish = { navController.popBackStack() }
+          workout = workout,
+          viewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+            factory = WorkoutViewModelFactory(
+              workout = workout,
+              ftmsManager = app.ftmsManager.value,
+              hrManager = app.hrManager.value,
+              ftmsControlManager = app.ftmsControlManager.value
+            )
+          ),
+          onSessionFinished = { data ->
+            app.pendingSessionSamples = data.samples
+            navController.navigate(
+              Screen.WorkoutComplete.createRoute(
+                sessionId = data.startTimeMs.toString(),
+                workoutName = data.workoutName,
+                startTimeMs = data.startTimeMs
+              )
+            )
+          }
         )
       }
 
