@@ -15,7 +15,6 @@ import com.trainerloop.data.model.CoachVoice
 import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.model.Workout
-import com.trainerloop.data.repository.SessionRepository
 import com.trainerloop.domain.CoachEngine
 import com.trainerloop.domain.TelemetryRecorder
 import com.trainerloop.domain.WorkoutClock
@@ -70,8 +69,7 @@ class WorkoutViewModel(
   private val workout: Workout,
   private val ftmsManager: FtmsManager? = null,
   private val hrManager: HrManager? = null,
-  private val ftmsControlManager: FtmsControlManager? = null,
-  private val sessionRepository: SessionRepository? = null
+  private val ftmsControlManager: FtmsControlManager? = null
 ) : ViewModel() {
 
   private val clock = WorkoutClock(workout.segments, Dispatchers.Default)
