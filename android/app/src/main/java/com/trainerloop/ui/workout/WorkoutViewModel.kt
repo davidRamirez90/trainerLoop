@@ -19,6 +19,7 @@ import com.trainerloop.domain.CoachEngine
 import com.trainerloop.domain.TelemetryRecorder
 import com.trainerloop.domain.WorkoutClock
 import com.trainerloop.domain.WorkoutMath
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -69,10 +70,11 @@ class WorkoutViewModel(
   private val workout: Workout,
   private val ftmsManager: FtmsManager? = null,
   private val hrManager: HrManager? = null,
-  private val ftmsControlManager: FtmsControlManager? = null
+  private val ftmsControlManager: FtmsControlManager? = null,
+  private val dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
-  private val clock = WorkoutClock(workout.segments, Dispatchers.Default)
+  private val clock = WorkoutClock(workout.segments, dispatcher)
   private val coachEngine = CoachEngine(defaultProfile(), workout.segments)
 
   private val _uiState = MutableStateFlow(WorkoutUiState())
@@ -83,7 +85,7 @@ class WorkoutViewModel(
 
   private val telemetryRecorder: TelemetryRecorder? =
     if (ftmsManager != null) {
-      TelemetryRecorder(clock, ftmsManager, hrManager)
+      TelemetryRecorder(clock, ftmsManager, hrManager, dispatcher)
     } else null
 
   private var wasErgEnabled: Boolean = true

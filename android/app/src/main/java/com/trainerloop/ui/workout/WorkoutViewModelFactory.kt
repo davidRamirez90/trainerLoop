@@ -6,12 +6,15 @@ import com.trainerloop.ble.FtmsControlManager
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
 import com.trainerloop.data.model.Workout
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 
 class WorkoutViewModelFactory(
   private val workout: Workout,
   private val ftmsManager: FtmsManager? = null,
   private val hrManager: HrManager? = null,
-  private val ftmsControlManager: FtmsControlManager? = null
+  private val ftmsControlManager: FtmsControlManager? = null,
+  private val dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModelProvider.Factory {
 
   @Suppress("UNCHECKED_CAST")
@@ -21,7 +24,8 @@ class WorkoutViewModelFactory(
         workout,
         ftmsManager,
         hrManager,
-        ftmsControlManager
+        ftmsControlManager,
+        dispatcher
       ) as T
     }
     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

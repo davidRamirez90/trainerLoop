@@ -28,13 +28,15 @@ class TelemetryRecorder(
   constructor(
     clock: WorkoutClock,
     ftms: FtmsManager,
-    hr: HrManager? = null
+    hr: HrManager? = null,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default
   ) : this(
     clock,
     DataProvider(
       data = ftms.data,
       heartRate = hr?.heartRate ?: MutableStateFlow<Int?>(null).asStateFlow()
-    )
+    ),
+    dispatcher
   )
 
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
