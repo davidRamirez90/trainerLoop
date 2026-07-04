@@ -7,5 +7,7 @@ data class UserProfile(
   val maxHr: Int = 190,
   val restingHr: Int = 55,
   val ergBiasPct: Int = 0,
-  val selectedCoachProfileId: String = "default"
+  val selectedCoachProfileId: String = "default",
+  val intervalsIcuAthleteId: String = "",
+  val intervalsIcuApiKey: String = ""
 )

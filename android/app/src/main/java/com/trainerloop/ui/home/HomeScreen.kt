@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.model.SessionSummary
+import com.trainerloop.ui.components.MetricBadge
 import com.trainerloop.ui.theme.Green40
 
 @SuppressLint("MissingPermission")
@@ -156,30 +157,6 @@ private fun RiderHeader(
         MetricBadge(label = "FTP", value = "$ftp W")
         MetricBadge(label = "Weight", value = "${"%.1f".format(weightKg)} kg")
       }
-    }
-  }
-}
-
-@Composable
-private fun MetricBadge(label: String, value: String) {
-  Surface(
-    shape = RoundedCornerShape(16.dp),
-    color = MaterialTheme.colorScheme.surfaceVariant
-  ) {
-    Row(
-      modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      Text(
-        text = "$label: ",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
-      Text(
-        text = value,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.SemiBold
-      )
     }
   }
 }

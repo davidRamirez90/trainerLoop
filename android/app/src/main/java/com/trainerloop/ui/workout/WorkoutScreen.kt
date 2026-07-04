@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -27,12 +29,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -44,6 +50,7 @@ import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
 import com.trainerloop.ui.components.WorkoutChart
+import com.trainerloop.ui.components.zoneColor
 import com.trainerloop.ui.theme.Green40
 import com.trainerloop.ui.workout.WorkoutStatsPager
 
@@ -51,15 +58,22 @@ import com.trainerloop.ui.workout.WorkoutStatsPager
 @Composable
 fun WorkoutScreen(
   workout: Workout,
-  viewModel: WorkoutViewModel = viewModel(
-    factory = WorkoutViewModelFactory(workout)
-  ),
-  onSessionFinished: (WorkoutFinishData) -> Unit
+  viewModel: WorkoutViewModel,
+  onSessionFinished: (WorkoutFinishData) -> Unit,
+  onExit: () -> Unit
 ) {
   val uiState by viewModel.uiState.collectAsState()
   val finishData by viewModel.finishEvent.collectAsState()
   val view = LocalView.current
   val context = LocalContext.current
+  val ftp = remember { com.trainerloop.data.repository.ProfileRepository(context).getProfileSync().ftp }
+  var showStopConfirm by remember { mutableStateOf(false) }
+
+  fun requestStop() {
+    if (uiState.elapsedSec == 0) onExit() else showStopConfirm = true
+  }
+
+  BackHandler(enabled = uiState.elapsedSec > 0) { showStopConfirm = true }
 
   LaunchedEffect(finishData) {
     finishData?.let {
@@ -94,7 +108,7 @@ fun WorkoutScreen(
       TopAppBar(
         title = { Text(workout.name) },
         navigationIcon = {
-          IconButton(onClick = { viewModel.stop() }) {
+          IconButton(onClick = { requestStop() }) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
           }
         },
@@ -163,7 +177,8 @@ fun WorkoutScreen(
           value = uiState.currentPowerWatts.toString(),
           unit = "W",
           modifier = Modifier.weight(1f),
-          highlight = true
+          highlight = true,
+          valueColor = zoneColor(uiState.currentPowerWatts, ftp).copy(alpha = 1f)
         )
         BigMetric(
           label = "HR",
@@ -210,6 +225,7 @@ fun WorkoutScreen(
           workout = workout,
           samples = uiState.samples,
           elapsedSec = uiState.elapsedSec,
+          ftp = ftp,
           modifier = Modifier.fillMaxWidth()
         )
 
@@ -317,7 +333,7 @@ fun WorkoutScreen(
         }
 
         Button(
-          onClick = { viewModel.stop() },
+          onClick = { requestStop() },
           colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
         ) {
           Icon(Icons.Default.Stop, contentDescription = null)
@@ -337,6 +353,27 @@ fun WorkoutScreen(
       Spacer(modifier = Modifier.height(8.dp))
     }
   }
+
+  if (showStopConfirm) {
+    AlertDialog(
+      onDismissRequest = { showStopConfirm = false },
+      title = { Text("End workout?") },
+      text = { Text("Your ride will be saved.") },
+      confirmButton = {
+        TextButton(onClick = {
+          showStopConfirm = false
+          viewModel.stop()
+        }) {
+          Text("End")
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { showStopConfirm = false }) {
+          Text("Cancel")
+        }
+      }
+    )
+  }
 }
 
 @Composable
@@ -345,7 +382,8 @@ private fun BigMetric(
   value: String,
   unit: String,
   modifier: Modifier = Modifier,
-  highlight: Boolean = false
+  highlight: Boolean = false,
+  valueColor: androidx.compose.ui.graphics.Color? = null
 ) {
   Card(
     modifier = modifier,
@@ -368,10 +406,13 @@ private fun BigMetric(
       Row(verticalAlignment = Alignment.Bottom) {
         Text(
           text = value,
-          style = MaterialTheme.typography.headlineMedium,
+          style = MaterialTheme.typography.headlineLarge.copy(
+            fontFeatureSettings = "tnum"
+          ),
           fontWeight = FontWeight.Bold,
-          color = if (highlight) MaterialTheme.colorScheme.onPrimaryContainer
-          else MaterialTheme.colorScheme.onSurface
+          color = valueColor
+            ?: if (highlight) MaterialTheme.colorScheme.onPrimaryContainer
+            else MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.width(2.dp))
         Text(

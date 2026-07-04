@@ -9,6 +9,9 @@ import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
+import com.trainerloop.data.repository.ProfileRepository
+import com.trainerloop.data.source.remote.IntervalsIcuClient
+import com.trainerloop.domain.WorkoutImporter
 import com.trainerloop.domain.WorkoutSummaryMath
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import java.io.File
+import java.time.LocalDate
 
 enum class WorkoutCategory(val label: String) {
   ALL("All"),
@@ -38,18 +42,25 @@ data class LibraryUiState(
   val filteredWorkouts: List<WorkoutListItem> = emptyList(),
   val categories: List<WorkoutCategory> = WorkoutCategory.entries,
   val isLoading: Boolean = false,
-  val error: String? = null
+  val error: String? = null,
+  val canSync: Boolean = false,
+  val isSyncing: Boolean = false
 )
 
 class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(application) {
 
   private val importFile = File(application.filesDir, "imported_workouts.json")
+  private val profileRepository = ProfileRepository(application)
 
   private val _uiState = MutableStateFlow(LibraryUiState())
   val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
   init {
     loadWorkouts()
+    val profile = profileRepository.getProfileSync()
+    _uiState.value = _uiState.value.copy(
+      canSync = profile.intervalsIcuAthleteId.isNotBlank() && profile.intervalsIcuApiKey.isNotBlank()
+    )
   }
 
   fun onSearchQueryChange(query: String) {
@@ -99,6 +110,39 @@ class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(appli
           isLoading = false,
           error = "Failed to import workout"
         )
+      }
+    }
+  }
+
+  fun sync() {
+    val profile = profileRepository.getProfileSync()
+    val athleteId = profile.intervalsIcuAthleteId
+    val apiKey = profile.intervalsIcuApiKey
+    if (athleteId.isBlank() || apiKey.isBlank()) return
+
+    _uiState.value = _uiState.value.copy(isSyncing = true, error = null)
+    viewModelScope.launch {
+      try {
+        val client = IntervalsIcuClient(apiKey)
+
+        val athlete = client.getAthlete(athleteId)
+        athlete.ftp?.let { ftp -> profileRepository.updateFtp(ftp) }
+        athlete.icu_weight?.let { weight -> profileRepository.updateWeight(weight) }
+
+        val today = LocalDate.now().toString()
+        val events = client.getTodaysWorkoutEvents(athleteId, today)
+        val ftp = profileRepository.getProfileSync().ftp
+        events.forEach { event ->
+          val zwo = client.downloadZwo(athleteId, event.id)
+          val name = event.name ?: "intervals_${event.id}"
+          val workout = WorkoutImporter.import("$name.zwo", zwo, ftp)
+          saveImportedWorkout(ImportedWorkout(fileName = "$name.zwo", workout = workout))
+        }
+
+        loadWorkouts()
+        _uiState.value = _uiState.value.copy(isSyncing = false)
+      } catch (e: Exception) {
+        _uiState.value = _uiState.value.copy(isSyncing = false, error = "Sync failed: ${e.message}")
       }
     }
   }

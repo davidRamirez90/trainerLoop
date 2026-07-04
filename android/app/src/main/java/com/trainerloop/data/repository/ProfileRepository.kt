@@ -48,6 +48,10 @@ open class ProfileRepository(context: Context) {
     updateProfile { it.copy(selectedCoachProfileId = profileId) }
   }
 
+  suspend fun updateIntervalsIcuCredentials(athleteId: String, apiKey: String) {
+    updateProfile { it.copy(intervalsIcuAthleteId = athleteId, intervalsIcuApiKey = apiKey) }
+  }
+
   private fun load(): UserProfile {
     return UserProfile(
       name = prefs.getString(KEY_NAME, "Rider") ?: "Rider",
@@ -56,7 +60,9 @@ open class ProfileRepository(context: Context) {
       maxHr = prefs.getInt(KEY_MAX_HR, 190),
       restingHr = prefs.getInt(KEY_RESTING_HR, 55),
       ergBiasPct = prefs.getInt(KEY_ERG_BIAS, 0),
-      selectedCoachProfileId = prefs.getString(KEY_COACH_PROFILE, "default") ?: "default"
+      selectedCoachProfileId = prefs.getString(KEY_COACH_PROFILE, "default") ?: "default",
+      intervalsIcuAthleteId = prefs.getString(KEY_INTERVALS_ATHLETE_ID, "") ?: "",
+      intervalsIcuApiKey = prefs.getString(KEY_INTERVALS_API_KEY, "") ?: ""
     )
   }
 
@@ -69,6 +75,8 @@ open class ProfileRepository(context: Context) {
       .putInt(KEY_RESTING_HR, profile.restingHr)
       .putInt(KEY_ERG_BIAS, profile.ergBiasPct)
       .putString(KEY_COACH_PROFILE, profile.selectedCoachProfileId)
+      .putString(KEY_INTERVALS_ATHLETE_ID, profile.intervalsIcuAthleteId)
+      .putString(KEY_INTERVALS_API_KEY, profile.intervalsIcuApiKey)
       .apply()
   }
 
@@ -81,5 +89,7 @@ open class ProfileRepository(context: Context) {
     private const val KEY_ERG_BIAS = "erg_bias"
     private const val KEY_COACH_PROFILE = "coach_profile"
     private const val KEY_NAME = "name"
+    private const val KEY_INTERVALS_ATHLETE_ID = "intervals_icu_athlete_id"
+    private const val KEY_INTERVALS_API_KEY = "intervals_icu_api_key"
   }
 }

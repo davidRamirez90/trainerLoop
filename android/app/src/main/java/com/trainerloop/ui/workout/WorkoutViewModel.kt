@@ -27,8 +27,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class WorkoutUiState(
   val isRunning: Boolean = false,
@@ -66,11 +72,18 @@ private data class WorkoutControlTick(
   val targetRange: TargetRange
 )
 
+/**
+ * @param ftmsManagerFlow the application-owned [FtmsManager] state. Pass the
+ *   `StateFlow` (not a snapshot) so a manager that appears *after* this
+ *   ViewModel is created still wires into the recorder.
+ * @param hrManagerFlow same idea for the HR sensor.
+ */
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class WorkoutViewModel(
   private val workout: Workout,
-  private val ftmsManager: FtmsManager? = null,
-  private val hrManager: HrManager? = null,
-  private val ftmsControlManager: FtmsControlManager? = null,
+  private val ftmsManagerFlow: StateFlow<FtmsManager?> = MutableStateFlow(null),
+  private val hrManagerFlow: StateFlow<HrManager?> = MutableStateFlow(null),
+  private val ftmsControlManagerFlow: StateFlow<FtmsControlManager?> = MutableStateFlow(null),
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : ViewModel() {
 
@@ -83,32 +96,65 @@ class WorkoutViewModel(
   private val _finishEvent = MutableStateFlow<WorkoutFinishData?>(null)
   val finishEvent: StateFlow<WorkoutFinishData?> = _finishEvent.asStateFlow()
 
-  private val telemetryRecorder: TelemetryRecorder? =
-    if (ftmsManager != null) {
-      TelemetryRecorder(clock, ftmsManager, hrManager, dispatcher)
-    } else null
+  /**
+   * The active recorder. Replaced when [ftmsManagerFlow] / [hrManagerFlow]
+   * change, so a manager that attaches after this ViewModel was created (or
+   * one that reattaches after a disconnect) is picked up.
+   */
+  private val recorder = MutableStateFlow<TelemetryRecorder?>(null)
 
   private var wasErgEnabled: Boolean = true
 
   private var ergWriteJob: Job? = null
 
   init {
-    telemetryRecorder?.startCollecting()
-
+    // (Re)create the recorder whenever the manager references change.
     viewModelScope.launch {
-      telemetryRecorder?.latest?.collect { sample ->
-        _uiState.value = _uiState.value.copy(
-          currentPowerWatts = sample.powerWatts,
-          currentCadenceRpm = sample.cadenceRpm,
-          currentHrBpm = sample.hrBpm
-        )
-      }
+      combine(ftmsManagerFlow, hrManagerFlow) { ftms, hr -> ftms to hr }
+        .distinctUntilChanged()
+        .collect { (ftms, hr) ->
+          val previous = recorder.value
+          val next = if (ftms != null) {
+            TelemetryRecorder(clock, ftms, hr, dispatcher).also { it.startCollecting() }
+          } else null
+          recorder.value = next
+          previous?.stop()
+          com.trainerloop.ble.BleLog.d(
+            "VM recorder swap: ftms=${ftms?.device?.address} hr=${hr?.device?.address}"
+          )
+        }
     }
 
+    // Power + cadence via the recorder (1 Hz, gated by clock).
     viewModelScope.launch {
-      telemetryRecorder?.samples?.collect { samples ->
-        _uiState.value = _uiState.value.copy(samples = samples)
-      }
+      recorder
+        .flatMapLatest { r ->
+          if (r == null) flowOf(emptySample())
+          else r.latest
+        }
+        .collect { sample ->
+          _uiState.value = _uiState.value.copy(
+            currentPowerWatts = sample.powerWatts,
+            currentCadenceRpm = sample.cadenceRpm
+          )
+        }
+    }
+
+    // Samples list (for the chart).
+    viewModelScope.launch {
+      recorder
+        .flatMapLatest { r -> r?.samples ?: flowOf(emptyList()) }
+        .collect { samples -> _uiState.value = _uiState.value.copy(samples = samples) }
+    }
+
+    // Fast-path HR: bypass the recorder entirely so the displayed HR
+    // updates the instant an HR packet arrives instead of waiting for the
+    // next 1 Hz clock tick.
+    viewModelScope.launch {
+      hrManagerFlow
+        .flatMapLatest { hr -> hr?.heartRate ?: flowOf(null) }
+        .filterNotNull()
+        .collect { bpm -> _uiState.value = _uiState.value.copy(currentHrBpm = bpm) }
     }
 
     viewModelScope.launch {
@@ -159,41 +205,33 @@ class WorkoutViewModel(
   fun start() {
     clock.start()
     updateFromClock()
-    viewModelScope.launch {
-      if (ftmsControlManager?.status?.value == com.trainerloop.ble.FtmsControlStatus.READY) {
-        ftmsControlManager.startResume()
-      }
-    }
+    sendControlWhenReady { it.startResume() }
   }
 
   fun pause() {
     clock.pause()
     viewModelScope.launch {
-      ftmsControlManager?.stopPause(stop = false)
+      controlNow()?.stopPause(stop = false)
     }
   }
 
   fun resume() {
     clock.resume()
     updateFromClock()
-    viewModelScope.launch {
-      if (ftmsControlManager?.status?.value == com.trainerloop.ble.FtmsControlStatus.READY) {
-        ftmsControlManager.startResume()
-      }
-    }
+    sendControlWhenReady { it.startResume() }
   }
 
   fun stop() {
     clock.stop()
     viewModelScope.launch {
-      ftmsControlManager?.stopPause(stop = true)
+      controlNow()?.stopPause(stop = true)
     }
-    telemetryRecorder?.reset(clock.sessionId.value)
+    maybeEmitFinish()
+    recorder.value?.reset(clock.sessionId.value)
     _uiState.value = _uiState.value.copy(
       intensityOffsetPct = 0,
       samples = emptyList()
     )
-    _finishEvent.value = null
   }
 
   fun seek(seconds: Int) {
@@ -260,7 +298,7 @@ class WorkoutViewModel(
 
     if (!tick.ergEnabled) {
       if (wasErgEnabled) {
-        ftmsControlManager?.let { control ->
+        controlNow()?.let { control ->
           ergWriteJob?.cancel()
           ergWriteJob = viewModelScope.launch { control.stopPause(stop = false) }
         }
@@ -272,9 +310,43 @@ class WorkoutViewModel(
     wasErgEnabled = true
 
     val target = (tick.targetRange.low + tick.targetRange.high) / 2
-    ftmsControlManager?.let { control ->
+    controlNow()?.let { control ->
       ergWriteJob?.cancel()
       ergWriteJob = viewModelScope.launch { control.setTargetPower(target.coerceIn(0, 2000)) }
+    }
+  }
+
+  private fun controlNow(): FtmsControlManager? = ftmsControlManagerFlow.value
+
+  /**
+   * Sends a control command once the FTMS control point reports READY.
+   *
+   * Previously [start]/[resume] checked `status == READY` exactly once and
+   * dropped the command if the trainer hadn't acked Request Control yet —
+   * which, with the old indicate-armed-as-notify bug, was always. Now we
+   * wait (bounded) for READY so Start/Resume actually reaches the trainer.
+   */
+  private fun sendControlWhenReady(action: suspend (FtmsControlManager) -> Unit) {
+    val control = controlNow() ?: run {
+      com.trainerloop.ble.BleLog.w("sendControlWhenReady: no control manager attached")
+      return
+    }
+    viewModelScope.launch {
+      if (control.status.value == com.trainerloop.ble.FtmsControlStatus.READY) {
+        action(control)
+        return@launch
+      }
+      val ready = withTimeoutOrNull(CONTROL_READY_TIMEOUT_MS) {
+        control.status.filter { it == com.trainerloop.ble.FtmsControlStatus.READY }.first()
+      }
+      if (ready != null) {
+        action(control)
+      } else {
+        com.trainerloop.ble.BleLog.w(
+          "sendControlWhenReady: timed out after ${CONTROL_READY_TIMEOUT_MS}ms " +
+            "waiting for READY; status=${control.status.value}"
+        )
+      }
     }
   }
 
@@ -342,9 +414,13 @@ class WorkoutViewModel(
   override fun onCleared() {
     clock.stop()
     clock.close()
-    telemetryRecorder?.stop()
+    recorder.value?.stop()
     super.onCleared()
   }
+
+  private fun emptySample() = TelemetrySample(
+    timeSec = 0, powerWatts = 0, cadenceRpm = 0, hrBpm = 0, dropout = true
+  )
 
   companion object {
     private fun defaultProfile(): CoachProfile = CoachProfile(
@@ -385,5 +461,7 @@ class WorkoutViewModel(
         encouragement = emptyList()
       )
     )
+
+    private const val CONTROL_READY_TIMEOUT_MS = 5_000L
   }
 }

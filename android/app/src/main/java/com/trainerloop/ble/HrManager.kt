@@ -25,40 +25,63 @@ class HrManager(
   val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
   suspend fun connect(): Result<Unit> {
+    BleLog.d("HrManager.connect device=${device.address}")
     val conn = BleConnection(context, device)
     connection = conn
 
-    conn.connect().getOrElse { return Result.failure(it) }
-    conn.discoverServices().getOrElse { return Result.failure(it) }
+    conn.connect().getOrElse {
+      BleLog.e("HrManager.connect: connect() failed: ${it.message}")
+      return Result.failure(it)
+    }
+    conn.discoverServices().getOrElse {
+      BleLog.e("HrManager.connect: discoverServices failed: ${it.message}")
+      return Result.failure(it)
+    }
 
     subscribeToNotifications(conn)
 
-    // Auto-resubscribe on reconnect
-    conn.onReconnected = {
-      conn.discoverServices()
+    // Auto-resubscribe on reconnect. Service discovery is re-run once by
+    // BleConnection before handlers fire.
+    conn.addReconnectHandler {
       subscribeToNotifications(conn)
     }
 
     _isConnected.value = true
+    BleLog.d("HrManager.connect success")
     return Result.success(Unit)
   }
 
   private fun subscribeToNotifications(conn: BleConnection) {
     val dataChar = conn.getCharacteristic(BleConstants.HEART_RATE_SERVICE, BleConstants.HEART_RATE_MEASUREMENT)
-    if (dataChar != null) {
-      scope.launch {
+    if (dataChar == null) {
+      BleLog.e(
+        "HR Measurement characteristic NOT FOUND " +
+          "service=${BleConstants.HEART_RATE_SERVICE} char=${BleConstants.HEART_RATE_MEASUREMENT}"
+      )
+      return
+    }
+    BleLog.d("HR characteristic found, enabling notifications")
+    scope.launch {
+      try {
         val notificationFlow = conn.enableNotifications(dataChar)
+        BleLog.d("HR notifications enabled, starting collect")
         notificationFlow.collect { bytes ->
           val hr = HeartRateMeasurementParser.parse(bytes)
           if (hr != null) {
             _heartRate.value = hr
+            BleLog.d("HR update: $hr bpm")
+          } else {
+            BleLog.w("HR parse returned null, dropping ${bytes.size} bytes")
           }
         }
+      } catch (t: Throwable) {
+        BleLog.e("HR notification collector crashed", t)
       }
     }
   }
 
   suspend fun disconnect() {
+    BleLog.d("HrManager.disconnect device=${device.address}")
     connection?.disconnect()
     connection = null
     _isConnected.value = false

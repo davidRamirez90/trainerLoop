@@ -58,6 +58,7 @@ class TelemetryRecorder(
   fun startCollecting() {
     if (collecting) return
     collecting = true
+    com.trainerloop.ble.BleLog.d("TelemetryRecorder.startCollecting")
 
     scope.launch {
       combine(
@@ -94,12 +95,17 @@ class TelemetryRecorder(
             _samples.value = existing + sample
           }
         }
+        com.trainerloop.ble.BleLog.d(
+          "tick t=${elapsedSec}s p=${sample.powerWatts} c=${sample.cadenceRpm} " +
+            "hr=${sample.hrBpm} dropout=${sample.dropout}"
+        )
       }
     }
   }
 
   @Suppress("UNUSED_PARAMETER")
   fun reset(sessionId: Int) {
+    com.trainerloop.ble.BleLog.d("TelemetryRecorder.reset sessionId=$sessionId")
     _samples.value = emptyList()
     lastDataReceivedAtSec = null
     lastPowerWatts = 0

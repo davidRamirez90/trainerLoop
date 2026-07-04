@@ -17,6 +17,8 @@ data class SettingsUiState(
   val restingHr: String = "55",
   val ergBias: String = "0",
   val selectedCoach: String = "default",
+  val intervalsAthleteId: String = "",
+  val intervalsApiKey: String = "",
   val isSaved: Boolean = false
 )
 
@@ -35,7 +37,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
       maxHr = profile.maxHr.toString(),
       restingHr = profile.restingHr.toString(),
       ergBias = profile.ergBiasPct.toString(),
-      selectedCoach = profile.selectedCoachProfileId
+      selectedCoach = profile.selectedCoachProfileId,
+      intervalsAthleteId = profile.intervalsIcuAthleteId,
+      intervalsApiKey = profile.intervalsIcuApiKey
     )
   }
 
@@ -67,6 +71,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     _uiState.value = _uiState.value.copy(selectedCoach = value, isSaved = false)
   }
 
+  fun updateIntervalsAthleteId(value: String) {
+    _uiState.value = _uiState.value.copy(intervalsAthleteId = value, isSaved = false)
+  }
+
+  fun updateIntervalsApiKey(value: String) {
+    _uiState.value = _uiState.value.copy(intervalsApiKey = value, isSaved = false)
+  }
+
   fun save() {
     viewModelScope.launch {
       val state = _uiState.value
@@ -78,7 +90,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
           maxHr = state.maxHr.toIntOrNull() ?: it.maxHr,
           restingHr = state.restingHr.toIntOrNull() ?: it.restingHr,
           ergBiasPct = state.ergBias.toIntOrNull() ?: it.ergBiasPct,
-          selectedCoachProfileId = state.selectedCoach
+          selectedCoachProfileId = state.selectedCoach,
+          intervalsIcuAthleteId = state.intervalsAthleteId.trim(),
+          intervalsIcuApiKey = state.intervalsApiKey.trim()
         )
       }
       _uiState.value = _uiState.value.copy(isSaved = true)

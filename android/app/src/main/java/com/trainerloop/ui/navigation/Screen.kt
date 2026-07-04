@@ -4,7 +4,6 @@ sealed class Screen(val route: String) {
   // Bottom tabs
   object Home : Screen("home")
   object Workouts : Screen("workouts")
-  object Ride : Screen("ride")
   object History : Screen("history")
   object Profile : Screen("profile")
 
@@ -24,6 +23,6 @@ sealed class Screen(val route: String) {
   }
 
   companion object {
-    val bottomTabs = listOf(Home, Workouts, Ride, History, Profile)
+    val bottomTabs = listOf(Home, Workouts, History, Profile)
   }
 }

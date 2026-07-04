@@ -7,10 +7,11 @@ import androidx.core.content.FileProvider
 import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.domain.fit.FitEncoder
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 object FitShareHelper {
-
-  private const val FILENAME = "trainer_loop_workout.fit"
 
   fun createFitFile(
     context: Context,
@@ -18,9 +19,10 @@ object FitShareHelper {
     elapsedSec: Int,
     samples: List<TelemetrySample>
   ): File {
-    val dir = File(context.cacheDir, "fit_exports")
+    val dir = File(context.filesDir, "fit_exports")
     dir.mkdirs()
-    val file = File(dir, FILENAME)
+    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date(startTimeMs))
+    val file = File(dir, "trainer_loop_$timestamp.fit")
     val bytes = FitEncoder.encode(
       startTimeMs = startTimeMs,
       elapsedSec = elapsedSec,

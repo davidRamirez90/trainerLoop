@@ -1,12 +1,9 @@
 package com.trainerloop.ui
 
 import android.app.Application
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
-import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
@@ -19,9 +16,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -39,6 +34,7 @@ import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
 import com.trainerloop.ui.devices.DevicesScreen
 import com.trainerloop.app.trainerLoopApp
+import com.trainerloop.ui.history.HistoryScreen
 import com.trainerloop.ui.home.HomeScreen
 import com.trainerloop.ui.library.WorkoutLibraryScreen
 import com.trainerloop.ui.navigation.Screen
@@ -104,12 +100,8 @@ fun TrainerLoopApp(
         )
       }
 
-      composable(Screen.Ride.route) {
-        PlaceholderScreen("Ride")
-      }
-
       composable(Screen.History.route) {
-        PlaceholderScreen("History")
+        HistoryScreen()
       }
 
       composable(Screen.Profile.route) {
@@ -140,17 +132,20 @@ fun TrainerLoopApp(
         val context = LocalContext.current
         val app = context.trainerLoopApp
         val workout = app.selectedWorkout ?: sampleWorkout
-        val ftmsManager by app.ftmsManager.collectAsState()
-        val hrManager by app.hrManager.collectAsState()
-        val ftmsControlManager by app.ftmsControlManager.collectAsState()
+        // Pass the StateFlows (not the .value snapshot) so the ViewModel
+        // observes manager changes and re-wires when a manager attaches
+        // after the screen was first composed. Previously the control
+        // manager was passed as a snapshot, so if the trainer connected
+        // after the player was opened the ViewModel never saw it and
+        // ERG control silently no-op'd.
         WorkoutScreen(
           workout = workout,
           viewModel = androidx.lifecycle.viewmodel.compose.viewModel(
             factory = WorkoutViewModelFactory(
               workout = workout,
-              ftmsManager = ftmsManager,
-              hrManager = hrManager,
-              ftmsControlManager = ftmsControlManager
+              ftmsManagerFlow = app.ftmsManager,
+              hrManagerFlow = app.hrManager,
+              ftmsControlManagerFlow = app.ftmsControlManager
             )
           ),
           onSessionFinished = { data ->
@@ -163,7 +158,8 @@ fun TrainerLoopApp(
                 startTimeMs = data.startTimeMs
               )
             )
-          }
+          },
+          onExit = { navController.popBackStack() }
         )
       }
 
@@ -214,7 +210,6 @@ private val Screen.icon: ImageVector
   get() = when (this) {
     Screen.Home -> Icons.Default.Home
     Screen.Workouts -> Icons.Default.FitnessCenter
-    Screen.Ride -> Icons.AutoMirrored.Filled.DirectionsBike
     Screen.History -> Icons.Default.History
     Screen.Profile -> Icons.Default.Person
     else -> Icons.AutoMirrored.Filled.DirectionsRun
@@ -224,7 +219,6 @@ private val Screen.label: String
   get() = when (this) {
     Screen.Home -> "Home"
     Screen.Workouts -> "Workouts"
-    Screen.Ride -> "Ride"
     Screen.History -> "History"
     Screen.Profile -> "Profile"
     else -> ""
@@ -245,16 +239,3 @@ private val sampleWorkout = Workout(
     WorkoutSegment.FreeRide(id = "cd", durationSec = 300, label = "Cool Down", phase = SegmentPhase.COOLDOWN)
   )
 )
-
-@Composable
-private fun PlaceholderScreen(title: String) {
-  Box(
-    modifier = Modifier.fillMaxSize(),
-    contentAlignment = Alignment.Center
-  ) {
-    Text(
-      text = title,
-      style = MaterialTheme.typography.headlineLarge
-    )
-  }
-}

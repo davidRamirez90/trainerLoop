@@ -30,12 +30,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.Workout
+import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.ui.components.WorkoutMiniChart
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,6 +51,8 @@ fun WorkoutDetailScreen(
     factory = WorkoutDetailViewModelFactory(workout)
   )
 ) {
+  val context = LocalContext.current
+  val ftp = remember { ProfileRepository(context).getProfileSync().ftp }
   Scaffold(
     topBar = {
       TopAppBar(
@@ -127,6 +132,7 @@ fun WorkoutDetailScreen(
         ) {
           WorkoutMiniChart(
             workout = workout,
+            ftp = ftp,
             modifier = Modifier
               .fillMaxWidth()
               .padding(12.dp),

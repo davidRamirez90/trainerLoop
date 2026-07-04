@@ -179,36 +179,21 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
         }
         capturedFtms = ftmsManager
 
-        val ftmsResult = try {
-          ftmsManager.connect()
+        // Single GATT connect for both data + control managers.
+        val connectResult = try {
+          app.connectTrainer()
         } catch (e: CancellationException) {
           throw e
         } catch (e: Exception) {
           Result.failure(e)
         }
-        if (!ftmsResult.isSuccess) {
+        if (!connectResult.isSuccess) {
           _uiState.value = _uiState.value.copy(
             connectedTrainer = null,
             isConnectingTrainer = false,
             pendingTrainerAddress = null,
-            error = "Trainer connection failed: ${ftmsResult.exceptionOrNull()?.message ?: "unknown"}"
-          )
-          return@launch
-        }
-
-        val controlResult = try {
-          app.ftmsControlManager.value?.connect()
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Exception) {
-          Result.failure(e)
-        }
-        if (controlResult?.isSuccess != true) {
-          _uiState.value = _uiState.value.copy(
-            connectedTrainer = null,
-            isConnectingTrainer = false,
-            pendingTrainerAddress = null,
-            error = "Trainer control point failed: ${controlResult?.exceptionOrNull()?.message ?: "unknown"}"
+            error = "Trainer connection failed: " +
+              "${connectResult.exceptionOrNull()?.message ?: "unknown"}"
           )
           return@launch
         }

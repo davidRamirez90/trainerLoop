@@ -191,6 +191,15 @@ fun WorkoutCompleteScreen(
         Text("Share FIT")
       }
 
+      uiState.uploadStatus?.let { status ->
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+          text = status,
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+      }
+
       Spacer(modifier = Modifier.height(8.dp))
 
       OutlinedButton(

@@ -19,23 +19,44 @@ class GattCallback(
 
   private var connectionDeferred = CompletableDeferred<Boolean>()
   private var servicesDeferred = CompletableDeferred<Boolean>()
-  private var writeDeferred = CompletableDeferred<Boolean>()
-  private var readDeferred = CompletableDeferred<ByteArray>()
-  private var descriptorWriteDeferred = CompletableDeferred<Boolean>()
 
+  // Per-characteristic deferreds. A previous version used a single shared
+  // deferred for all descriptor writes / reads / writes, which meant two
+  // concurrent operations on different characteristics clobbered each other
+  // (the second reset*() call replaced the deferred the first caller was
+  // still awaiting, so the first caller hung forever). Keying by the
+  // characteristic UUID makes each caller await its own result. Android
+  // still only allows one outstanding GATT op at a time, so BleConnection
+  // serialises dispatch via a Mutex — these deferreds just make sure the
+  // right callback completes the right awaiter.
+  private val writeDeferreds = mutableMapOf<String, CompletableDeferred<Boolean>>()
+  private val readDeferreds = mutableMapOf<String, CompletableDeferred<ByteArray>>()
+  private val descriptorWriteDeferreds = mutableMapOf<String, CompletableDeferred<Boolean>>()
   private val notificationChannels = mutableMapOf<String, Channel<ByteArray>>()
 
   val connectionResult: CompletableDeferred<Boolean> get() = connectionDeferred
   val servicesResult: CompletableDeferred<Boolean> get() = servicesDeferred
-  val writeResult: CompletableDeferred<Boolean> get() = writeDeferred
-  val readResult: CompletableDeferred<ByteArray> get() = readDeferred
-  val descriptorWriteResult: CompletableDeferred<Boolean> get() = descriptorWriteDeferred
 
   fun resetConnectionDeferred() { connectionDeferred = CompletableDeferred() }
   fun resetServicesDeferred() { servicesDeferred = CompletableDeferred() }
-  fun resetWriteDeferred() { writeDeferred = CompletableDeferred() }
-  fun resetReadDeferred() { readDeferred = CompletableDeferred() }
-  fun resetDescriptorWriteDeferred() { descriptorWriteDeferred = CompletableDeferred() }
+
+  fun resetWriteDeferred(uuid: UUID): CompletableDeferred<Boolean> {
+    val d = CompletableDeferred<Boolean>()
+    synchronized(writeDeferreds) { writeDeferreds[uuid.toString()] = d }
+    return d
+  }
+
+  fun resetReadDeferred(uuid: UUID): CompletableDeferred<ByteArray> {
+    val d = CompletableDeferred<ByteArray>()
+    synchronized(readDeferreds) { readDeferreds[uuid.toString()] = d }
+    return d
+  }
+
+  fun resetDescriptorWriteDeferred(uuid: UUID): CompletableDeferred<Boolean> {
+    val d = CompletableDeferred<Boolean>()
+    synchronized(descriptorWriteDeferreds) { descriptorWriteDeferreds[uuid.toString()] = d }
+    return d
+  }
 
   var onUnexpectedDisconnect: (() -> Unit)? = null
 
@@ -43,6 +64,9 @@ class GattCallback(
   val status: Int get() = _status
 
   override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+    com.trainerloop.ble.BleLog.d(
+      "onConnectionStateChange status=$status newState=$newState"
+    )
     _status = newState
     if (status == BluetoothGatt.GATT_SUCCESS) {
       if (newState == BluetoothProfile.STATE_CONNECTED) {
@@ -76,6 +100,7 @@ class GattCallback(
   }
 
   override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+    com.trainerloop.ble.BleLog.d("onServicesDiscovered status=$status")
     servicesDeferred.complete(status == BluetoothGatt.GATT_SUCCESS)
   }
 
@@ -84,8 +109,14 @@ class GattCallback(
     characteristic: BluetoothGattCharacteristic,
     value: ByteArray
   ) {
+    com.trainerloop.ble.BleLog.d(
+      "notification char=${characteristic.uuid} len=${value.size} bytes=${value.toHex()}"
+    )
     dispatchNotification(characteristic.uuid, value)
   }
+
+  private fun ByteArray.toHex(): String =
+    joinToString(separator = " ") { "%02X".format(it.toInt() and 0xFF) }
 
   @Deprecated("Deprecated in Android SDK", ReplaceWith("onCharacteristicChanged(gatt, characteristic, value)"))
   @Suppress("DEPRECATION")
@@ -93,7 +124,10 @@ class GattCallback(
     gatt: BluetoothGatt,
     characteristic: BluetoothGattCharacteristic
   ) {
-    dispatchNotification(characteristic.uuid, characteristic.value)
+    com.trainerloop.ble.BleLog.d(
+      "notification(legacy) char=${characteristic.uuid} bytes=${characteristic.value?.toHex() ?: "null"}"
+    )
+    dispatchNotification(characteristic.uuid, characteristic.value ?: return)
   }
 
   override fun onCharacteristicWrite(
@@ -101,7 +135,10 @@ class GattCallback(
     characteristic: BluetoothGattCharacteristic,
     status: Int
   ) {
-    writeDeferred.complete(status == BluetoothGatt.GATT_SUCCESS)
+    val key = characteristic.uuid.toString()
+    val ok = status == BluetoothGatt.GATT_SUCCESS
+    com.trainerloop.ble.BleLog.d("onCharacteristicWrite char=$key status=$status ok=$ok")
+    synchronized(writeDeferreds) { writeDeferreds.remove(key) }?.complete(ok)
   }
 
   override fun onCharacteristicRead(
@@ -110,10 +147,15 @@ class GattCallback(
     value: ByteArray,
     status: Int
   ) {
-    if (status == BluetoothGatt.GATT_SUCCESS) {
-      readDeferred.complete(value)
-    } else {
-      readDeferred.completeExceptionally(GattException("Read failed with status $status"))
+    val key = characteristic.uuid.toString()
+    com.trainerloop.ble.BleLog.d("onCharacteristicRead char=$key status=$status len=${value.size}")
+    val d = synchronized(readDeferreds) { readDeferreds.remove(key) }
+    if (d != null) {
+      if (status == BluetoothGatt.GATT_SUCCESS) {
+        d.complete(value)
+      } else {
+        d.completeExceptionally(GattException("Read failed with status $status"))
+      }
     }
   }
 
@@ -124,10 +166,16 @@ class GattCallback(
     characteristic: BluetoothGattCharacteristic,
     status: Int
   ) {
-    if (status == BluetoothGatt.GATT_SUCCESS) {
-      readDeferred.complete(characteristic.value)
-    } else {
-      readDeferred.completeExceptionally(GattException("Read failed with status $status"))
+    val key = characteristic.uuid.toString()
+    com.trainerloop.ble.BleLog.d("onCharacteristicRead(legacy) char=$key status=$status")
+    val d = synchronized(readDeferreds) { readDeferreds.remove(key) }
+    if (d != null) {
+      if (status == BluetoothGatt.GATT_SUCCESS) {
+        @Suppress("DEPRECATION")
+        d.complete(characteristic.value ?: ByteArray(0))
+      } else {
+        d.completeExceptionally(GattException("Read failed with status $status"))
+      }
     }
   }
 
@@ -136,7 +184,14 @@ class GattCallback(
     descriptor: BluetoothGattDescriptor,
     status: Int
   ) {
-    descriptorWriteDeferred.complete(status == BluetoothGatt.GATT_SUCCESS)
+    // Key by the parent characteristic UUID so enableNotifications() can
+    // await the specific descriptor write it issued.
+    val key = descriptor.characteristic?.uuid?.toString()
+    val ok = status == BluetoothGatt.GATT_SUCCESS
+    com.trainerloop.ble.BleLog.d("onDescriptorWrite char=$key status=$status ok=$ok")
+    if (key != null) {
+      synchronized(descriptorWriteDeferreds) { descriptorWriteDeferreds.remove(key) }?.complete(ok)
+    }
   }
 
   fun notificationsFor(characteristicUuid: UUID): Flow<ByteArray> {

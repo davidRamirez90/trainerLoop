@@ -30,12 +30,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.model.Workout
+import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.ui.components.WorkoutMiniChart
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,6 +48,8 @@ fun WorkoutLibraryScreen(
   viewModel: WorkoutLibraryViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsState()
+  val context = LocalContext.current
+  val ftp = remember { ProfileRepository(context).getProfileSync().ftp }
 
   val importLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.OpenDocument()
@@ -68,10 +73,17 @@ fun WorkoutLibraryScreen(
         text = "Workouts",
         style = MaterialTheme.typography.headlineLarge
       )
-      Button(onClick = {
-        importLauncher.launch(arrayOf("*/*"))
-      }) {
-        Text("Import")
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (uiState.canSync) {
+          Button(onClick = { viewModel.sync() }, enabled = !uiState.isSyncing) {
+            Text(if (uiState.isSyncing) "Syncing…" else "Sync")
+          }
+        }
+        Button(onClick = {
+          importLauncher.launch(arrayOf("*/*"))
+        }) {
+          Text("Import")
+        }
       }
     }
 
@@ -114,6 +126,7 @@ fun WorkoutLibraryScreen(
       items(uiState.filteredWorkouts, key = { it.workout.id }) { item ->
         WorkoutCard(
           item = item,
+          ftp = ftp,
           onClick = { onWorkoutSelected(item.workout) }
         )
       }
@@ -137,6 +150,7 @@ fun WorkoutLibraryScreen(
 @Composable
 private fun WorkoutCard(
   item: WorkoutListItem,
+  ftp: Int,
   onClick: () -> Unit
 ) {
   val workout = item.workout
@@ -157,6 +171,7 @@ private fun WorkoutCard(
     ) {
       WorkoutMiniChart(
         workout = workout,
+        ftp = ftp,
         modifier = Modifier.fillMaxWidth(),
         chartHeight = 60.dp
       )

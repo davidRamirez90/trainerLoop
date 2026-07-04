@@ -1,7 +1,6 @@
 package com.trainerloop.ble
 
 import android.bluetooth.BluetoothDevice
-import android.content.Context
 import com.trainerloop.ble.model.IndoorBikeData
 import com.trainerloop.ble.model.IndoorBikeDataParser
 import kotlinx.coroutines.CoroutineScope
@@ -12,12 +11,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/**
+ * Subscribes to FTMS Indoor Bike Data notifications on a **shared**
+ * [BleConnection]. Do not pass a different connection to a separate
+ * [FtmsControlManager] — the BLE peripheral (trainer) only allows one
+ * active GATT client, and a second `connectGatt` will either be refused
+ * or steal the link from the first one. The [TrainerLoopApplication]
+ * owns a single [BleConnection] per trainer and hands it to both
+ * this manager and the control manager.
+ */
 class FtmsManager(
-  private val context: Context,
-  val device: BluetoothDevice
+  val device: BluetoothDevice,
+  private val connection: BleConnection
 ) {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-  private var connection: BleConnection? = null
 
   private val _data = MutableStateFlow<IndoorBikeData?>(null)
   val data: StateFlow<IndoorBikeData?> = _data.asStateFlow()
@@ -34,23 +41,32 @@ class FtmsManager(
   private val _isConnected = MutableStateFlow(false)
   val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
+  /**
+   * Subscribes to the FTMS Indoor Bike Data notifications on the shared
+   * [connection]. The caller is responsible for [BleConnection.connect]
+   * and [BleConnection.discoverServices] having been called and returned
+   * successfully before invoking this.
+   */
+  // NOTE: service discovery is performed exactly once by
+  // TrainerLoopApplication.connectTrainer() before either manager is
+  // asked to subscribe. Calling discoverServices() here again raced with
+  // the control manager's subscription and aborted in-flight descriptor
+  // writes on the shared GATT link.
   suspend fun connect(): Result<Unit> {
-    val conn = BleConnection(context, device)
-    connection = conn
+    BleLog.d("FtmsManager.connect device=${device.address}")
+    readDeviceInfo(connection)
+    subscribeToNotifications(connection)
 
-    conn.connect().getOrElse { return Result.failure(it) }
-    conn.discoverServices().getOrElse { return Result.failure(it) }
-
-    readDeviceInfo(conn)
-    subscribeToNotifications(conn)
-
-    // Auto-resubscribe on reconnect
-    conn.onReconnected = {
-      conn.discoverServices()
-      subscribeToNotifications(conn)
+    // Auto-resubscribe on reconnect (the GATT link is shared, but
+    // characteristic subscriptions need to be re-armed after a drop).
+    // Service discovery is re-run once by BleConnection before handlers fire.
+    connection.addReconnectHandler {
+      readDeviceInfo(connection)
+      subscribeToNotifications(connection)
     }
 
     _isConnected.value = true
+    BleLog.d("FtmsManager.connect success")
     return Result.success(Unit)
   }
 
@@ -74,22 +90,36 @@ class FtmsManager(
 
   private fun subscribeToNotifications(conn: BleConnection) {
     val dataChar = conn.getCharacteristic(BleConstants.FTMS_SERVICE, BleConstants.INDOOR_BIKE_DATA)
-    if (dataChar != null) {
-      scope.launch {
+    if (dataChar == null) {
+      BleLog.e(
+        "FTMS IndoorBikeData characteristic NOT FOUND " +
+          "service=${BleConstants.FTMS_SERVICE} char=${BleConstants.INDOOR_BIKE_DATA}"
+      )
+      return
+    }
+    BleLog.d("FTMS IndoorBikeData characteristic found, enabling notifications")
+    scope.launch {
+      try {
         val notificationFlow = conn.enableNotifications(dataChar)
+        BleLog.d("FTMS notifications enabled, starting collect")
         notificationFlow.collect { bytes ->
           val parsed = IndoorBikeDataParser.parse(bytes)
           if (parsed != null) {
             _data.value = parsed
+          } else {
+            BleLog.w("FTMS parse returned null, dropping ${bytes.size} bytes")
           }
         }
+      } catch (t: Throwable) {
+        BleLog.e("FTMS notification collector crashed", t)
       }
     }
   }
 
   suspend fun disconnect() {
-    connection?.disconnect()
-    connection = null
+    BleLog.d("FtmsManager.disconnect device=${device.address}")
+    // Do NOT close the shared BleConnection here — the application
+    // owns it and will close it when both managers have been released.
     _isConnected.value = false
     _data.value = null
   }

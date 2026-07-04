@@ -21,6 +21,9 @@ object IndoorBikeDataParser {
     var offset = 0
     val flags = bytes.readUint16Le(offset)
     offset += 2
+    com.trainerloop.ble.BleLog.d(
+      "parse flags=0x${"%04X".format(flags)} size=${bytes.size}"
+    )
 
     val hasAverageSpeed = flags and (1 shl 1) != 0
     val hasInstantCadence = flags and (1 shl 2) != 0
@@ -121,7 +124,7 @@ object IndoorBikeDataParser {
       value
     } else null
 
-    return IndoorBikeData(
+    val data = IndoorBikeData(
       powerWatts = powerWatts,
       cadenceRpm = cadenceRpm,
       speedKph = speedKph,
@@ -133,6 +136,10 @@ object IndoorBikeDataParser {
       elapsedTimeSec = elapsedTimeSec,
       remainingTimeSec = remainingTimeSec
     )
+    com.trainerloop.ble.BleLog.d(
+      "parsed power=${powerWatts} cad=${cadenceRpm} spd=${speedKph} hr=${heartRateBpm}"
+    )
+    return data
   }
 }
 

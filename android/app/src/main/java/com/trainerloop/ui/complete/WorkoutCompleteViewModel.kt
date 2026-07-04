@@ -8,6 +8,7 @@ import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.data.repository.SessionRepository
 import com.trainerloop.data.source.local.AppDatabase
+import com.trainerloop.data.source.remote.IntervalsIcuClient
 import com.trainerloop.domain.WorkoutSummaryMath
 import com.trainerloop.ui.components.FitShareHelper
 import kotlinx.serialization.builtins.ListSerializer
@@ -35,7 +36,8 @@ data class WorkoutCompleteUiState(
   val fitFile: File? = null,
   val isSaved: Boolean = false,
   val isDiscarded: Boolean = false,
-  val error: String? = null
+  val error: String? = null,
+  val uploadStatus: String? = null
 )
 
 class WorkoutCompleteViewModel(
@@ -139,8 +141,28 @@ class WorkoutCompleteViewModel(
         samples = samples
       )
       _uiState.value = _uiState.value.copy(fitFile = file)
+      uploadToIntervalsIcu(file)
     } catch (e: Exception) {
       _uiState.value = _uiState.value.copy(error = "Failed to create FIT: ${e.message}")
+    }
+  }
+
+  private fun uploadToIntervalsIcu(file: File) {
+    val profile = profileRepository.getProfileSync()
+    val athleteId = profile.intervalsIcuAthleteId
+    val apiKey = profile.intervalsIcuApiKey
+    if (athleteId.isBlank() || apiKey.isBlank()) return
+
+    _uiState.value = _uiState.value.copy(uploadStatus = "Uploading…")
+    viewModelScope.launch {
+      try {
+        val ok = IntervalsIcuClient(apiKey).uploadActivity(athleteId, file.readBytes(), workoutName)
+        _uiState.value = _uiState.value.copy(
+          uploadStatus = if (ok) "Uploaded to intervals.icu" else "Upload failed"
+        )
+      } catch (e: Exception) {
+        _uiState.value = _uiState.value.copy(uploadStatus = "Upload failed: ${e.message}")
+      }
     }
   }
 

@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 enum class ConnectionStatus {
@@ -40,10 +42,27 @@ class BleConnection(
   private val callback = GattCallback(scope)
   private var userInitiatedDisconnect = false
   private var autoReconnectEnabled = false
-  var onReconnected: (suspend () -> Unit)? = null
+
+  // Serialises all GATT operations on this connection. Android allows only
+  // one outstanding GATT operation at a time; issuing a second while the
+  // first is in flight aborts the first. Previously the data manager's
+  // descriptor write and the control manager's descriptor write raced,
+  // leaving Indoor Bike Data notifications un-armed ("watts don't appear").
+  private val gattMutex = Mutex()
+
+  // Multiple managers (FtmsManager + FtmsControlManager) share one
+  // BleConnection and each needs to re-arm its own characteristic
+  // subscription after a drop. A single `var onReconnected` got
+  // overwritten by whichever manager connected last, so the other
+  // manager's notifications were never re-armed. Use a list.
+  private val reconnectHandlers = mutableListOf<suspend () -> Unit>()
 
   init {
     callback.onUnexpectedDisconnect = { handleUnexpectedDisconnect() }
+  }
+
+  fun addReconnectHandler(handler: suspend () -> Unit) {
+    synchronized(reconnectHandlers) { reconnectHandlers.add(handler) }
   }
 
   @Suppress("MissingPermission")
@@ -116,10 +135,12 @@ class BleConnection(
       if (connected) {
         _connectionState.value = true
         _connectionStatus.value = ConnectionStatus.CONNECTED
-        // Rediscover services after reconnect
+        // Rediscover services once, then let every registered manager
+        // re-arm its own subscriptions. Previously each handler also
+        // called discoverServices(), which raced with in-flight ops.
         discoverServices()
-        // Notify manager to re-subscribe notifications
-        onReconnected?.invoke()
+        val handlers = synchronized(reconnectHandlers) { reconnectHandlers.toList() }
+        handlers.forEach { runCatching { it.invoke() } }
         return
       }
       attempt++
@@ -132,12 +153,14 @@ class BleConnection(
   @Suppress("MissingPermission")
   suspend fun discoverServices(): Result<Unit> {
     val gattInstance = gatt ?: return Result.failure(Exception("Not connected"))
-    callback.resetServicesDeferred()
-    return if (gattInstance.discoverServices()) {
-      val success = callback.servicesResult.await()
-      if (success) Result.success(Unit) else Result.failure(Exception("Service discovery failed"))
-    } else {
-      Result.failure(Exception("Could not start service discovery"))
+    return gattMutex.withLock {
+      callback.resetServicesDeferred()
+      if (gattInstance.discoverServices()) {
+        val success = callback.servicesResult.await()
+        if (success) Result.success(Unit) else Result.failure(Exception("Service discovery failed"))
+      } else {
+        Result.failure(Exception("Could not start service discovery"))
+      }
     }
   }
 
@@ -145,30 +168,71 @@ class BleConnection(
     return gatt?.getService(serviceUuid)?.getCharacteristic(characteristicUuid)
   }
 
+  /**
+   * Enables notifications (or indications) for [characteristic] and returns
+   * a flow of its notification payloads.
+   *
+   * The CCCD value is chosen from the characteristic's properties: FTMS
+   * Indoor Bike Data (0x2AD2) is Notify, but the FTMS Control Point
+   * (0x2AD9) is **Indicate**. Writing ENABLE_NOTIFICATION_VALUE to an
+   * indicate-only characteristic is rejected by the peripheral, so the
+   * control-point responses never arrived — which is why the trainer was
+   * not controllable. Branch on PROPERTY_INDICATE and write
+   * ENABLE_INDICATION_VALUE in that case.
+   *
+   * The descriptor write is serialised via [gattMutex] against every other
+   * GATT op on this connection, because Android only allows one
+   * outstanding GATT operation at a time.
+   */
   @Suppress("MissingPermission")
   @SuppressLint("WrongConstant")
   suspend fun enableNotifications(characteristic: BluetoothGattCharacteristic): Flow<ByteArray> {
     val gattInstance = gatt ?: throw IllegalStateException("Not connected")
-    gattInstance.setCharacteristicNotification(characteristic, true)
+    val uuid = characteristic.uuid
+    val useIndicate =
+      characteristic.properties and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0
+    val cccdValue = if (useIndicate) {
+      BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+    } else {
+      BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+    }
+    BleLog.d(
+      "enableNotifications char=$uuid indicate=$useIndicate " +
+        "props=0x${"%02X".format(characteristic.properties)}"
+    )
 
-    val descriptorUuid = CLIENT_CHARACTERISTIC_CONFIG_UUID
-    val descriptor = characteristic.getDescriptor(descriptorUuid)
-    if (descriptor != null) {
-      callback.resetDescriptorWriteDeferred()
-      val started = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        gattInstance.writeDescriptor(descriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) == BluetoothGatt.GATT_SUCCESS
+    // Create the channel BEFORE arming the peripheral, so the first
+    // indication/notification is not dropped.
+    val flow = callback.notificationsFor(uuid)
+
+    gattMutex.withLock {
+      gattInstance.setCharacteristicNotification(characteristic, true)
+
+      val descriptor = characteristic.getDescriptor(CLIENT_CHARACTERISTIC_CONFIG_UUID)
+      if (descriptor != null) {
+        val deferred = callback.resetDescriptorWriteDeferred(uuid)
+        val started = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+          gattInstance.writeDescriptor(descriptor, cccdValue) == BluetoothGatt.GATT_SUCCESS
+        } else {
+          @Suppress("DEPRECATION")
+          descriptor.value = cccdValue
+          @Suppress("DEPRECATION")
+          gattInstance.writeDescriptor(descriptor)
+        }
+        if (started) {
+          val ok = deferred.await()
+          if (!ok) {
+            BleLog.w("Descriptor write for $uuid returned GATT failure (indicate=$useIndicate)")
+          }
+        } else {
+          BleLog.w("writeDescriptor returned false for $uuid (indicate=$useIndicate)")
+        }
       } else {
-        @Suppress("DEPRECATION")
-        descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-        @Suppress("DEPRECATION")
-        gattInstance.writeDescriptor(descriptor)
-      }
-      if (started) {
-        callback.descriptorWriteResult.await()
+        BleLog.w("CCCD not found for $uuid — notifications may not arrive")
       }
     }
 
-    return callback.notificationsFor(characteristic.uuid)
+    return flow
   }
 
   @Suppress("MissingPermission")
@@ -184,24 +248,29 @@ class BleConnection(
       BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
     }
 
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-      val status = gattInstance.writeCharacteristic(characteristic, bytes, writeType)
-      if (status == BluetoothGatt.GATT_SUCCESS) {
-        Result.success(Unit)
+    return gattMutex.withLock {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val status = gattInstance.writeCharacteristic(characteristic, bytes, writeType)
+        if (status == BluetoothGatt.GATT_SUCCESS) {
+          Result.success(Unit)
+        } else {
+          Result.failure(Exception("Write failed with status $status"))
+        }
       } else {
-        Result.failure(Exception("Write failed with status $status"))
+        val deferred = callback.resetWriteDeferred(characteristic.uuid)
+        @Suppress("DEPRECATION")
+        characteristic.writeType = writeType
+        @Suppress("DEPRECATION")
+        characteristic.value = bytes
+        @Suppress("DEPRECATION")
+        val started = gattInstance.writeCharacteristic(characteristic)
+        if (!started) {
+          Result.failure(Exception("Could not start write"))
+        } else {
+          val success = deferred.await()
+          if (success) Result.success(Unit) else Result.failure(Exception("Write failed"))
+        }
       }
-    } else {
-      callback.resetWriteDeferred()
-      @Suppress("DEPRECATION")
-      characteristic.writeType = writeType
-      @Suppress("DEPRECATION")
-      characteristic.value = bytes
-      @Suppress("DEPRECATION")
-      val started = gattInstance.writeCharacteristic(characteristic)
-      if (!started) return Result.failure(Exception("Could not start write"))
-      val success = callback.writeResult.await()
-      if (success) Result.success(Unit) else Result.failure(Exception("Write failed"))
     }
   }
 
@@ -213,15 +282,17 @@ class BleConnection(
   ): T? {
     val gattInstance = gatt ?: return null
     val char = gattInstance.getService(service)?.getCharacteristic(characteristic) ?: return null
-    return try {
-      callback.resetReadDeferred()
+    return gattMutex.withLock {
+      val deferred = callback.resetReadDeferred(char.uuid)
       @Suppress("DEPRECATION")
       val started = gattInstance.readCharacteristic(char)
-      if (!started) return null
-      val bytes = callback.readResult.await()
+      if (!started) return@withLock null
+      val bytes = try {
+        deferred.await()
+      } catch (_: Throwable) {
+        return@withLock null
+      }
       parse(bytes)
-    } catch (_: Throwable) {
-      null
     }
   }
 

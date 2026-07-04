@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -48,11 +49,13 @@ class WorkoutViewModelTest {
     val heartRate = MutableStateFlow<Int?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
     val hr = mockHrManager(heartRate = heartRate)
+    val ftmsFlow = MutableStateFlow<FtmsManager?>(ftms)
+    val hrFlow = MutableStateFlow<HrManager?>(hr)
 
     val viewModel = WorkoutViewModel(
       workout = sampleWorkout(),
-      ftmsManager = ftms,
-      hrManager = hr,
+      ftmsManagerFlow = ftmsFlow,
+      hrManagerFlow = hrFlow,
       dispatcher = testDispatcher
     )
 
@@ -84,11 +87,13 @@ class WorkoutViewModelTest {
     val heartRate = MutableStateFlow<Int?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
     val hr = mockHrManager(heartRate = heartRate)
+    val ftmsFlow = MutableStateFlow<FtmsManager?>(ftms)
+    val hrFlow = MutableStateFlow<HrManager?>(hr)
 
     val viewModel = WorkoutViewModel(
       workout = sampleWorkout(),
-      ftmsManager = ftms,
-      hrManager = hr,
+      ftmsManagerFlow = ftmsFlow,
+      hrManagerFlow = hrFlow,
       dispatcher = testDispatcher
     )
 
@@ -126,6 +131,95 @@ class WorkoutViewModelTest {
     assertEquals(0, state.currentHrBpm)
   }
 
+  /**
+   * Regression test for the watts-not-showing bug. The original bug was that
+   * the ViewModel captured the manager reference at construction time, so
+   * a manager that attached *after* the screen was composed left the
+   * recorder null and power frozen at 0.
+   */
+  @Test
+  fun `manager attaching after VM creation wires into the recorder`() = runTest(testDispatcher) {
+    // Simulate the app starting with no manager (e.g. user navigated to
+    // the workout screen before connecting the trainer).
+    val ftmsFlow = MutableStateFlow<FtmsManager?>(null)
+    val hrFlow = MutableStateFlow<HrManager?>(null)
+
+    val viewModel = WorkoutViewModel(
+      workout = sampleWorkout(),
+      ftmsManagerFlow = ftmsFlow,
+      hrManagerFlow = hrFlow,
+      dispatcher = testDispatcher
+    )
+
+    // Pretend the user just got on the bike and the trainer reports
+    // 230 W — but only AFTER the ViewModel was created.
+    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
+    val heartRate = MutableStateFlow<Int?>(null)
+    val ftms = mockFtmsManager(data = ftmsData)
+    val hr = mockHrManager(heartRate = heartRate)
+    ftmsFlow.value = ftms
+    hrFlow.value = hr
+
+    runCurrent()
+
+    // Now emit some real data.
+    ftmsData.value = IndoorBikeData(
+      powerWatts = 230,
+      cadenceRpm = 88.0,
+      speedKph = 32.0,
+      resistanceLevel = null,
+      averagePower = null,
+      averageSpeed = null,
+      totalDistanceMeters = null,
+      heartRateBpm = null,
+      elapsedTimeSec = null,
+      remainingTimeSec = null
+    )
+    heartRate.value = 152
+
+    runCurrent()
+
+    val state = viewModel.uiState.value
+    assertEquals("power should reach UI after late attach", 230, state.currentPowerWatts)
+    assertEquals("cadence should reach UI after late attach", 88, state.currentCadenceRpm)
+    assertEquals("hr should reach UI after late attach", 152, state.currentHrBpm)
+  }
+
+  /**
+   * Fast-path HR: the displayed HR should follow HR-strap notifications
+   * even when the 1 Hz clock has not advanced.
+   */
+  @Test
+  fun `hr updates immediately when strap notifies (fast path)`() = runTest(testDispatcher) {
+    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
+    val heartRate = MutableStateFlow<Int?>(null)
+    val ftms = mockFtmsManager(data = ftmsData)
+    val hr = mockHrManager(heartRate = heartRate)
+    val ftmsFlow = MutableStateFlow<FtmsManager?>(ftms)
+    val hrFlow = MutableStateFlow<HrManager?>(hr)
+
+    val viewModel = WorkoutViewModel(
+      workout = sampleWorkout(),
+      ftmsManagerFlow = ftmsFlow,
+      hrManagerFlow = hrFlow,
+      dispatcher = testDispatcher
+    )
+
+    // Pretend the clock hasn't advanced and the FTMS data is silent.
+    // The HR strap notifies at 1 Hz; the UI should reflect it without
+    // waiting for the clock tick.
+    runCurrent()
+    assertEquals(0, viewModel.uiState.value.currentHrBpm)
+
+    heartRate.value = 138
+    runCurrent()
+    assertEquals(138, viewModel.uiState.value.currentHrBpm)
+
+    heartRate.value = 142
+    runCurrent()
+    assertEquals(142, viewModel.uiState.value.currentHrBpm)
+  }
+
   @Test
   fun `intensity offset adjusts target range`() = runTest(testDispatcher) {
     val viewModel = WorkoutViewModel(workout = sampleWorkout())
@@ -135,6 +229,50 @@ class WorkoutViewModelTest {
     val state = viewModel.uiState.value
     assertEquals(5, state.intensityOffsetPct)
     assertTrue(state.targetRange.low > 0)
+  }
+
+  @Test
+  fun `stop with samples emits finish event`() = runTest(testDispatcher) {
+    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
+    val ftms = mockFtmsManager(data = ftmsData)
+    val ftmsFlow = MutableStateFlow<FtmsManager?>(ftms)
+
+    val viewModel = WorkoutViewModel(
+      workout = sampleWorkout(),
+      ftmsManagerFlow = ftmsFlow,
+      dispatcher = testDispatcher
+    )
+
+    ftmsData.value = IndoorBikeData(
+      powerWatts = 200,
+      cadenceRpm = 85.0,
+      speedKph = null,
+      resistanceLevel = null,
+      averagePower = null,
+      averageSpeed = null,
+      totalDistanceMeters = null,
+      heartRateBpm = null,
+      elapsedTimeSec = null,
+      remainingTimeSec = null
+    )
+    runCurrent()
+    // Fake a recorded sample so stop() has something to emit.
+    viewModel.start()
+    advanceTimeBy(1_000)
+    runCurrent()
+
+    viewModel.stop()
+
+    assertTrue("finishEvent should carry samples", viewModel.finishEvent.value?.samples?.isNotEmpty() == true)
+  }
+
+  @Test
+  fun `stop with no samples leaves finish event null`() = runTest(testDispatcher) {
+    val viewModel = WorkoutViewModel(workout = sampleWorkout(), dispatcher = testDispatcher)
+
+    viewModel.stop()
+
+    assertEquals(null, viewModel.finishEvent.value)
   }
 
   @Test

@@ -15,11 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Favorite
@@ -36,7 +34,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trainerloop.ui.components.MetricBadge
 
 @Composable
 fun SettingsScreen(
@@ -159,12 +157,6 @@ fun SettingsScreen(
       )
       HorizontalDivider()
       SettingsRow(
-        icon = Icons.Default.Bluetooth,
-        label = "Connected Apps",
-        onClick = { /* Detail screen not in scope */ }
-      )
-      HorizontalDivider()
-      SettingsRow(
         icon = Icons.Default.Build,
         label = "Trainer Settings",
         onClick = { /* Detail screen not in scope */ }
@@ -186,6 +178,33 @@ fun SettingsScreen(
           )
         }
       )
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+      Column(modifier = Modifier.padding(16.dp)) {
+        Text(
+          text = "intervals.icu",
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        OutlinedTextField(
+          value = uiState.intervalsAthleteId,
+          onValueChange = viewModel::updateIntervalsAthleteId,
+          label = { Text("Athlete ID") },
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+          value = uiState.intervalsApiKey,
+          onValueChange = viewModel::updateIntervalsApiKey,
+          label = { Text("API Key") },
+          singleLine = true,
+          visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+          modifier = Modifier.fillMaxWidth()
+        )
+      }
     }
 
     SettingsGroupCard(title = "Support") {
@@ -266,34 +285,10 @@ private fun RiderProfileHeader(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-          MetricBadge(label = "FTP", value = "$ftp W")
-          MetricBadge(label = "Weight", value = "${"%.1f".format(weightKg)} kg")
+          MetricBadge(label = "FTP", value = "$ftp W", backgroundColor = MaterialTheme.colorScheme.surface)
+          MetricBadge(label = "Weight", value = "${"%.1f".format(weightKg)} kg", backgroundColor = MaterialTheme.colorScheme.surface)
         }
       }
-    }
-  }
-}
-
-@Composable
-private fun MetricBadge(label: String, value: String) {
-  Surface(
-    shape = RoundedCornerShape(16.dp),
-    color = MaterialTheme.colorScheme.surface
-  ) {
-    Row(
-      modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      Text(
-        text = "$label: ",
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
-      Text(
-        text = value,
-        style = MaterialTheme.typography.labelMedium,
-        fontWeight = FontWeight.SemiBold
-      )
     }
   }
 }
