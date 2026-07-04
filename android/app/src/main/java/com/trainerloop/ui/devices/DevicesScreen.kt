@@ -259,7 +259,7 @@ private fun StatusRow(label: String, ok: Boolean) {
       Text(
         text = if (ok) "✓" else "✗",
         style = MaterialTheme.typography.bodySmall,
-        color = if (ok) Green40 else Color(0xFFE53935)
+        color = if (ok) Green40 else MaterialTheme.colorScheme.error
       )
     }
   }

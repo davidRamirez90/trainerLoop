@@ -55,10 +55,10 @@ class WorkoutDetailViewModel(
   }
 
   private fun phaseColor(phase: SegmentPhase): androidx.compose.ui.graphics.Color = when (phase) {
-    SegmentPhase.WARMUP -> androidx.compose.ui.graphics.Color(0xFFFFB300)
-    SegmentPhase.WORK -> androidx.compose.ui.graphics.Color(0xFF4CAF78)
-    SegmentPhase.RECOVERY -> androidx.compose.ui.graphics.Color(0xFF5C8EED)
-    SegmentPhase.COOLDOWN -> androidx.compose.ui.graphics.Color(0xFFFFB300)
+    SegmentPhase.WARMUP -> com.trainerloop.ui.theme.Amber80
+    SegmentPhase.WORK -> com.trainerloop.ui.theme.Green60
+    SegmentPhase.RECOVERY -> com.trainerloop.ui.theme.Blue80
+    SegmentPhase.COOLDOWN -> com.trainerloop.ui.theme.Amber80
   }
 
   private fun targetFtpPct(segment: WorkoutSegment, ftp: Int): String {

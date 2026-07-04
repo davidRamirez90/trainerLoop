@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Fill
@@ -16,16 +17,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
-import com.trainerloop.ui.theme.Green40
 
 @Composable
 fun WorkoutMiniChart(
   workout: Workout,
+  ftp: Int,
   modifier: Modifier = Modifier,
   chartHeight: Dp = 60.dp,
   maxPowerAxis: Int = 400,
-  fillColor: Color = Green40.copy(alpha = 0.35f),
-  lineColor: Color = Green40
+  lineColor: Color = MaterialTheme.colorScheme.primary
 ) {
   val totalDuration = remember(workout) {
     WorkoutMath.totalDurationSec(workout.segments)
@@ -72,7 +72,7 @@ fun WorkoutMiniChart(
       }
 
       drawRect(
-        color = fillColor,
+        color = zoneColor(power, ftp),
         topLeft = Offset(x, y),
         size = Size(
           width = (xForTime((sec + step).coerceAtMost(totalDuration)) - x).coerceAtLeast(1f),
@@ -84,6 +84,6 @@ fun WorkoutMiniChart(
       sec += step
     }
 
-    drawPath(path, color = lineColor, style = Stroke(width = 2f))
+    drawPath(path, color = lineColor, style = Stroke(width = 2.dp.toPx()))
   }
 }
