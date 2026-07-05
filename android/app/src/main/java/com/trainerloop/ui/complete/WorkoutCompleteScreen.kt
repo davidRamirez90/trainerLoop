@@ -37,15 +37,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.TelemetrySample
-import com.trainerloop.ui.theme.Blue40
-import com.trainerloop.ui.theme.Green40
-import com.trainerloop.ui.theme.Red40
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -300,11 +296,12 @@ private fun SampleChart(samples: List<TelemetrySample>) {
   Spacer(modifier = Modifier.height(8.dp))
 
   val (values, color, unit) = when (selectedTab) {
-    0 -> Triple(samples.map { it.powerWatts }, Blue40, "W")
-    1 -> Triple(samples.map { it.hrBpm }, Red40, "bpm")
-    else -> Triple(samples.map { it.cadenceRpm }, Green40, "rpm")
+    0 -> Triple(samples.map { it.powerWatts }, MaterialTheme.colorScheme.secondary, "W")
+    1 -> Triple(samples.map { it.hrBpm }, MaterialTheme.colorScheme.error, "bpm")
+    else -> Triple(samples.map { it.cadenceRpm }, MaterialTheme.colorScheme.primary, "rpm")
   }
 
+  val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
   val maxValue = values.maxOrNull()?.coerceAtLeast(1) ?: 1
   val totalDuration = samples.lastOrNull()?.timeSec?.coerceAtLeast(1) ?: 1
 
@@ -336,7 +333,7 @@ private fun SampleChart(samples: List<TelemetrySample>) {
 
     // Draw horizontal grid line at max
     drawLine(
-      color = Color.White.copy(alpha = 0.3f),
+      color = gridColor,
       start = Offset(0f, padding),
       end = Offset(width, padding),
       strokeWidth = 1f

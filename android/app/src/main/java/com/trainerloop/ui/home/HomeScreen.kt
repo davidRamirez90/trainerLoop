@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -31,7 +32,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,11 +41,15 @@ import android.annotation.SuppressLint
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.model.SessionSummary
 import com.trainerloop.ui.components.MetricBadge
+import com.trainerloop.ui.theme.Green20
 import com.trainerloop.ui.theme.Green40
 
 @SuppressLint("MissingPermission")
@@ -73,20 +77,18 @@ fun HomeScreen(
     }
 
     item {
-      ConnectedDevicesSection(
+      StartRideHero(onStartFreeRide = onStartFreeRide)
+    }
+
+    item {
+      DeviceStatusRow(
         trainerName = uiState.connectedTrainer?.name,
         trainerConnected = uiState.isTrainerConnected,
         trainerBattery = uiState.trainerBattery,
-        trainerModel = uiState.trainerModel,
-        hrName = uiState.connectedHr?.name,
         hrConnected = uiState.isHrConnected,
         latestHrBpm = uiState.latestHrBpm,
         onManageDevices = onNavigateToDevices
       )
-    }
-
-    item {
-      QuickStartCard(onStartFreeRide = onStartFreeRide)
     }
 
     item {
@@ -162,144 +164,120 @@ private fun RiderHeader(
 }
 
 @Composable
-private fun ConnectedDevicesSection(
-  trainerName: String?,
-  trainerConnected: Boolean,
-  trainerBattery: Int?,
-  trainerModel: String?,
-  hrName: String?,
-  hrConnected: Boolean,
-  latestHrBpm: Int?,
-  onManageDevices: () -> Unit
-) {
+private fun StartRideHero(onStartFreeRide: () -> Unit) {
   Card(
     modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant
-    )
-  ) {
-    Column(modifier = Modifier.padding(16.dp)) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Text(
-          text = "Connected Devices",
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold
-        )
-        OutlinedButton(onClick = onManageDevices) {
-          Text("Manage")
-        }
-      }
-
-      Spacer(modifier = Modifier.height(12.dp))
-
-      DeviceRow(
-        name = trainerName ?: "No trainer connected",
-        connected = trainerConnected,
-        detail = buildString {
-          trainerModel?.let { append(it) }
-          trainerBattery?.let {
-            if (isNotBlank()) append(" · ")
-            append("Battery $it%")
-          }
-          if (isBlank()) append("Tap Manage to pair")
-        }
-      )
-
-      Spacer(modifier = Modifier.height(8.dp))
-
-      DeviceRow(
-        name = hrName ?: "No HR sensor connected",
-        connected = hrConnected,
-        detail = latestHrBpm?.let { "HR $it bpm" }
-          ?: if (hrName != null) "Connecting..." else "Tap Manage to pair"
-      )
-    }
-  }
-}
-
-@Composable
-private fun DeviceRow(
-  name: String,
-  connected: Boolean,
-  detail: String
-) {
-  Row(
-    modifier = Modifier.fillMaxWidth(),
-    verticalAlignment = Alignment.CenterVertically
-  ) {
-    Icon(
-      imageVector = if (connected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
-      contentDescription = if (connected) "Device connected" else "Device disconnected",
-      tint = if (connected) Green40 else MaterialTheme.colorScheme.onSurfaceVariant,
-      modifier = Modifier.size(24.dp)
-    )
-
-    Spacer(modifier = Modifier.width(12.dp))
-
-    Column(modifier = Modifier.weight(1f)) {
-      Text(
-        text = name,
-        style = MaterialTheme.typography.bodyLarge,
-        fontWeight = FontWeight.Medium
-      )
-      Text(
-        text = detail,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
-    }
-
-    if (connected) {
-      Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = Green40.copy(alpha = 0.2f)
-      ) {
-        Text(
-          text = "Connected",
-          modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-          style = MaterialTheme.typography.labelSmall,
-          color = Green40
-        )
-      }
-    }
-  }
-}
-
-@Composable
-private fun QuickStartCard(onStartFreeRide: () -> Unit) {
-  Card(
-    modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.primaryContainer
-    )
+    shape = RoundedCornerShape(24.dp)
   ) {
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally
+        .background(Brush.linearGradient(listOf(Green20, Green40)))
+        .padding(24.dp)
     ) {
       Text(
         text = "Ready to ride?",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onPrimaryContainer
+        style = MaterialTheme.typography.headlineSmall,
+        fontWeight = FontWeight.Bold,
+        color = Color.White
       )
-      Spacer(modifier = Modifier.height(8.dp))
+      Text(
+        text = "Jump on the trainer and go",
+        style = MaterialTheme.typography.bodyMedium,
+        color = Color.White.copy(alpha = 0.8f)
+      )
+      Spacer(modifier = Modifier.height(16.dp))
       Button(
         onClick = onStartFreeRide,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(
+          containerColor = Color.White,
+          contentColor = Green20
+        )
       ) {
         Icon(
           imageVector = Icons.Default.FitnessCenter,
-          contentDescription = "Start free ride",
+          contentDescription = null,
           modifier = Modifier.padding(end = 8.dp)
         )
-        Text("Start Free Ride")
+        Text("Start Free Ride", fontWeight = FontWeight.SemiBold)
+      }
+    }
+  }
+}
+
+@Composable
+private fun DeviceStatusRow(
+  trainerName: String?,
+  trainerConnected: Boolean,
+  trainerBattery: Int?,
+  hrConnected: Boolean,
+  latestHrBpm: Int?,
+  onManageDevices: () -> Unit
+) {
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(8.dp)
+  ) {
+    DeviceChip(
+      modifier = Modifier.weight(1f),
+      connected = trainerConnected,
+      label = if (trainerConnected) trainerName ?: "Trainer" else "No trainer",
+      detail = if (trainerConnected) {
+        trainerBattery?.let { "Battery $it%" } ?: "Connected"
+      } else "Tap to pair",
+      onClick = onManageDevices
+    )
+    DeviceChip(
+      modifier = Modifier.weight(1f),
+      connected = hrConnected,
+      label = if (hrConnected) latestHrBpm?.let { "$it bpm" } ?: "HR sensor" else "No HR",
+      detail = if (hrConnected) "Connected" else "Tap to pair",
+      onClick = onManageDevices
+    )
+  }
+}
+
+@Composable
+private fun DeviceChip(
+  modifier: Modifier = Modifier,
+  connected: Boolean,
+  label: String,
+  detail: String,
+  onClick: () -> Unit
+) {
+  Surface(
+    modifier = modifier,
+    shape = RoundedCornerShape(16.dp),
+    color = MaterialTheme.colorScheme.surfaceVariant,
+    onClick = onClick
+  ) {
+    Row(
+      modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      Icon(
+        imageVector = if (connected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
+        contentDescription = if (connected) "Device connected" else "Device disconnected",
+        tint = if (connected) Green40 else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(20.dp)
+      )
+      Spacer(modifier = Modifier.width(8.dp))
+      Column {
+        Text(
+          text = label,
+          style = MaterialTheme.typography.labelLarge,
+          fontWeight = FontWeight.SemiBold,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+        Text(
+          text = detail,
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
       }
     }
   }

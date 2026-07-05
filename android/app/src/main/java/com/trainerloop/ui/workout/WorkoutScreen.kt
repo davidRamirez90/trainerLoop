@@ -244,7 +244,7 @@ fun WorkoutScreen(
         }
       }
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.weight(1f))
 
       // Intensity controls
       Row(
@@ -283,7 +283,7 @@ fun WorkoutScreen(
         }
       }
 
-      Spacer(modifier = Modifier.weight(1f))
+      Spacer(modifier = Modifier.height(12.dp))
 
       // Main controls
       Row(
@@ -406,7 +406,7 @@ private fun BigMetric(
       Row(verticalAlignment = Alignment.Bottom) {
         Text(
           text = value,
-          style = MaterialTheme.typography.headlineLarge.copy(
+          style = MaterialTheme.typography.displaySmall.copy(
             fontFeatureSettings = "tnum"
           ),
           fontWeight = FontWeight.Bold,

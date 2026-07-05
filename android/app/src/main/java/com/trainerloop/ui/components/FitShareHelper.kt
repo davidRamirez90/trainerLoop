@@ -45,6 +45,8 @@ object FitShareHelper {
     if (activities.isEmpty()) {
       intent.type = "application/octet-stream"
     }
-    context.startActivity(Intent.createChooser(intent, "Export Workout"))
+    val chooser = Intent.createChooser(intent, "Export Workout")
+      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    context.startActivity(chooser)
   }
 }

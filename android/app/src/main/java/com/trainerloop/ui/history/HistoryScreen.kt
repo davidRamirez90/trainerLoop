@@ -10,8 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,11 +45,26 @@ fun HistoryScreen(
         .padding(16.dp),
       contentAlignment = Alignment.Center
     ) {
-      Text(
-        text = "No saved workouts yet.",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
+      Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+          imageVector = Icons.Default.History,
+          contentDescription = null,
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.size(56.dp)
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+          text = "No rides yet",
+          style = MaterialTheme.typography.titleLarge,
+          fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+          text = "Finished workouts will show up here.",
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+      }
     }
     return
   }
@@ -77,42 +96,52 @@ private fun SessionCard(session: SessionSummary) {
     )
   ) {
     Column(modifier = Modifier.padding(16.dp)) {
-      Text(
-        text = session.workoutName,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold
-      )
-      Spacer(modifier = Modifier.height(4.dp))
       Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
       ) {
+        Text(
+          text = session.workoutName,
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold
+        )
         Text(
           text = formatSessionDate(session.startedAt),
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(
-          text = formatDuration(session.durationSec),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+      }
+      Spacer(modifier = Modifier.height(12.dp))
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(24.dp)
+      ) {
+        SessionStat(value = formatDuration(session.durationSec), label = "Time")
         if (session.avgPower > 0) {
-          Text(
-            text = "${session.avgPower} W avg",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
+          SessionStat(value = "${session.avgPower} W", label = "Avg Power")
         }
         if (session.avgHr > 0) {
-          Text(
-            text = "${session.avgHr} bpm avg",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
+          SessionStat(value = "${session.avgHr} bpm", label = "Avg HR")
         }
       }
     }
+  }
+}
+
+@Composable
+private fun SessionStat(value: String, label: String) {
+  Column {
+    Text(
+      text = value,
+      style = MaterialTheme.typography.titleMedium,
+      fontWeight = FontWeight.Bold
+    )
+    Text(
+      text = label,
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
   }
 }
 

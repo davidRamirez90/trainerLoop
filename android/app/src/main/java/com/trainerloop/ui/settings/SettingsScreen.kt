@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -29,7 +30,6 @@ import androidx.compose.material.icons.filled.Power
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,7 +47,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.trainerloop.ui.components.MetricBadge
 
 @Composable
 fun SettingsScreen(
@@ -69,8 +68,6 @@ fun SettingsScreen(
 
     RiderProfileHeader(
       name = uiState.name,
-      ftp = uiState.ftp.toIntOrNull() ?: 0,
-      weightKg = uiState.weightKg.toDoubleOrNull() ?: 0.0,
       onNameChange = viewModel::updateName
     )
 
@@ -242,54 +239,37 @@ fun SettingsScreen(
 @Composable
 private fun RiderProfileHeader(
   name: String,
-  ftp: Int,
-  weightKg: Double,
   onNameChange: (String) -> Unit
 ) {
-  Card(
+  Row(
     modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.primaryContainer
-    )
+    verticalAlignment = Alignment.CenterVertically
   ) {
-    Row(
+    Box(
       modifier = Modifier
-        .fillMaxWidth()
-        .padding(16.dp),
-      verticalAlignment = Alignment.CenterVertically
+        .size(64.dp)
+        .clip(CircleShape)
+        .background(MaterialTheme.colorScheme.primaryContainer),
+      contentAlignment = Alignment.Center
     ) {
-      Box(
-        modifier = Modifier
-          .size(72.dp)
-          .clip(CircleShape)
-          .background(MaterialTheme.colorScheme.primary),
-        contentAlignment = Alignment.Center
-      ) {
-        Text(
-          text = name.take(1).uppercase().takeIf { it.isNotBlank() } ?: "?",
-          style = MaterialTheme.typography.headlineLarge,
-          color = MaterialTheme.colorScheme.onPrimary,
-          fontWeight = FontWeight.Bold
-        )
-      }
-
-      Spacer(modifier = Modifier.width(16.dp))
-
-      Column(modifier = Modifier.weight(1f)) {
-        OutlinedTextField(
-          value = name,
-          onValueChange = onNameChange,
-          label = { Text("Rider Name") },
-          singleLine = true,
-          modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-          MetricBadge(label = "FTP", value = "$ftp W", backgroundColor = MaterialTheme.colorScheme.surface)
-          MetricBadge(label = "Weight", value = "${"%.1f".format(weightKg)} kg", backgroundColor = MaterialTheme.colorScheme.surface)
-        }
-      }
+      Text(
+        text = name.take(1).uppercase().takeIf { it.isNotBlank() } ?: "?",
+        style = MaterialTheme.typography.headlineMedium,
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+        fontWeight = FontWeight.Bold
+      )
     }
+
+    Spacer(modifier = Modifier.width(16.dp))
+
+    OutlinedTextField(
+      value = name,
+      onValueChange = onNameChange,
+      label = { Text("Rider Name") },
+      singleLine = true,
+      shape = RoundedCornerShape(12.dp),
+      modifier = Modifier.weight(1f)
+    )
   }
 }
 
@@ -346,23 +326,17 @@ private fun CompactNumberField(
   keyboardType: KeyboardType = KeyboardType.Number,
   onValueChange: (String) -> Unit
 ) {
-  Row(verticalAlignment = Alignment.CenterVertically) {
-    OutlinedTextField(
-      value = value,
-      onValueChange = onValueChange,
-      keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType),
-      singleLine = true,
-      modifier = Modifier.width(100.dp)
-    )
-    if (suffix.isNotBlank()) {
-      Spacer(modifier = Modifier.width(4.dp))
-      Text(
-        text = suffix,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
-    }
-  }
+  OutlinedTextField(
+    value = value,
+    onValueChange = onValueChange,
+    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType),
+    singleLine = true,
+    shape = RoundedCornerShape(12.dp),
+    suffix = if (suffix.isNotBlank()) {
+      { Text(suffix, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    } else null,
+    modifier = Modifier.width(120.dp)
+  )
 }
 
 @Composable
