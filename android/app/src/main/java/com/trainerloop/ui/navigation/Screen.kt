@@ -9,6 +9,10 @@ sealed class Screen(val route: String) {
 
   // Other flows
   object Devices : Screen("devices")
+  object WorkoutBuilder : Screen("workout_builder")
+  object SessionDetail : Screen("session_detail/{sessionId}") {
+    fun createRoute(sessionId: String): String = "session_detail/$sessionId"
+  }
   object WorkoutDetail : Screen("workout_detail/{workoutId}") {
     fun createRoute(workoutId: String): String = "workout_detail/$workoutId"
   }

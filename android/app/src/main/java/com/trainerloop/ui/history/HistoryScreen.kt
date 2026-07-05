@@ -1,5 +1,8 @@
 package com.trainerloop.ui.history
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,9 +12,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Card
@@ -20,20 +26,29 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.model.SessionSummary
+import com.trainerloop.data.repository.ProfileRepository
+import com.trainerloop.ui.components.zoneColor
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
 fun HistoryScreen(
+  onSessionClick: (String) -> Unit,
   viewModel: HistoryViewModel = viewModel()
 ) {
   val sessions by viewModel.sessions.collectAsState()
@@ -81,16 +96,19 @@ fun HistoryScreen(
         style = MaterialTheme.typography.headlineLarge
       )
     }
+    item { WeekStripes(sessions) }
     items(sessions, key = { it.id }) { session ->
-      SessionCard(session)
+      SessionCard(session, onClick = { onSessionClick(session.id) })
     }
   }
 }
 
 @Composable
-private fun SessionCard(session: SessionSummary) {
+private fun SessionCard(session: SessionSummary, onClick: () -> Unit) {
   Card(
-    modifier = Modifier.fillMaxWidth(),
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable(onClick = onClick),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceVariant
     )
@@ -123,6 +141,83 @@ private fun SessionCard(session: SessionSummary) {
         }
         if (session.avgHr > 0) {
           SessionStat(value = "${session.avgHr} bpm", label = "Avg HR")
+        }
+      }
+    }
+  }
+}
+
+private const val STRIPE_DAYS = 42
+
+/** Horizontal strip of the last [STRIPE_DAYS] days; each ride day is a vertical
+ *  bar sized by duration and colored by its average-power zone. */
+@Composable
+private fun WeekStripes(sessions: List<SessionSummary>) {
+  val context = LocalContext.current
+  val resolvedFtp = remember { ProfileRepository(context).getProfileSync().ftp }
+
+  // Aggregate sessions per local day.
+  data class DayLoad(val durationSec: Int, val avgPower: Int)
+  val byDay = remember(sessions) {
+    val map = HashMap<LocalDate, DayLoad>()
+    sessions.forEach { s ->
+      val day = try {
+        Instant.parse(s.startedAt).atZone(ZoneId.systemDefault()).toLocalDate()
+      } catch (_: Exception) { return@forEach }
+      val prev = map[day]
+      map[day] = if (prev == null) DayLoad(s.durationSec, s.avgPower)
+      else DayLoad(prev.durationSec + s.durationSec, maxOf(prev.avgPower, s.avgPower))
+    }
+    map
+  }
+  val today = LocalDate.now()
+  val days = remember(byDay) { (STRIPE_DAYS - 1 downTo 0).map { today.minusDays(it.toLong()) } }
+  val maxDuration = remember(byDay) { byDay.values.maxOfOrNull { it.durationSec } ?: 1 }
+
+  Column {
+    Text(
+      text = "Last 6 weeks",
+      style = MaterialTheme.typography.labelMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Spacer(modifier = Modifier.height(6.dp))
+    val scrollState = rememberScrollState()
+    // Open scrolled to the most recent day (today), not the 6-weeks-ago start.
+    LaunchedEffect(scrollState.maxValue) { scrollState.scrollTo(scrollState.maxValue) }
+    Row(modifier = Modifier.horizontalScroll(scrollState)) {
+      days.forEach { day ->
+        val load = byDay[day]
+        val frac = if (load != null) (load.durationSec.toFloat() / maxDuration).coerceIn(0.15f, 1f) else 0f
+        val barColor = if (load != null) zoneColor(load.avgPower, resolvedFtp).copy(alpha = 1f)
+        else Color.Transparent
+        Column(
+          horizontalAlignment = Alignment.CenterHorizontally,
+          modifier = Modifier.width(14.dp)
+        ) {
+          Box(
+            modifier = Modifier
+              .width(8.dp)
+              .height(48.dp)
+              .clip(RoundedCornerShape(4.dp))
+              .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.BottomCenter
+          ) {
+            if (load != null) {
+              Box(
+                modifier = Modifier
+                  .width(8.dp)
+                  .height((48 * frac).dp)
+                  .clip(RoundedCornerShape(4.dp))
+                  .background(barColor)
+              )
+            }
+          }
+          Spacer(modifier = Modifier.height(2.dp))
+          Text(
+            text = "MTWTFSS"[day.dayOfWeek.value - 1].toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
         }
       }
     }
