@@ -19,26 +19,26 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Brightness6
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Power
-import androidx.compose.material.icons.filled.Straighten
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +53,24 @@ fun SettingsScreen(
   viewModel: SettingsViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsState()
+  var activeDialog by remember { mutableStateOf<SettingsDialog?>(null) }
+
+  when (activeDialog) {
+    SettingsDialog.POWER_ZONES -> ZonesDialog(
+      title = "Power Zones",
+      zones = powerZones(uiState.ftp.toIntOrNull() ?: 0),
+      subtitle = "Based on FTP ${uiState.ftp} W",
+      onDismiss = { activeDialog = null }
+    )
+    SettingsDialog.HR_ZONES -> ZonesDialog(
+      title = "Heart Rate Zones",
+      zones = hrZones(uiState.maxHr.toIntOrNull() ?: 0),
+      subtitle = "Based on Max HR ${uiState.maxHr} bpm",
+      onDismiss = { activeDialog = null }
+    )
+    SettingsDialog.ABOUT -> AboutDialog(onDismiss = { activeDialog = null })
+    null -> Unit
+  }
 
   Column(
     modifier = Modifier
@@ -134,46 +152,17 @@ fun SettingsScreen(
       )
     }
 
-    SettingsGroupCard(title = "Settings") {
-      SettingsRow(
-        icon = Icons.Default.FitnessCenter,
-        label = "FTP Settings",
-        onClick = { /* Detail screen not in scope */ }
-      )
-      HorizontalDivider()
+    SettingsGroupCard(title = "Zones") {
       SettingsRow(
         icon = Icons.Default.Power,
         label = "Power Zones",
-        onClick = { /* Detail screen not in scope */ }
+        onClick = { activeDialog = SettingsDialog.POWER_ZONES }
       )
       HorizontalDivider()
       SettingsRow(
         icon = Icons.Default.Favorite,
         label = "Heart Rate Zones",
-        onClick = { /* Detail screen not in scope */ }
-      )
-      HorizontalDivider()
-      SettingsRow(
-        icon = Icons.Default.Build,
-        label = "Trainer Settings",
-        onClick = { /* Detail screen not in scope */ }
-      )
-      HorizontalDivider()
-      SettingsRow(
-        icon = Icons.Default.Straighten,
-        label = "Units",
-        onClick = { /* Detail screen not in scope */ }
-      )
-      HorizontalDivider()
-      SettingsRow(
-        icon = Icons.Default.Brightness6,
-        label = "Theme",
-        trailing = {
-          Switch(
-            checked = false,
-            onCheckedChange = { /* Theme toggle not in scope */ }
-          )
-        }
+        onClick = { activeDialog = SettingsDialog.HR_ZONES }
       )
     }
 
@@ -206,15 +195,9 @@ fun SettingsScreen(
 
     SettingsGroupCard(title = "Support") {
       SettingsRow(
-        icon = Icons.AutoMirrored.Filled.Help,
-        label = "Help & Support",
-        onClick = { /* Not in scope */ }
-      )
-      HorizontalDivider()
-      SettingsRow(
         icon = Icons.Default.Info,
         label = "About",
-        onClick = { /* Not in scope */ }
+        onClick = { activeDialog = SettingsDialog.ABOUT }
       )
     }
 
@@ -234,6 +217,101 @@ fun SettingsScreen(
       )
     }
   }
+}
+
+private enum class SettingsDialog { POWER_ZONES, HR_ZONES, ABOUT }
+
+private data class Zone(val name: String, val range: String)
+
+// ponytail: standard Coggan 7-zone / 5-zone HR models, display only
+private fun powerZones(ftp: Int): List<Zone> {
+  if (ftp <= 0) return emptyList()
+  fun pct(p: Int) = ftp * p / 100
+  return listOf(
+    Zone("Z1 Recovery", "0–${pct(55)} W"),
+    Zone("Z2 Endurance", "${pct(56)}–${pct(75)} W"),
+    Zone("Z3 Tempo", "${pct(76)}–${pct(90)} W"),
+    Zone("Z4 Threshold", "${pct(91)}–${pct(105)} W"),
+    Zone("Z5 VO2 Max", "${pct(106)}–${pct(120)} W"),
+    Zone("Z6 Anaerobic", "${pct(121)}–${pct(150)} W"),
+    Zone("Z7 Neuromuscular", "${pct(150)}+ W")
+  )
+}
+
+private fun hrZones(maxHr: Int): List<Zone> {
+  if (maxHr <= 0) return emptyList()
+  fun pct(p: Int) = maxHr * p / 100
+  return listOf(
+    Zone("Z1 Recovery", "0–${pct(60)} bpm"),
+    Zone("Z2 Endurance", "${pct(60)}–${pct(70)} bpm"),
+    Zone("Z3 Tempo", "${pct(70)}–${pct(80)} bpm"),
+    Zone("Z4 Threshold", "${pct(80)}–${pct(90)} bpm"),
+    Zone("Z5 Max", "${pct(90)}–$maxHr bpm")
+  )
+}
+
+@Composable
+private fun ZonesDialog(
+  title: String,
+  subtitle: String,
+  zones: List<Zone>,
+  onDismiss: () -> Unit
+) {
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text(title) },
+    text = {
+      Column {
+        Text(
+          text = subtitle,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        if (zones.isEmpty()) {
+          Text("Set your FTP / Max HR above to see zones.")
+        }
+        zones.forEach { zone ->
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+          ) {
+            Text(zone.name, style = MaterialTheme.typography.bodyMedium)
+            Text(
+              zone.range,
+              style = MaterialTheme.typography.bodyMedium,
+              fontWeight = FontWeight.SemiBold
+            )
+          }
+        }
+      }
+    },
+    confirmButton = {
+      TextButton(onClick = onDismiss) { Text("Close") }
+    }
+  )
+}
+
+@Composable
+private fun AboutDialog(onDismiss: () -> Unit) {
+  val context = LocalContext.current
+  val version = remember {
+    try {
+      context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "?"
+    } catch (_: Exception) {
+      "?"
+    }
+  }
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("TrainerLoop") },
+    text = { Text("Version $version\n\nIndoor cycling trainer control, workouts and telemetry.") },
+    confirmButton = {
+      TextButton(onClick = onDismiss) { Text("Close") }
+    }
+  )
 }
 
 @Composable

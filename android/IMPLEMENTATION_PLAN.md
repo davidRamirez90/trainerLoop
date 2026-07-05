@@ -65,6 +65,34 @@ Files: `ui/theme/*`, `res/values/themes.xml`, `TrainerLoopApp.kt`, `HomeScreen.k
 
 Skipped: animations, custom fonts, tablet layouts, refactoring the Application-singleton workout handoff (works; touch only if it bites).
 
+## Phase 6 — Calendar strip, extend-recovery, chart interaction (shipped)
+
+Follow-on asks after Phases 1–5 landed. All four verified on a Pixel 2 XL except the recovery button (see note).
+
+1. **Calendar strip** (`ui/history/HistoryScreen.kt`): horizontal 6-week strip (`WeekStripes`) above the session list — one bar per day, height ∝ ride duration, color = avg-power zone via `zoneColor()`. Auto-scrolls to today (`LaunchedEffect(scrollState.maxValue)`), else the strip opens on the oldest day and today's bars sit off-screen. Skipped: tap-a-day-to-scroll (visual only).
+2. **Extend current recovery** (`WorkoutViewModel`, `WorkoutClock`, `data/model/WorkoutSegment.kt`, `WorkoutScreen.kt`): both entry points.
+   - `WorkoutSegment.withDurationSec()` copies a segment preserving its concrete type.
+   - `WorkoutClock.totalDurationSec` made mutable + `extendTotalDuration(delta)` (un-completes and relaunches the tick loop if already past the old end).
+   - VM holds a live `segments` list (diverges from `workout.segments` on extend) exposed via `WorkoutUiState.segments`; `extendCurrentRecovery(delta=30)` grows the active RECOVERY segment + clock, no-op otherwise.
+   - `CoachEngine.accept()` now returns the accepted `CoachSuggestion`; VM applies `ExtendRecovery` for real (previously the suggestion only marked itself accepted).
+   - Screen: manual "+30s recovery" button, shown only while the active segment is RECOVERY; all `workout.segments` reads switched to `uiState.segments`.
+   - Note: no bundled workout has a RECOVERY segment, so the button/coach suggestion have no on-device trigger yet — covered by `WorkoutViewModelTest` (grows / no-op). Add a recovery interval to a sample workout to demo.
+3. **Interval tap tooltip + zoom** (`ui/components/WorkoutChart.kt`): signature changed from `workout: Workout` to `segments: List<WorkoutSegment>` (only caller was `WorkoutScreen`). Tap an interval → `IntervalTooltip` card (label, `Interval n/N · starts m:ss`, target W · duration) with the block highlighted; re-tap dismisses. Full/Focus `FilterChip` windows the x-axis to the current interval ±20 s; sample lines clipped to the visible window.
+
+Tests: two new `WorkoutViewModelTest` cases for extend-recovery.
+
+## Phase 7 — Quick-start home + immersive landscape chart (shipped)
+
+1. **Today's plan replaces recent workouts** (`ui/home/HomeViewModel.kt`, `ui/home/HomeScreen.kt`):
+   - `refreshIntervals()` now also downloads + parses today's ZWO (`plannedWorkout` in `HomeUiState`) so the home card previews the interval profile and `startPlanned()` jumps in with no second round-trip (falls back to on-tap download if the pre-fetch failed).
+   - `PlannedWorkoutCard` redesigned: live "TODAY'S PLAN · intervals.icu" dot header, big name, duration + interval-count row, `WorkoutMiniChart` profile preview, prominent Quick Start button.
+   - Recent Workouts section is hidden whenever a plan exists (`hasPlan`) — the plan owns that slot; recent history only shows on rest days.
+2. **Landscape immersive chart** (`ui/workout/WorkoutScreen.kt`, `AndroidManifest.xml`):
+   - Manifest gets `configChanges="orientation|screenSize|screenLayout|keyboardHidden"` so rotation recomposes instead of tearing down the ride/foreground-service state.
+   - `WorkoutScreen` branches on `LocalConfiguration.orientation`; landscape renders `LandscapeWorkout` (returns early, no Scaffold/TopAppBar) — a compact metric rail (zone-tinted power, HR, cadence, elapsed) + play/pause + stop, and the chart as the hero.
+   - `ImmersiveWorkoutChart`: full-height zone-block + power/HR/cursor graph inside a `horizontalScroll`, 1×/2×/4×/8× zoom buttons, auto-follows the cursor (~40% from left) while running. Touching the chart to scroll/inspect pauses auto-follow (`awaitFirstDown`); a green-dot "Live" button re-engages it. Editing controls (skip / intensity / extend) intentionally omitted — rotate to portrait to adjust.
+   - Shared stop dialog extracted to `StopConfirmDialog`.
+
 ## Sequencing
 
 1+2 ship first as one small PR (~70 lines) → 3 → 4 → 5. Each phase independently verifiable.
