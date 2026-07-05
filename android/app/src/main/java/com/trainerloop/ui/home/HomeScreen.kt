@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import java.time.Instant
@@ -39,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import android.annotation.SuppressLint
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,10 +94,13 @@ fun HomeScreen(
       StartRideHero(onStartFreeRide = onStartFreeRide)
     }
 
-    if (uiState.plannedName != null || uiState.plannedLoading || uiState.plannedError != null) {
+    val hasPlan = uiState.plannedName != null || uiState.plannedLoading || uiState.plannedError != null
+    if (hasPlan) {
       item {
         PlannedWorkoutCard(
           name = uiState.plannedName,
+          workout = uiState.plannedWorkout,
+          ftp = uiState.ftp,
           loading = uiState.plannedLoading,
           error = uiState.plannedError,
           onStart = { viewModel.startPlanned() }
@@ -121,26 +126,30 @@ fun HomeScreen(
       )
     }
 
-    item {
-      Text(
-        text = "Recent Workouts",
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.SemiBold
-      )
-    }
-
-    val recentSession = uiState.recentSession
-    if (recentSession == null) {
+    // Today's plan takes over this slot when present — recent history only
+    // shows on rest days / when no workout is scheduled.
+    if (!hasPlan) {
       item {
         Text(
-          text = "No saved workouts yet.",
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
+          text = "Recent Workouts",
+          style = MaterialTheme.typography.titleLarge,
+          fontWeight = FontWeight.SemiBold
         )
       }
-    } else {
-      item {
-        RecentSessionCard(session = recentSession)
+
+      val recentSession = uiState.recentSession
+      if (recentSession == null) {
+        item {
+          Text(
+            text = "No saved workouts yet.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
+      } else {
+        item {
+          RecentSessionCard(session = recentSession)
+        }
       }
     }
   }
@@ -232,33 +241,73 @@ private fun StartRideHero(onStartFreeRide: () -> Unit) {
 @Composable
 private fun PlannedWorkoutCard(
   name: String?,
+  workout: com.trainerloop.data.model.Workout?,
+  ftp: Int,
   loading: Boolean,
   error: String?,
   onStart: () -> Unit
 ) {
+  val onColor = MaterialTheme.colorScheme.onSecondaryContainer
   Card(
     modifier = Modifier.fillMaxWidth(),
-    shape = RoundedCornerShape(20.dp),
+    shape = RoundedCornerShape(24.dp),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.secondaryContainer
     )
   ) {
     Column(modifier = Modifier.padding(20.dp)) {
-      Text(
-        text = "TODAY ON INTERVALS.ICU",
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
-      )
-      Spacer(modifier = Modifier.height(6.dp))
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+          modifier = Modifier
+            .size(8.dp)
+            .clip(CircleShape)
+            .background(Green40)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+          text = "TODAY'S PLAN · INTERVALS.ICU",
+          style = MaterialTheme.typography.labelSmall,
+          fontWeight = FontWeight.Bold,
+          color = onColor.copy(alpha = 0.7f)
+        )
+      }
+      Spacer(modifier = Modifier.height(8.dp))
       Text(
         text = name ?: error ?: "Loading planned workout…",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold,
+        color = onColor,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis
       )
+
+      if (workout != null) {
+        val totalSec = remember(workout) {
+          com.trainerloop.domain.WorkoutMath.totalDurationSec(workout.segments)
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+          Text(
+            text = formatDuration(totalSec),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = onColor.copy(alpha = 0.85f)
+          )
+          Text(
+            text = "${workout.segments.size} intervals",
+            style = MaterialTheme.typography.bodyMedium,
+            color = onColor.copy(alpha = 0.85f)
+          )
+        }
+        Spacer(modifier = Modifier.height(14.dp))
+        com.trainerloop.ui.components.WorkoutMiniChart(
+          workout = workout,
+          ftp = ftp,
+          chartHeight = 72.dp,
+          lineColor = onColor.copy(alpha = 0.9f)
+        )
+      }
+
       if (name != null) {
         Spacer(modifier = Modifier.height(16.dp))
         Button(
@@ -274,7 +323,7 @@ private fun PlannedWorkoutCard(
             )
           } else {
             Icon(
-              imageVector = Icons.Default.FitnessCenter,
+              imageVector = Icons.Default.PlayArrow,
               contentDescription = null,
               modifier = Modifier.padding(end = 8.dp)
             )

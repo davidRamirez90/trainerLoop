@@ -38,6 +38,7 @@ data class HomeUiState(
   val recentSession: SessionSummary? = null,
   // intervals.icu planned-workout quick start
   val plannedName: String? = null,
+  val plannedWorkout: Workout? = null,
   val plannedLoading: Boolean = false,
   val plannedError: String? = null
 )
@@ -155,8 +156,17 @@ class HomeViewModel(
           .putString(KEY_PLANNED_NAME, name)
           .putString(KEY_PLANNED_DATE, cachedToday)
           .apply()
+        // Pre-fetch the profile so the card can preview the interval shape and
+        // Quick Start jumps straight in without a second round-trip.
+        val workout = event?.id?.let { eventId ->
+          runCatching {
+            val zwo = client.downloadZwo(athleteId, eventId)
+            WorkoutImporter.import("$eventId.zwo", zwo, profileRepository.getProfileSync().ftp)
+          }.getOrNull()
+        }
         _uiState.value = _uiState.value.copy(
           plannedName = name,
+          plannedWorkout = workout,
           plannedLoading = false,
           plannedError = null
         )
@@ -171,6 +181,11 @@ class HomeViewModel(
 
   /** Downloads + parses the planned workout, then emits it via [plannedWorkoutReady]. */
   fun startPlanned() {
+    // Fast path: refreshIntervals already downloaded + parsed it for the preview.
+    _uiState.value.plannedWorkout?.let {
+      _plannedWorkoutReady.value = it
+      return
+    }
     val profile = profileRepository.getProfileSync()
     val athleteId = profile.intervalsIcuAthleteId
     val apiKey = profile.intervalsIcuApiKey
