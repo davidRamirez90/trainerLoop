@@ -19,7 +19,7 @@ class WorkoutClock(
   segments: List<WorkoutSegment>,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : AutoCloseable {
-  private val totalDurationSec: Int = segments.sumOf { it.durationSec }
+  private var totalDurationSec: Int = segments.sumOf { it.durationSec }
   private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + dispatcher)
   private val mutex = Mutex()
   private var tickJob: Job? = null
@@ -83,6 +83,22 @@ class WorkoutClock(
         _elapsedSec.value = 0
         _activeSec.value = 0
         _isComplete.value = false
+      }
+    }
+  }
+
+  /** Grows (or shrinks) the total timeline, e.g. when a recovery is extended mid-ride. */
+  fun extendTotalDuration(deltaSec: Int) {
+    scope.launch {
+      mutex.withLock {
+        totalDurationSec = (totalDurationSec + deltaSec).coerceAtLeast(0)
+        if (_isComplete.value && _elapsedSec.value < totalDurationSec) {
+          _isComplete.value = false
+          if (!_isRunning.value) {
+            _isRunning.value = true
+            tickJob = launchTickLoop()
+          }
+        }
       }
     }
   }

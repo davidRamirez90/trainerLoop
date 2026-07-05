@@ -38,3 +38,10 @@ sealed class WorkoutSegment(
 }
 
 enum class SegmentPhase { WARMUP, WORK, RECOVERY, COOLDOWN }
+
+/** Returns a copy of this segment with a new duration, preserving its concrete type. */
+fun WorkoutSegment.withDurationSec(newDurationSec: Int): WorkoutSegment = when (this) {
+  is WorkoutSegment.Step -> copy(durationSec = newDurationSec)
+  is WorkoutSegment.Ramp -> copy(durationSec = newDurationSec)
+  is WorkoutSegment.FreeRide -> copy(durationSec = newDurationSec)
+}

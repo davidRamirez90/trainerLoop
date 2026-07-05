@@ -71,8 +71,8 @@ class CoachEngine(
     }
   }
 
-  suspend fun accept(suggestionId: String) {
-    mutex.withLock {
+  suspend fun accept(suggestionId: String): CoachSuggestion? {
+    return mutex.withLock {
       updateSuggestionStatus(suggestionId, SuggestionStatus.ACCEPTED)
     }
   }

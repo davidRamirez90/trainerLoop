@@ -311,6 +311,58 @@ class WorkoutViewModelTest {
     return manager
   }
 
+  @Test
+  fun `extendCurrentRecovery grows the active recovery segment and total`() = runTest(testDispatcher) {
+    val viewModel = WorkoutViewModel(workout = recoveryWorkout(), dispatcher = testDispatcher)
+    viewModel.start()
+    runCurrent()
+
+    // Segment 0 is RECOVERY at elapsed 0.
+    viewModel.extendCurrentRecovery(30)
+    runCurrent()
+
+    val segs = viewModel.uiState.value.segments
+    assertEquals("recovery grown", 90, segs[0].durationSec)
+    assertEquals("total grown", 90 + 60, segs.sumOf { it.durationSec })
+  }
+
+  @Test
+  fun `extendCurrentRecovery is a no-op outside a recovery segment`() = runTest(testDispatcher) {
+    val viewModel = WorkoutViewModel(workout = sampleWorkout(), dispatcher = testDispatcher)
+    viewModel.start()
+    runCurrent()
+
+    viewModel.extendCurrentRecovery(30)
+    runCurrent()
+
+    assertEquals("unchanged", 60, viewModel.uiState.value.segments[0].durationSec)
+  }
+
+  private fun recoveryWorkout(): Workout = Workout(
+    id = "rec-workout",
+    name = "Recovery Test",
+    description = null,
+    source = WorkoutSource.MANUAL,
+    segments = listOf(
+      WorkoutSegment.Step(
+        id = "r1",
+        durationSec = 60,
+        label = "Ease",
+        phase = SegmentPhase.RECOVERY,
+        isWork = false,
+        targetRange = TargetRange(low = 100, high = 110)
+      ),
+      WorkoutSegment.Step(
+        id = "w1",
+        durationSec = 60,
+        label = "Work",
+        phase = SegmentPhase.WORK,
+        isWork = true,
+        targetRange = TargetRange(low = 200, high = 220)
+      )
+    )
+  )
+
   private fun sampleWorkout(): Workout = Workout(
     id = "test-workout",
     name = "Test Workout",
