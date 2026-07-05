@@ -52,6 +52,8 @@ data class WorkoutUiState(
   val samples: List<TelemetrySample> = emptyList(),
   val intensityOffsetPct: Int = 0,
   val isErgEnabled: Boolean = true,
+  /** Seconds spent on-target within the current interval so far. */
+  val inZoneSec: Int = 0,
   val error: String? = null,
   // Coach state
   val pendingSuggestion: CoachSuggestion? = null,
@@ -107,6 +109,10 @@ class WorkoutViewModel(
 
   private var ergWriteJob: Job? = null
 
+  // Time-in-zone bookkeeping: reset whenever the interval changes.
+  private var inZoneSegmentIndex: Int = -1
+  private var inZoneCount: Int = 0
+
   init {
     // (Re)create the recorder whenever the manager references change.
     viewModelScope.launch {
@@ -160,6 +166,7 @@ class WorkoutViewModel(
     viewModelScope.launch {
       clock.elapsedSec.collect {
         updateFromClock()
+        updateInZone()
         tickCoach()
       }
     }
@@ -382,6 +389,26 @@ class WorkoutViewModel(
         )
       )
     }
+  }
+
+  /**
+   * Counts one second of "on target" per clock tick when the current power is
+   * within ~5% of the interval's target band. Resets on interval change so the
+   * bar reflects the *current* interval, not the whole session.
+   */
+  private fun updateInZone() {
+    val state = _uiState.value
+    if (state.segmentIndex != inZoneSegmentIndex) {
+      inZoneSegmentIndex = state.segmentIndex
+      inZoneCount = 0
+    }
+    val range = state.targetRange
+    if (state.isRunning && range.low > 0) {
+      val onTarget = state.currentPowerWatts >= (range.low * 0.95).toInt() &&
+        state.currentPowerWatts <= (range.high * 1.05).toInt()
+      if (onTarget) inZoneCount++
+    }
+    _uiState.value = _uiState.value.copy(inZoneSec = inZoneCount)
   }
 
   private fun updateFromClock() {

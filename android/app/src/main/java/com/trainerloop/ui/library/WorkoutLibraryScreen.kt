@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,14 +16,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Snackbar
@@ -30,7 +37,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -49,6 +58,9 @@ fun WorkoutLibraryScreen(
 ) {
   val uiState by viewModel.uiState.collectAsState()
   val context = LocalContext.current
+
+  // Pick up workouts saved by the builder while this ViewModel was alive
+  androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refresh() }
   val ftp = remember { ProfileRepository(context).getProfileSync().ftp }
 
   val importLauncher = rememberLauncherForActivityResult(
@@ -127,7 +139,12 @@ fun WorkoutLibraryScreen(
         WorkoutCard(
           item = item,
           ftp = ftp,
-          onClick = { onWorkoutSelected(item.workout) }
+          isFavorite = item.workout.id in uiState.favoriteIds,
+          canDelete = item.workout.id in uiState.deletableIds,
+          onClick = { onWorkoutSelected(item.workout) },
+          onToggleFavorite = { viewModel.toggleFavorite(item.workout.id) },
+          onDuplicate = { viewModel.duplicateWorkout(item.workout) },
+          onDelete = { viewModel.deleteWorkout(item.workout.id) }
         )
       }
     }
@@ -151,10 +168,16 @@ fun WorkoutLibraryScreen(
 private fun WorkoutCard(
   item: WorkoutListItem,
   ftp: Int,
-  onClick: () -> Unit
+  isFavorite: Boolean,
+  canDelete: Boolean,
+  onClick: () -> Unit,
+  onToggleFavorite: () -> Unit,
+  onDuplicate: () -> Unit,
+  onDelete: () -> Unit
 ) {
   val workout = item.workout
   val stats = item.stats
+  var menuOpen by remember { mutableStateOf(false) }
 
   Card(
     modifier = Modifier
@@ -178,11 +201,39 @@ private fun WorkoutCard(
 
       Spacer(modifier = Modifier.height(8.dp))
 
-      Text(
-        text = workout.name,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold
-      )
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+          text = workout.name,
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold,
+          modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onToggleFavorite) {
+          Icon(
+            imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+            contentDescription = if (isFavorite) "Unfavorite" else "Favorite",
+            tint = if (isFavorite) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
+        Box {
+          IconButton(onClick = { menuOpen = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "More")
+          }
+          DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            DropdownMenuItem(
+              text = { Text("Duplicate") },
+              onClick = { menuOpen = false; onDuplicate() }
+            )
+            if (canDelete) {
+              DropdownMenuItem(
+                text = { Text("Delete") },
+                onClick = { menuOpen = false; onDelete() }
+              )
+            }
+          }
+        }
+      }
       if (workout.description != null) {
         Text(
           text = workout.description,

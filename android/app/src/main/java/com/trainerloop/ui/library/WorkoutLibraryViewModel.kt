@@ -17,8 +17,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import java.io.File
 import java.time.LocalDate
 
 enum class WorkoutCategory(val label: String) {
@@ -44,12 +42,15 @@ data class LibraryUiState(
   val isLoading: Boolean = false,
   val error: String? = null,
   val canSync: Boolean = false,
-  val isSyncing: Boolean = false
+  val isSyncing: Boolean = false,
+  /** Ids the user has starred; these sort to the top. */
+  val favoriteIds: Set<String> = emptySet(),
+  /** Ids backed by the on-disk store (imported/built) — the only ones that can be deleted. */
+  val deletableIds: Set<String> = emptySet()
 )
 
 class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(application) {
 
-  private val importFile = File(application.filesDir, "imported_workouts.json")
   private val profileRepository = ProfileRepository(application)
 
   private val _uiState = MutableStateFlow(LibraryUiState())
@@ -73,12 +74,41 @@ class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(appli
     applyFilter()
   }
 
+  fun refresh() = loadWorkouts()
+
   private fun loadWorkouts() {
     val builtIn = builtInWorkouts().map { it.toListItem() }
-    val imported = loadImportedWorkouts().map { it.toListItem() }
+    val stored = loadImportedWorkouts()
+    val imported = stored.map { it.toListItem() }
     val all = builtIn + imported
-    _uiState.value = _uiState.value.copy(workouts = all)
+    _uiState.value = _uiState.value.copy(
+      workouts = all,
+      favoriteIds = FavoriteStore.ids(getApplication()),
+      deletableIds = stored.map { it.id }.toSet()
+    )
     applyFilter()
+  }
+
+  fun toggleFavorite(id: String) {
+    FavoriteStore.toggle(getApplication(), id)
+    _uiState.value = _uiState.value.copy(favoriteIds = FavoriteStore.ids(getApplication()))
+    applyFilter()
+  }
+
+  /** Copies a workout (built-in or imported) into the store so it can be tweaked. */
+  fun duplicateWorkout(workout: Workout) {
+    val copy = workout.copy(
+      id = "custom_${System.currentTimeMillis()}",
+      name = "${workout.name} (copy)",
+      source = WorkoutSource.MANUAL
+    )
+    ImportedWorkoutStore.add(getApplication(), copy)
+    loadWorkouts()
+  }
+
+  fun deleteWorkout(id: String) {
+    ImportedWorkoutStore.remove(getApplication(), id)
+    loadWorkouts()
   }
 
   private fun applyFilter() {
@@ -91,7 +121,7 @@ class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(appli
         item.workout.name.lowercase().contains(query) ||
         item.workout.description?.lowercase()?.contains(query) == true
       matchesCategory && matchesSearch
-    }
+    }.sortedBy { it.workout.id !in state.favoriteIds } // favorites (false) sort first
     _uiState.value = state.copy(filteredWorkouts = filtered)
   }
 
@@ -177,26 +207,11 @@ class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(appli
   }
 
   private fun saveImportedWorkout(imported: ImportedWorkout) {
-    val existing = loadImportedWorkouts().toMutableList()
-    existing.add(imported.workout)
-    val json = JSONArray()
-    existing.forEach { workout ->
-      json.put(workoutToJson(workout))
-    }
-    importFile.writeText(json.toString())
+    ImportedWorkoutStore.add(getApplication(), imported.workout)
   }
 
-  private fun loadImportedWorkouts(): List<Workout> {
-    if (!importFile.exists()) return emptyList()
-    return try {
-      val json = JSONArray(importFile.readText())
-      (0 until json.length()).map { i ->
-        jsonToWorkout(json.getJSONObject(i))
-      }
-    } catch (e: Exception) {
-      emptyList()
-    }
-  }
+  private fun loadImportedWorkouts(): List<Workout> =
+    ImportedWorkoutStore.load(getApplication())
 
   private fun builtInWorkouts(): List<Workout> = listOf(
     Workout(
@@ -239,87 +254,4 @@ class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(appli
     )
   )
 
-  companion object {
-    private fun workoutToJson(w: Workout): org.json.JSONObject {
-      return org.json.JSONObject().apply {
-        put("id", w.id)
-        put("name", w.name)
-        put("description", w.description ?: "")
-        put("source", w.source.name)
-        val segs = JSONArray()
-        w.segments.forEach { seg ->
-          val obj = org.json.JSONObject()
-          obj.put("id", seg.id)
-          obj.put("durationSec", seg.durationSec)
-          obj.put("label", seg.label ?: "")
-          obj.put("phase", seg.phase.name)
-          obj.put("isWork", seg.isWork)
-          when (seg) {
-            is WorkoutSegment.Step -> {
-              obj.put("type", "step")
-              obj.put("targetLow", seg.targetRange.low)
-              obj.put("targetHigh", seg.targetRange.high)
-              seg.targetCadence?.let { obj.put("cadenceLow", it.first); obj.put("cadenceHigh", it.last) }
-            }
-            is WorkoutSegment.Ramp -> {
-              obj.put("type", "ramp")
-              obj.put("startPower", seg.startPower)
-              obj.put("endPower", seg.endPower)
-            }
-            is WorkoutSegment.FreeRide -> {
-              obj.put("type", "freeride")
-            }
-          }
-          segs.put(obj)
-        }
-        put("segments", segs)
-      }
-    }
-
-    private fun jsonToWorkout(obj: org.json.JSONObject): Workout {
-      val segs = mutableListOf<WorkoutSegment>()
-      val segArr = obj.getJSONArray("segments")
-      (0 until segArr.length()).forEach { i ->
-        val s = segArr.getJSONObject(i)
-        val type = s.getString("type")
-        val segment = when (type) {
-          "step" -> WorkoutSegment.Step(
-            id = s.getString("id"),
-            durationSec = s.getInt("durationSec"),
-            label = s.optString("label", null)?.takeIf { it.isNotEmpty() },
-            phase = SegmentPhase.valueOf(s.getString("phase")),
-            isWork = s.getBoolean("isWork"),
-            targetRange = TargetRange(s.getInt("targetLow"), s.getInt("targetHigh")),
-            targetCadence = if (s.has("cadenceLow") && s.has("cadenceHigh")) {
-              IntRange(s.getInt("cadenceLow"), s.getInt("cadenceHigh"))
-            } else null
-          )
-          "ramp" -> WorkoutSegment.Ramp(
-            id = s.getString("id"),
-            durationSec = s.getInt("durationSec"),
-            label = s.optString("label", null)?.takeIf { it.isNotEmpty() },
-            phase = SegmentPhase.valueOf(s.getString("phase")),
-            isWork = s.getBoolean("isWork"),
-            startPower = s.getInt("startPower"),
-            endPower = s.getInt("endPower")
-          )
-          else -> WorkoutSegment.FreeRide(
-            id = s.getString("id"),
-            durationSec = s.getInt("durationSec"),
-            label = s.optString("label", null)?.takeIf { it.isNotEmpty() },
-            phase = SegmentPhase.valueOf(s.getString("phase")),
-            isWork = s.getBoolean("isWork")
-          )
-        }
-        segs.add(segment)
-      }
-      return Workout(
-        id = obj.getString("id"),
-        name = obj.getString("name"),
-        description = obj.optString("description", null)?.takeIf { it.isNotEmpty() },
-        source = WorkoutSource.valueOf(obj.getString("source")),
-        segments = segs
-      )
-    }
-  }
 }

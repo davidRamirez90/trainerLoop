@@ -35,6 +35,8 @@ import com.trainerloop.data.model.WorkoutSource
 import com.trainerloop.ui.devices.DevicesScreen
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.ui.history.HistoryScreen
+import com.trainerloop.ui.history.SessionDetailScreen
+import com.trainerloop.ui.library.WorkoutBuilderScreen
 import com.trainerloop.ui.home.HomeScreen
 import com.trainerloop.ui.library.WorkoutLibraryScreen
 import com.trainerloop.ui.navigation.Screen
@@ -83,10 +85,29 @@ fun TrainerLoopApp(
       startDestination = Screen.Home.route
     ) {
       composable(Screen.Home.route) {
+        val context = LocalContext.current
         HomeScreen(
           onNavigateToDevices = { navController.navigate(Screen.Devices.route) },
           onNavigateToWorkouts = { navController.navigate(Screen.Workouts.route) },
-          onStartFreeRide = { navController.navigate(Screen.WorkoutPlayer.createRoute(sessionId = 1L)) }
+          onNavigateToBuilder = { navController.navigate(Screen.WorkoutBuilder.route) },
+          onStartFreeRide = { navController.navigate(Screen.WorkoutPlayer.createRoute(sessionId = 1L)) },
+          onStartPlanned = { workout ->
+            context.trainerLoopApp.selectedWorkout = workout
+            navController.navigate(Screen.WorkoutPlayer.createRoute(sessionId = 1L))
+          }
+        )
+      }
+
+      composable(Screen.WorkoutBuilder.route) {
+        WorkoutBuilderScreen(
+          onSaved = {
+            navController.popBackStack()
+            navController.navigate(Screen.Workouts.route) {
+              popUpTo(Screen.Home.route) { saveState = true }
+              launchSingleTop = true
+            }
+          },
+          onBack = { navController.popBackStack() }
         )
       }
 
@@ -101,7 +122,22 @@ fun TrainerLoopApp(
       }
 
       composable(Screen.History.route) {
-        HistoryScreen()
+        HistoryScreen(
+          onSessionClick = { sessionId ->
+            navController.navigate(Screen.SessionDetail.createRoute(sessionId))
+          }
+        )
+      }
+
+      composable(
+        route = Screen.SessionDetail.route,
+        arguments = listOf(navArgument("sessionId") { type = NavType.StringType })
+      ) { backStackEntry ->
+        val sessionId = backStackEntry.arguments?.getString("sessionId") ?: return@composable
+        SessionDetailScreen(
+          sessionId = sessionId,
+          onBack = { navController.popBackStack() }
+        )
       }
 
       composable(Screen.Profile.route) {

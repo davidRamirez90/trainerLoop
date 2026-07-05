@@ -87,6 +87,37 @@ fun WorkoutScreen(
     onDispose { view.keepScreenOn = false }
   }
 
+  // Audible cue when the interval changes, so you don't need to watch the
+  // screen. Skips the very first segment (index 0) so it doesn't fire on open.
+  val toneGen = remember {
+    android.media.ToneGenerator(
+      android.media.AudioManager.STREAM_MUSIC,
+      android.media.ToneGenerator.MAX_VOLUME
+    )
+  }
+  val tts = remember {
+    var engine: android.speech.tts.TextToSpeech? = null
+    engine = android.speech.tts.TextToSpeech(context) { /* status ignored; speak() no-ops if not ready */ }
+    engine
+  }
+  DisposableEffect(Unit) {
+    onDispose {
+      toneGen.release()
+      tts.stop()
+      tts.shutdown()
+    }
+  }
+  LaunchedEffect(uiState.segmentIndex) {
+    if (uiState.isRunning && uiState.segmentIndex > 0) {
+      toneGen.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 200)
+      val seg = workout.segments.getOrNull(uiState.segmentIndex)
+      val label = seg?.label ?: seg?.phase?.name?.lowercase() ?: "next interval"
+      val target = uiState.targetRange
+      val spoken = if (target.low > 0) "$label, ${(target.low + target.high) / 2} watts" else label
+      tts.speak(spoken, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "seg-${uiState.segmentIndex}")
+    }
+  }
+
   LaunchedEffect(uiState.isRunning) {
     if (uiState.isRunning) {
       val timeStr = formatDuration(uiState.elapsedSec)
@@ -163,6 +194,33 @@ fun WorkoutScreen(
             fontWeight = FontWeight.Bold
           )
         }
+      }
+
+      // Time-in-zone bar for the current interval (only when there's a target).
+      if (uiState.targetRange.low > 0) {
+        val segElapsed = uiState.elapsedInSegmentSec.coerceAtLeast(1)
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+          Text(
+            text = "IN ZONE",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+          Text(
+            text = "${uiState.inZoneSec}s / ${formatShortDuration(segElapsed)}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        androidx.compose.material3.LinearProgressIndicator(
+          progress = { (uiState.inZoneSec.toFloat() / segElapsed).coerceIn(0f, 1f) },
+          modifier = Modifier.fillMaxWidth(),
+          color = Green40
+        )
       }
 
       Spacer(modifier = Modifier.height(16.dp))

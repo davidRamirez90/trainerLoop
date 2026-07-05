@@ -9,9 +9,13 @@ import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
 import com.trainerloop.data.model.SessionSummary
+import com.trainerloop.data.model.Workout
 import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.data.repository.SessionRepository
 import com.trainerloop.data.source.local.AppDatabase
+import com.trainerloop.data.source.remote.IntervalsIcuClient
+import com.trainerloop.domain.WorkoutImporter
+import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -31,7 +35,11 @@ data class HomeUiState(
   val connectedHr: BluetoothDevice? = null,
   val isHrConnected: Boolean = false,
   val latestHrBpm: Int? = null,
-  val recentSession: SessionSummary? = null
+  val recentSession: SessionSummary? = null,
+  // intervals.icu planned-workout quick start
+  val plannedName: String? = null,
+  val plannedLoading: Boolean = false,
+  val plannedError: String? = null
 )
 
 class HomeViewModel(
@@ -55,6 +63,12 @@ class HomeViewModel(
 
   private val _uiState = MutableStateFlow(HomeUiState())
   val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+  /** Set once the planned workout has been downloaded + parsed and is ready to ride. */
+  private val _plannedWorkoutReady = MutableStateFlow<Workout?>(null)
+  val plannedWorkoutReady: StateFlow<Workout?> = _plannedWorkoutReady.asStateFlow()
+
+  private var plannedEventId: Long? = null
 
   private var ftmsJob: Job? = null
   private var hrJob: Job? = null
@@ -89,6 +103,106 @@ class HomeViewModel(
         bindHr(manager)
       }
     }
+
+    refreshIntervals()
+  }
+
+  /**
+   * Pulls today's planned workout (for the quick-start card) and the latest
+   * FTP/weight from intervals.icu. No-op when credentials aren't configured.
+   * Failures are surfaced softly on the card, not fatal.
+   */
+  fun refreshIntervals() {
+    val profile = profileRepository.getProfileSync()
+    val athleteId = profile.intervalsIcuAthleteId
+    val apiKey = profile.intervalsIcuApiKey
+    if (athleteId.isBlank() || apiKey.isBlank()) return
+
+    val client = IntervalsIcuClient(apiKey)
+    // Show yesterday's-cached name immediately so the card isn't blank while
+    // the network call is in flight (or if it fails offline).
+    val cache = getApplication<Application>()
+      .getSharedPreferences(PLANNED_CACHE_PREFS, Application.MODE_PRIVATE)
+    val cachedToday = LocalDate.now().toString()
+    val cachedName = cache.getString(KEY_PLANNED_NAME, null)
+      ?.takeIf { cache.getString(KEY_PLANNED_DATE, "") == cachedToday }
+    _uiState.value = _uiState.value.copy(
+      plannedName = cachedName ?: _uiState.value.plannedName,
+      plannedLoading = true,
+      plannedError = null
+    )
+
+    scope.launch {
+      // Sync FTP/weight from the athlete profile so targets stay current.
+      runCatching { client.getAthlete(athleteId) }.getOrNull()?.let { athlete ->
+        if (athlete.ftp != null || athlete.icu_weight != null) {
+          profileRepository.updateProfile {
+            it.copy(
+              ftp = athlete.ftp ?: it.ftp,
+              weightKg = athlete.icu_weight ?: it.weightKg
+            )
+          }
+        }
+      }
+
+      val today = LocalDate.now().toString()
+      val result = runCatching { client.getTodaysWorkoutEvents(athleteId, today) }
+      result.onSuccess { events ->
+        val event = events.firstOrNull()
+        plannedEventId = event?.id
+        val name = event?.name?.takeIf { it.isNotBlank() } ?: event?.let { "Planned workout" }
+        cache.edit()
+          .putString(KEY_PLANNED_NAME, name)
+          .putString(KEY_PLANNED_DATE, cachedToday)
+          .apply()
+        _uiState.value = _uiState.value.copy(
+          plannedName = name,
+          plannedLoading = false,
+          plannedError = null
+        )
+      }.onFailure {
+        _uiState.value = _uiState.value.copy(
+          plannedLoading = false,
+          plannedError = "Couldn't reach intervals.icu"
+        )
+      }
+    }
+  }
+
+  /** Downloads + parses the planned workout, then emits it via [plannedWorkoutReady]. */
+  fun startPlanned() {
+    val profile = profileRepository.getProfileSync()
+    val athleteId = profile.intervalsIcuAthleteId
+    val apiKey = profile.intervalsIcuApiKey
+    val eventId = plannedEventId ?: return
+    if (athleteId.isBlank() || apiKey.isBlank()) return
+
+    _uiState.value = _uiState.value.copy(plannedLoading = true, plannedError = null)
+    val client = IntervalsIcuClient(apiKey)
+    scope.launch {
+      runCatching {
+        val zwo = client.downloadZwo(athleteId, eventId)
+        WorkoutImporter.import("$eventId.zwo", zwo, profile.ftp)
+      }.onSuccess { workout ->
+        _uiState.value = _uiState.value.copy(plannedLoading = false)
+        _plannedWorkoutReady.value = workout
+      }.onFailure {
+        _uiState.value = _uiState.value.copy(
+          plannedLoading = false,
+          plannedError = "Couldn't load planned workout"
+        )
+      }
+    }
+  }
+
+  fun consumePlannedWorkout() {
+    _plannedWorkoutReady.value = null
+  }
+
+  private companion object {
+    const val PLANNED_CACHE_PREFS = "trainer_loop_planned_cache"
+    const val KEY_PLANNED_NAME = "planned_name"
+    const val KEY_PLANNED_DATE = "planned_date"
   }
 
   private fun bindTrainer(manager: FtmsManager?) {

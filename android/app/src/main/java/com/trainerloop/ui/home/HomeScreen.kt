@@ -34,7 +34,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import android.annotation.SuppressLint
@@ -57,10 +59,20 @@ import com.trainerloop.ui.theme.Green40
 fun HomeScreen(
   onNavigateToDevices: () -> Unit,
   onNavigateToWorkouts: () -> Unit,
+  onNavigateToBuilder: () -> Unit,
   onStartFreeRide: () -> Unit,
+  onStartPlanned: (com.trainerloop.data.model.Workout) -> Unit,
   viewModel: HomeViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsState()
+  val plannedReady by viewModel.plannedWorkoutReady.collectAsState()
+
+  LaunchedEffect(plannedReady) {
+    plannedReady?.let {
+      viewModel.consumePlannedWorkout()
+      onStartPlanned(it)
+    }
+  }
 
   LazyColumn(
     modifier = Modifier
@@ -80,6 +92,17 @@ fun HomeScreen(
       StartRideHero(onStartFreeRide = onStartFreeRide)
     }
 
+    if (uiState.plannedName != null || uiState.plannedLoading || uiState.plannedError != null) {
+      item {
+        PlannedWorkoutCard(
+          name = uiState.plannedName,
+          loading = uiState.plannedLoading,
+          error = uiState.plannedError,
+          onStart = { viewModel.startPlanned() }
+        )
+      }
+    }
+
     item {
       DeviceStatusRow(
         trainerName = uiState.connectedTrainer?.name,
@@ -94,7 +117,7 @@ fun HomeScreen(
     item {
       ActionRows(
         onWorkoutLibrary = onNavigateToWorkouts,
-        onWorkoutBuilder = { /* TODO: builder not in scope */ }
+        onWorkoutBuilder = onNavigateToBuilder
       )
     }
 
@@ -201,6 +224,63 @@ private fun StartRideHero(onStartFreeRide: () -> Unit) {
           modifier = Modifier.padding(end = 8.dp)
         )
         Text("Start Free Ride", fontWeight = FontWeight.SemiBold)
+      }
+    }
+  }
+}
+
+@Composable
+private fun PlannedWorkoutCard(
+  name: String?,
+  loading: Boolean,
+  error: String?,
+  onStart: () -> Unit
+) {
+  Card(
+    modifier = Modifier.fillMaxWidth(),
+    shape = RoundedCornerShape(20.dp),
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.secondaryContainer
+    )
+  ) {
+    Column(modifier = Modifier.padding(20.dp)) {
+      Text(
+        text = "TODAY ON INTERVALS.ICU",
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+      )
+      Spacer(modifier = Modifier.height(6.dp))
+      Text(
+        text = name ?: error ?: "Loading planned workout…",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis
+      )
+      if (name != null) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Button(
+          onClick = onStart,
+          enabled = !loading,
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          if (loading) {
+            CircularProgressIndicator(
+              modifier = Modifier.size(18.dp),
+              strokeWidth = 2.dp,
+              color = MaterialTheme.colorScheme.onPrimary
+            )
+          } else {
+            Icon(
+              imageVector = Icons.Default.FitnessCenter,
+              contentDescription = null,
+              modifier = Modifier.padding(end = 8.dp)
+            )
+            Text("Quick Start", fontWeight = FontWeight.SemiBold)
+          }
+        }
       }
     }
   }
