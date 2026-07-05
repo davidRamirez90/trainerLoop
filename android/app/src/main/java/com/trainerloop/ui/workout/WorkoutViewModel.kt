@@ -10,11 +10,15 @@ import com.trainerloop.data.model.CoachInterventions
 import com.trainerloop.data.model.CoachMessages
 import com.trainerloop.data.model.CoachProfile
 import com.trainerloop.data.model.CoachRules
+import com.trainerloop.data.model.CoachAction
 import com.trainerloop.data.model.CoachSuggestion
 import com.trainerloop.data.model.CoachVoice
+import com.trainerloop.data.model.SegmentPhase
 import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.model.Workout
+import com.trainerloop.data.model.WorkoutSegment
+import com.trainerloop.data.model.withDurationSec
 import com.trainerloop.domain.CoachEngine
 import com.trainerloop.domain.TelemetryRecorder
 import com.trainerloop.domain.WorkoutClock
@@ -50,6 +54,8 @@ data class WorkoutUiState(
   val currentCadenceRpm: Int = 0,
   val currentHrBpm: Int = 0,
   val samples: List<TelemetrySample> = emptyList(),
+  /** Live segment list — mutated when a recovery is extended mid-ride. */
+  val segments: List<WorkoutSegment> = emptyList(),
   val intensityOffsetPct: Int = 0,
   val isErgEnabled: Boolean = true,
   /** Seconds spent on-target within the current interval so far. */
@@ -68,7 +74,6 @@ data class WorkoutFinishData(
 )
 
 private data class WorkoutControlTick(
-  val elapsedSec: Int,
   val running: Boolean,
   val ergEnabled: Boolean,
   val targetRange: TargetRange
@@ -92,7 +97,10 @@ class WorkoutViewModel(
   private val clock = WorkoutClock(workout.segments, dispatcher)
   private val coachEngine = CoachEngine(defaultProfile(), workout.segments)
 
-  private val _uiState = MutableStateFlow(WorkoutUiState())
+  /** Live timeline. Diverges from [workout.segments] once a recovery is extended. */
+  private var segments: List<WorkoutSegment> = workout.segments
+
+  private val _uiState = MutableStateFlow(WorkoutUiState(segments = workout.segments))
   val uiState: StateFlow<WorkoutUiState> = _uiState.asStateFlow()
 
   private val _finishEvent = MutableStateFlow<WorkoutFinishData?>(null)
@@ -196,13 +204,15 @@ class WorkoutViewModel(
     }
 
     viewModelScope.launch {
+      // Drive ERG writes off the values that actually change the target, not the
+      // 1 Hz clock. Otherwise every combine re-emit (once/sec) issues a GATT write
+      // (~3600/ride) when only segment/toggle changes matter (~tens/ride).
       combine(
-        clock.elapsedSec,
         _uiState.map { it.isRunning }.distinctUntilChanged(),
         _uiState.map { it.isErgEnabled }.distinctUntilChanged(),
         _uiState.map { it.targetRange }.distinctUntilChanged()
-      ) { elapsedSec, running, ergEnabled, targetRange ->
-        WorkoutControlTick(elapsedSec, running, ergEnabled, targetRange)
+      ) { running, ergEnabled, targetRange ->
+        WorkoutControlTick(running, ergEnabled, targetRange)
       }.collect { tick ->
         handleControlTick(tick)
       }
@@ -248,7 +258,7 @@ class WorkoutViewModel(
 
   fun skipSegment() {
     val nextSegmentStart = _uiState.value.segmentEndSec
-    if (nextSegmentStart < WorkoutMath.totalDurationSec(workout.segments)) {
+    if (nextSegmentStart < WorkoutMath.totalDurationSec(segments)) {
       seek(nextSegmentStart)
     }
   }
@@ -290,8 +300,28 @@ class WorkoutViewModel(
   // Coach suggestion handlers
   fun acceptSuggestion(suggestionId: String) {
     viewModelScope.launch {
-      coachEngine.accept(suggestionId)
+      val accepted = coachEngine.accept(suggestionId)
+      (accepted?.action as? CoachAction.ExtendRecovery)?.let {
+        extendCurrentRecovery(it.seconds)
+      }
     }
+  }
+
+  /**
+   * Lengthens the currently-active recovery segment by [deltaSec] and grows the
+   * clock's timeline to match, so ERG keeps holding the easy target longer. No-op
+   * unless the current segment is a RECOVERY. Also invoked by the manual button.
+   */
+  fun extendCurrentRecovery(deltaSec: Int = RECOVERY_EXTEND_STEP_SEC) {
+    val idx = _uiState.value.segmentIndex
+    val seg = segments.getOrNull(idx) ?: return
+    if (seg.phase != SegmentPhase.RECOVERY) return
+    segments = segments.toMutableList().also {
+      it[idx] = seg.withDurationSec(seg.durationSec + deltaSec)
+    }
+    clock.extendTotalDuration(deltaSec)
+    _uiState.value = _uiState.value.copy(segments = segments)
+    updateFromClock()
   }
 
   fun rejectSuggestion(suggestionId: String) {
@@ -414,12 +444,12 @@ class WorkoutViewModel(
   private fun updateFromClock() {
     val elapsed = clock.elapsedSec.value
     val active = clock.activeSec.value
-    val segIndex = WorkoutMath.segmentIndexAt(workout.segments, elapsed)
-    val segStart = workout.segments.take(segIndex).sumOf { it.durationSec }
-    val segEnd = segStart + (workout.segments.getOrNull(segIndex)?.durationSec ?: 0)
-    val elapsedInSeg = (elapsed - segStart).coerceIn(0, workout.segments.getOrNull(segIndex)?.durationSec ?: 0)
+    val segIndex = WorkoutMath.segmentIndexAt(segments, elapsed)
+    val segStart = segments.take(segIndex).sumOf { it.durationSec }
+    val segEnd = segStart + (segments.getOrNull(segIndex)?.durationSec ?: 0)
+    val elapsedInSeg = (elapsed - segStart).coerceIn(0, segments.getOrNull(segIndex)?.durationSec ?: 0)
     val offset = _uiState.value.intensityOffsetPct
-    val target = WorkoutMath.targetRangeAt(workout.segments, elapsed)
+    val target = WorkoutMath.targetRangeAt(segments, elapsed)
     val adjustedTarget = if (offset != 0) {
       val mid = (target.low + target.high) / 2
       val factor = 1.0 + offset / 100.0
@@ -490,5 +520,6 @@ class WorkoutViewModel(
     )
 
     private const val CONTROL_READY_TIMEOUT_MS = 5_000L
+    private const val RECOVERY_EXTEND_STEP_SEC = 30
   }
 }

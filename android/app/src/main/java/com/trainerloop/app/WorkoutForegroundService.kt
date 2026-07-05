@@ -19,7 +19,8 @@ class WorkoutForegroundService : Service() {
   override fun onCreate() {
     super.onCreate()
     createNotificationChannel()
-    acquireWakeLock()
+    // Wake lock is acquired lazily only while running (see onStartCommand), so a
+    // paused workout doesn't keep the CPU out of deep sleep.
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -33,12 +34,14 @@ class WorkoutForegroundService : Service() {
         val power = intent.getIntExtra(EXTRA_POWER, 0)
         val time = intent.getStringExtra(EXTRA_TIME) ?: "0:00"
         val isRunning = intent.getBooleanExtra(EXTRA_IS_RUNNING, true)
+        updateWakeLock(isRunning)
         startForeground(NOTIFICATION_ID, buildNotification(power, time, isRunning))
       }
       else -> {
         val power = intent?.getIntExtra(EXTRA_POWER, 0) ?: 0
         val time = intent?.getStringExtra(EXTRA_TIME) ?: "0:00"
         val isRunning = intent?.getBooleanExtra(EXTRA_IS_RUNNING, true) ?: true
+        updateWakeLock(isRunning)
         startForeground(NOTIFICATION_ID, buildNotification(power, time, isRunning))
       }
     }
@@ -83,7 +86,13 @@ class WorkoutForegroundService : Service() {
     }
   }
 
+  /** Hold the partial wake lock only while running; release it when paused. */
+  private fun updateWakeLock(isRunning: Boolean) {
+    if (isRunning) acquireWakeLock() else releaseWakeLock()
+  }
+
   private fun acquireWakeLock() {
+    if (wakeLock?.isHeld == true) return
     val powerManager = getSystemService(POWER_SERVICE) as PowerManager
     wakeLock = powerManager.newWakeLock(
       PowerManager.PARTIAL_WAKE_LOCK,

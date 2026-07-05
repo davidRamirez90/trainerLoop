@@ -1,6 +1,7 @@
 package com.trainerloop.ble
 
 import android.util.Log
+import com.trainerloop.app.BuildConfig
 
 /**
  * Thin wrapper around android.util.Log so the whole BLE pipeline logs under
@@ -16,12 +17,17 @@ import android.util.Log
 object BleLog {
   const val TAG = "TrainerLoopBle"
 
-  fun d(msg: String) { safe { Log.d(TAG, msg) } }
+  // Debug logs are per-BLE-packet on the hot path. Gate on DEBUG and take a
+  // lambda so the message (e.g. toHex() over every byte) is never built in
+  // release. `d(String)` kept for convenience but also DEBUG-gated.
+  inline fun d(msg: () -> String) { if (BuildConfig.DEBUG) safe { Log.d(TAG, msg()) } }
+  fun d(msg: String) { if (BuildConfig.DEBUG) safe { Log.d(TAG, msg) } }
   fun i(msg: String) { safe { Log.i(TAG, msg) } }
   fun w(msg: String, t: Throwable? = null) { safe { Log.w(TAG, msg, t) } }
   fun e(msg: String, t: Throwable? = null) { safe { Log.e(TAG, msg, t) } }
 
-  private inline fun safe(block: () -> Unit) {
+  @PublishedApi
+  internal inline fun safe(block: () -> Unit) {
     try { block() } catch (_: Throwable) { /* swallowed */ }
   }
 }

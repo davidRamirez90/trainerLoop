@@ -1,14 +1,36 @@
 package com.trainerloop.ui.workout
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.FilledIconButton
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -41,6 +63,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -127,11 +150,39 @@ fun WorkoutScreen(
     }
   }
 
-  LaunchedEffect(uiState.currentPowerWatts, uiState.elapsedSec) {
+  // Throttle FGS notification re-posts: each update() is a startService IPC +
+  // Notification rebuild. Keying on a 3 s time bucket (not raw elapsedSec) cuts
+  // that per-second churn to ~once per 3 s while keeping the "W • m:ss" fresh.
+  LaunchedEffect(uiState.currentPowerWatts, uiState.elapsedSec / 3) {
     if (uiState.isRunning) {
       val timeStr = formatDuration(uiState.elapsedSec)
       WorkoutForegroundService.update(context, uiState.currentPowerWatts, timeStr, true)
     }
+  }
+
+  val isLandscape =
+    LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+  if (isLandscape) {
+    LandscapeWorkout(
+      uiState = uiState,
+      ftp = ftp,
+      onPlayPause = {
+        when {
+          uiState.isRunning -> viewModel.pause()
+          uiState.isComplete -> viewModel.maybeEmitFinish()
+          else -> if (uiState.elapsedSec == 0) viewModel.start() else viewModel.resume()
+        }
+      },
+      onStop = { requestStop() }
+    )
+    if (showStopConfirm) {
+      StopConfirmDialog(
+        onDismiss = { showStopConfirm = false },
+        onConfirm = { showStopConfirm = false; viewModel.stop() }
+      )
+    }
+    return
   }
 
   Scaffold(
@@ -265,14 +316,14 @@ fun WorkoutScreen(
         powerSamples = uiState.samples,
         modifier = Modifier.fillMaxWidth()
       ) {
-        val currentSegment = workout.segments.getOrNull(uiState.segmentIndex)
+        val currentSegment = uiState.segments.getOrNull(uiState.segmentIndex)
         Text(
           text = currentSegment?.label ?: currentSegment?.phase?.name ?: "",
           style = MaterialTheme.typography.titleMedium,
           fontWeight = FontWeight.SemiBold
         )
         Text(
-          text = "Segment ${uiState.segmentIndex + 1}/${workout.segments.size}",
+          text = "Segment ${uiState.segmentIndex + 1}/${uiState.segments.size}",
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -280,7 +331,7 @@ fun WorkoutScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         WorkoutChart(
-          workout = workout,
+          segments = uiState.segments,
           samples = uiState.samples,
           elapsedSec = uiState.elapsedSec,
           ftp = ftp,
@@ -296,13 +347,26 @@ fun WorkoutScreen(
           FooterStat("Elapsed", formatDuration(uiState.elapsedSec))
           FooterStat(
             "Remaining",
-            formatDuration((WorkoutMath.totalDurationSec(workout.segments) - uiState.elapsedSec).coerceAtLeast(0))
+            formatDuration((WorkoutMath.totalDurationSec(uiState.segments) - uiState.elapsedSec).coerceAtLeast(0))
           )
-          FooterStat("Total", formatDuration(WorkoutMath.totalDurationSec(workout.segments)))
+          FooterStat("Total", formatDuration(WorkoutMath.totalDurationSec(uiState.segments)))
         }
       }
 
       Spacer(modifier = Modifier.weight(1f))
+
+      // Extend recovery — only meaningful while a recovery interval is active.
+      if (uiState.segments.getOrNull(uiState.segmentIndex)?.phase ==
+        com.trainerloop.data.model.SegmentPhase.RECOVERY
+      ) {
+        FilledTonalButton(
+          onClick = { viewModel.extendCurrentRecovery() },
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          Text("+30s recovery")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+      }
 
       // Intensity controls
       Row(
@@ -383,7 +447,7 @@ fun WorkoutScreen(
 
         FilledTonalButton(
           onClick = { viewModel.skipSegment() },
-          enabled = uiState.segmentEndSec < WorkoutMath.totalDurationSec(workout.segments)
+          enabled = uiState.segmentEndSec < WorkoutMath.totalDurationSec(uiState.segments)
         ) {
           Icon(Icons.Default.SkipNext, contentDescription = null)
           Spacer(modifier = Modifier.width(4.dp))
@@ -413,24 +477,302 @@ fun WorkoutScreen(
   }
 
   if (showStopConfirm) {
-    AlertDialog(
-      onDismissRequest = { showStopConfirm = false },
-      title = { Text("End workout?") },
-      text = { Text("Your ride will be saved.") },
-      confirmButton = {
-        TextButton(onClick = {
-          showStopConfirm = false
-          viewModel.stop()
-        }) {
-          Text("End")
+    StopConfirmDialog(
+      onDismiss = { showStopConfirm = false },
+      onConfirm = { showStopConfirm = false; viewModel.stop() }
+    )
+  }
+}
+
+@Composable
+private fun StopConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("End workout?") },
+    text = { Text("Your ride will be saved.") },
+    confirmButton = { TextButton(onClick = onConfirm) { Text("End") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+  )
+}
+
+/**
+ * Landscape mode: the chart is the hero. Big scrollable/zoomable interval graph
+ * with a compact metric rail. Editing controls (skip / intensity / extend) are
+ * intentionally absent — rotate back to portrait to adjust the ride.
+ */
+@Composable
+private fun LandscapeWorkout(
+  uiState: WorkoutUiState,
+  ftp: Int,
+  onPlayPause: () -> Unit,
+  onStop: () -> Unit
+) {
+  Row(
+    modifier = Modifier
+      .fillMaxSize()
+      .background(MaterialTheme.colorScheme.background)
+      .padding(12.dp),
+    horizontalArrangement = Arrangement.spacedBy(12.dp)
+  ) {
+    // Metric rail
+    Column(
+      modifier = Modifier
+        .width(132.dp)
+        .fillMaxHeight(),
+      verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+      RailMetric(
+        label = "POWER",
+        value = uiState.currentPowerWatts.toString(),
+        unit = "W",
+        color = zoneColor(uiState.currentPowerWatts, ftp).copy(alpha = 1f),
+        big = true
+      )
+      RailMetric(
+        label = "HEART",
+        value = if (uiState.currentHrBpm > 0) uiState.currentHrBpm.toString() else "—",
+        unit = "bpm"
+      )
+      RailMetric(
+        label = "CADENCE",
+        value = if (uiState.currentCadenceRpm > 0) uiState.currentCadenceRpm.toString() else "—",
+        unit = "rpm"
+      )
+      RailMetric(
+        label = "ELAPSED",
+        value = formatDuration(uiState.elapsedSec),
+        unit = ""
+      )
+      Spacer(Modifier.weight(1f))
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilledIconButton(onClick = onPlayPause, modifier = Modifier.weight(1f)) {
+          Icon(
+            if (uiState.isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+            contentDescription = if (uiState.isRunning) "Pause" else "Play"
+          )
         }
-      },
-      dismissButton = {
-        TextButton(onClick = { showStopConfirm = false }) {
-          Text("Cancel")
+        FilledIconButton(
+          onClick = onStop,
+          modifier = Modifier.weight(1f),
+          colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.error,
+            contentColor = MaterialTheme.colorScheme.onError
+          )
+        ) {
+          Icon(Icons.Default.Stop, contentDescription = "Stop")
         }
       }
+    }
+
+    ImmersiveWorkoutChart(
+      uiState = uiState,
+      ftp = ftp,
+      modifier = Modifier
+        .weight(1f)
+        .fillMaxHeight()
     )
+  }
+}
+
+@Composable
+private fun RailMetric(
+  label: String,
+  value: String,
+  unit: String,
+  color: androidx.compose.ui.graphics.Color? = null,
+  big: Boolean = false
+) {
+  Column {
+    Text(
+      text = label,
+      style = MaterialTheme.typography.labelSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    Row(verticalAlignment = Alignment.Bottom) {
+      Text(
+        text = value,
+        style = if (big) MaterialTheme.typography.displayMedium.copy(fontFeatureSettings = "tnum")
+        else MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
+        fontWeight = FontWeight.Bold,
+        color = color ?: MaterialTheme.colorScheme.onSurface
+      )
+      if (unit.isNotEmpty()) {
+        Spacer(Modifier.width(2.dp))
+        Text(
+          text = unit,
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+      }
+    }
+  }
+}
+
+private val ZOOM_LEVELS = listOf(1f, 2f, 4f, 8f)
+
+@Composable
+private fun ImmersiveWorkoutChart(
+  uiState: WorkoutUiState,
+  ftp: Int,
+  modifier: Modifier = Modifier
+) {
+  val segments = uiState.segments
+  val samples = uiState.samples
+  val elapsedSec = uiState.elapsedSec
+  val totalDuration = remember(segments) { WorkoutMath.totalDurationSec(segments) }
+
+  var zoomIdx by remember { mutableStateOf(0) }
+  val zoom = ZOOM_LEVELS[zoomIdx]
+  val scrollState = rememberScrollState()
+  val density = LocalDensity.current
+  // Touching the chart pauses auto-follow so you can inspect earlier intervals;
+  // the "Live" button re-engages it.
+  var followEnabled by remember { mutableStateOf(true) }
+
+  val cursorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+  val hrLineColor = MaterialTheme.colorScheme.error
+  val powerLineColor = MaterialTheme.colorScheme.secondary
+  val gridColor = cursorColor.copy(alpha = 0.15f)
+
+  Box(
+    modifier = modifier
+      .clip(RoundedCornerShape(16.dp))
+      .background(MaterialTheme.colorScheme.surface)
+  ) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+      val viewportWidth = maxWidth
+      val contentWidth = viewportWidth * zoom
+
+      // Auto-follow the cursor while running, keeping it ~40% from the left.
+      LaunchedEffect(elapsedSec, zoom, totalDuration, followEnabled) {
+        if (followEnabled && uiState.isRunning && totalDuration > 0) {
+          val contentPx = with(density) { contentWidth.toPx() }
+          val viewportPx = with(density) { viewportWidth.toPx() }
+          val cursorPx = contentPx * (elapsedSec.toFloat() / totalDuration)
+          val target = (cursorPx - viewportPx * 0.4f)
+            .coerceIn(0f, (contentPx - viewportPx).coerceAtLeast(0f))
+          scrollState.animateScrollTo(target.toInt())
+        }
+      }
+
+      Canvas(
+        modifier = Modifier
+          .horizontalScroll(scrollState)
+          .pointerInput(Unit) {
+            awaitEachGesture {
+              awaitFirstDown(requireUnconsumed = false)
+              followEnabled = false
+            }
+          }
+          .width(contentWidth)
+          .fillMaxHeight()
+      ) {
+        if (totalDuration == 0) return@Canvas
+        val width = size.width
+        val heightPx = size.height
+        val pad = 10.dp.toPx()
+        val chartHeight = heightPx - pad * 2
+        val chartBottom = heightPx - pad
+
+        val peakTarget = (0..totalDuration step (totalDuration / 100).coerceAtLeast(1))
+          .maxOf { WorkoutMath.targetRangeAt(segments, it).high }
+        val peakSample = samples.maxOfOrNull { it.powerWatts } ?: 0
+        val maxPowerAxis = (maxOf(peakTarget, peakSample, 1) * 1.1f)
+
+        fun xForTime(sec: Int): Float = (sec / totalDuration.toFloat()) * width
+        fun yForPower(power: Int): Float =
+          chartBottom - (power / maxPowerAxis).coerceIn(0f, 1f) * chartHeight
+        fun yForHr(bpm: Int): Float =
+          chartBottom - ((bpm - 40f) / 160f).coerceIn(0f, 1f) * chartHeight
+
+        if (ftp > 0) {
+          listOf(ftp, ftp / 2).forEach { watts ->
+            val y = yForPower(watts)
+            drawLine(gridColor, Offset(0f, y), Offset(width, y), strokeWidth = 1.dp.toPx())
+          }
+        }
+
+        // Zone blocks from zero.
+        val step = (totalDuration / 400).coerceAtLeast(1)
+        var sec = 0
+        while (sec <= totalDuration) {
+          val range = WorkoutMath.targetRangeAt(segments, sec)
+          val target = (range.low + range.high) / 2
+          val x = xForTime(sec)
+          val xEnd = xForTime((sec + step).coerceAtMost(totalDuration))
+          val yTop = yForPower(target)
+          drawRect(
+            color = zoneColor(target, ftp),
+            topLeft = Offset(x, yTop),
+            size = Size((xEnd - x).coerceAtLeast(1f), chartBottom - yTop)
+          )
+          sec += step
+        }
+
+        if (samples.size >= 2) {
+          var hrPath: Path? = null
+          samples.forEach { s ->
+            if (s.hrBpm <= 0) hrPath = null
+            else {
+              val p = Offset(xForTime(s.timeSec), yForHr(s.hrBpm))
+              val cur = hrPath
+              if (cur == null) hrPath = Path().apply { moveTo(p.x, p.y) }
+              else cur.lineTo(p.x, p.y)
+            }
+          }
+          hrPath?.let { drawPath(it, hrLineColor, style = Stroke(width = 2.dp.toPx())) }
+
+          val power = Path()
+          samples.firstOrNull()?.let { power.moveTo(xForTime(it.timeSec), yForPower(it.powerWatts)) }
+          samples.drop(1).forEach { power.lineTo(xForTime(it.timeSec), yForPower(it.powerWatts)) }
+          drawPath(power, powerLineColor, style = Stroke(width = 2.5.dp.toPx()))
+        }
+
+        val cursorX = xForTime(elapsedSec)
+        drawLine(cursorColor, Offset(cursorX, 0f), Offset(cursorX, heightPx), strokeWidth = 2.dp.toPx())
+      }
+    }
+
+    // Zoom controls, floating top-end.
+    Row(
+      modifier = Modifier
+        .align(Alignment.TopEnd)
+        .padding(8.dp),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      if (!followEnabled) {
+        FilledTonalButton(
+          onClick = { followEnabled = true },
+          modifier = Modifier.height(36.dp),
+          contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)
+        ) {
+          Box(
+            modifier = Modifier
+              .size(8.dp)
+              .clip(androidx.compose.foundation.shape.CircleShape)
+              .background(Green40)
+          )
+          Spacer(Modifier.width(6.dp))
+          Text("Live", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        }
+      }
+      FilledIconButton(
+        onClick = { if (zoomIdx > 0) zoomIdx-- },
+        enabled = zoomIdx > 0,
+        modifier = Modifier.size(36.dp)
+      ) { Icon(Icons.Default.Remove, contentDescription = "Zoom out") }
+      Text(
+        text = "${zoom.toInt()}×",
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold
+      )
+      FilledIconButton(
+        onClick = { if (zoomIdx < ZOOM_LEVELS.lastIndex) zoomIdx++ },
+        enabled = zoomIdx < ZOOM_LEVELS.lastIndex,
+        modifier = Modifier.size(36.dp)
+      ) { Icon(Icons.Default.Add, contentDescription = "Zoom in") }
+    }
   }
 }
 

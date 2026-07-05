@@ -95,10 +95,10 @@ class TelemetryRecorder(
             _samples.value = existing + sample
           }
         }
-        com.trainerloop.ble.BleLog.d(
+        com.trainerloop.ble.BleLog.d {
           "tick t=${elapsedSec}s p=${sample.powerWatts} c=${sample.cadenceRpm} " +
             "hr=${sample.hrBpm} dropout=${sample.dropout}"
-        )
+        }
       }
     }
   }

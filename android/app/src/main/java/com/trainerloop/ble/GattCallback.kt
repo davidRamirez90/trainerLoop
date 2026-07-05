@@ -109,9 +109,9 @@ class GattCallback(
     characteristic: BluetoothGattCharacteristic,
     value: ByteArray
   ) {
-    com.trainerloop.ble.BleLog.d(
+    com.trainerloop.ble.BleLog.d {
       "notification char=${characteristic.uuid} len=${value.size} bytes=${value.toHex()}"
-    )
+    }
     dispatchNotification(characteristic.uuid, value)
   }
 
@@ -124,9 +124,9 @@ class GattCallback(
     gatt: BluetoothGatt,
     characteristic: BluetoothGattCharacteristic
   ) {
-    com.trainerloop.ble.BleLog.d(
+    com.trainerloop.ble.BleLog.d {
       "notification(legacy) char=${characteristic.uuid} bytes=${characteristic.value?.toHex() ?: "null"}"
-    )
+    }
     dispatchNotification(characteristic.uuid, characteristic.value ?: return)
   }
 
