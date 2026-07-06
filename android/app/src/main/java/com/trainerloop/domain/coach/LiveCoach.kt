@@ -91,6 +91,15 @@ class LiveCoach(
     return item
   }
 
+  /**
+   * v1 modification suggestions rehomed as WORKOUT_MODIFICATION (§8.1):
+   * the event competes in arbitration like everything else, so the global
+   * gap/budget/log apply to it.
+   */
+  fun submitExternal(event: AnalysisEvent) {
+    decisionEngine.submit(listOf(event))
+  }
+
   /** Latest fatigue/confidence snapshot for summary screens. */
   fun ledger(): List<IntervalRecord> = stateModel.ledger.toList()
 

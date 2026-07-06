@@ -137,4 +137,22 @@ class LiveCoachPipelineTest {
     assertTrue(items.none { it.category == FeedbackCategory.SAFETY })
     assertTrue(items.none { it.ruleId == "hr-above-expected" })
   }
+
+  @Test
+  fun `externally submitted v1 modification wins arbitration`() {
+    val coach = LiveCoach(segments(), profile)
+    coach.submitExternal(
+      AnalysisEvent(
+        ruleId = "v1-modification",
+        category = FeedbackCategory.WORKOUT_MODIFICATION,
+        severity = 2,
+        message = "Reduce intensity by 5%?",
+        expiresAtSec = 800
+      )
+    )
+    val items = run(coach, 400, 460) { t ->
+      TelemetrySample(timeSec = t, powerWatts = 250, cadenceRpm = 90, hrBpm = 150)
+    }
+    assertTrue(items.any { it.category == FeedbackCategory.WORKOUT_MODIFICATION })
+  }
 }

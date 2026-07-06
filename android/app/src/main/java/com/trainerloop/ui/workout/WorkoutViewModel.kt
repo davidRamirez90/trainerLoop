@@ -135,6 +135,10 @@ class WorkoutViewModel(
   private var inZoneSegmentIndex: Int = -1
   private var inZoneCount: Int = 0
 
+  // v1 suggestion detected but not yet surfaced (waiting on arbitration).
+  private var awaitingSuggestion: CoachSuggestion? = null
+  private var awaitingSuggestionSinceSec: Int = 0
+
   init {
     // (Re)create the recorder whenever the manager references change.
     viewModelScope.launch {
@@ -214,13 +218,36 @@ class WorkoutViewModel(
       }
     }
     viewModelScope.launch {
+      // v1 suggestions rehomed (§8.1): detection stays in CoachEngine, but the
+      // suggestion only reaches the UI once it wins arbitration in LiveCoach.
       coachEngine.pendingSuggestion.collect { suggestion ->
-        _uiState.value = _uiState.value.copy(pendingSuggestion = suggestion)
+        if (suggestion == null) {
+          awaitingSuggestion = null
+          _uiState.value = _uiState.value.copy(pendingSuggestion = null)
+        } else {
+          awaitingSuggestion = suggestion
+          awaitingSuggestionSinceSec = _uiState.value.activeSec
+          liveCoach.submitExternal(
+            com.trainerloop.domain.coach.AnalysisEvent(
+              ruleId = "v1-modification",
+              category = com.trainerloop.domain.coach.FeedbackCategory.WORKOUT_MODIFICATION,
+              severity = 2,
+              message = suggestion.message,
+              expiresAtSec = _uiState.value.activeSec + SUGGESTION_ARBITRATION_TTL_SEC
+            )
+          )
+        }
       }
     }
     viewModelScope.launch {
       liveCoach.currentFeedback.collect { feedback ->
-        _uiState.value = _uiState.value.copy(liveFeedback = feedback)
+        if (feedback?.category == com.trainerloop.domain.coach.FeedbackCategory.WORKOUT_MODIFICATION) {
+          // Show the accept/reject suggestion card, not a plain feedback card.
+          _uiState.value = _uiState.value.copy(pendingSuggestion = awaitingSuggestion)
+          liveCoach.dismissCurrent()
+        } else {
+          _uiState.value = _uiState.value.copy(liveFeedback = feedback)
+        }
       }
     }
     viewModelScope.launch {
@@ -502,6 +529,16 @@ class WorkoutViewModel(
     if (feedback != null && state.activeSec - feedback.timestampSec > FEEDBACK_AUTO_DISMISS_SEC) {
       liveCoach.dismissCurrent()
     }
+    // A suggestion whose arbitration event expired unemitted would otherwise
+    // block CoachEngine forever — treat it as declined.
+    awaitingSuggestion?.let {
+      if (state.pendingSuggestion == null &&
+        state.activeSec - awaitingSuggestionSinceSec > SUGGESTION_ARBITRATION_TTL_SEC
+      ) {
+        awaitingSuggestion = null
+        viewModelScope.launch { coachEngine.reject(it.id) }
+      }
+    }
   }
 
   private fun updateInZone() {
@@ -599,6 +636,7 @@ class WorkoutViewModel(
 
     private const val CONTROL_READY_TIMEOUT_MS = 5_000L
     private const val FEEDBACK_AUTO_DISMISS_SEC = 12
+    private const val SUGGESTION_ARBITRATION_TTL_SEC = 180
     private const val RAMP_FAILURE_SEC = 5
     private const val RECOVERY_EXTEND_STEP_SEC = 30
   }
