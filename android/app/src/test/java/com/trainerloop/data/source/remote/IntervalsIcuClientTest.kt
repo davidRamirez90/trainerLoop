@@ -36,4 +36,16 @@ class IntervalsIcuClientTest {
     assertEquals(250, athlete.ftp)
     assertEquals(74.5, athlete.icu_weight!!, 0.001)
   }
+
+  @Test
+  fun `upload accepted on 2xx and on 422 duplicate`() {
+    org.junit.Assert.assertTrue(IntervalsIcuClient.isUploadAccepted(200, ""))
+    org.junit.Assert.assertTrue(IntervalsIcuClient.isUploadAccepted(201, "{}"))
+    org.junit.Assert.assertTrue(
+      IntervalsIcuClient.isUploadAccepted(422, """{"error":"Duplicate of activity i12345"}""")
+    )
+    org.junit.Assert.assertFalse(IntervalsIcuClient.isUploadAccepted(422, """{"error":"Invalid file"}"""))
+    org.junit.Assert.assertFalse(IntervalsIcuClient.isUploadAccepted(401, "unauthorized"))
+    org.junit.Assert.assertFalse(IntervalsIcuClient.isUploadAccepted(500, "boom"))
+  }
 }

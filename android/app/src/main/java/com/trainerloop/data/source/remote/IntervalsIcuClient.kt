@@ -60,9 +60,9 @@ class IntervalsIcuClient(private val apiKey: String) {
         out.write("\r\n--$boundary--\r\n".toByteArray())
       }
 
-      val ok = conn.responseCode in 200..299
-      conn.readBody()
-      ok
+      val code = conn.responseCode
+      val body = conn.readBody()
+      isUploadAccepted(code, body)
     }
 
   suspend fun updateFtp(athleteId: String, ftp: Int): Boolean = withContext(Dispatchers.IO) {
@@ -93,5 +93,11 @@ class IntervalsIcuClient(private val apiKey: String) {
   private fun HttpURLConnection.readBody(): String {
     val stream = if (responseCode in 200..299) inputStream else errorStream
     return stream?.bufferedReader()?.use { it.readText() } ?: ""
+  }
+
+  companion object {
+    /** 2xx = uploaded; 422 mentioning "duplicate" = already on the server, equally fine. */
+    fun isUploadAccepted(code: Int, body: String): Boolean =
+      code in 200..299 || (code == 422 && body.contains("duplicate", ignoreCase = true))
   }
 }
