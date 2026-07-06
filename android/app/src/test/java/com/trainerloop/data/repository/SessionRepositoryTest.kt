@@ -3,10 +3,6 @@ package com.trainerloop.data.repository
 import app.cash.turbine.test
 import com.trainerloop.data.model.SessionData
 import com.trainerloop.data.model.SessionSummary
-import com.trainerloop.data.source.local.SessionDao
-import com.trainerloop.data.source.local.SessionEntity
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -74,6 +70,31 @@ class SessionRepositoryTest {
     assertNull(repository.getById("del"))
   }
 
+  @Test
+  fun `markIcuSynced stamps the session and summaries expose it`() = runTest {
+    val dao = FakeSessionDao()
+    val repository = SessionRepository(dao)
+    repository.save(sampleSession(id = "s1"))
+
+    // Fresh sessions are unsynced.
+    assertNull(repository.getById("s1")!!.icuSyncedAt)
+
+    repository.markIcuSynced("s1", "2026-07-06T10:00:00Z")
+
+    assertEquals("2026-07-06T10:00:00Z", repository.getById("s1")!!.icuSyncedAt)
+    repository.summaries().test {
+      assertEquals("2026-07-06T10:00:00Z", awaitItem().single().icuSyncedAt)
+      cancelAndIgnoreRemainingEvents()
+    }
+  }
+
+  @Test
+  fun `markIcuSynced on missing id is a no-op`() = runTest {
+    val repository = SessionRepository(FakeSessionDao())
+    repository.markIcuSynced("missing", "2026-07-06T10:00:00Z")
+    assertNull(repository.getById("missing"))
+  }
+
   private fun sampleSession(
     id: String,
     workoutName: String = "Test Workout"
@@ -92,26 +113,4 @@ class SessionRepositoryTest {
     avgCadence = 90,
     avgHr = 150
   )
-}
-
-private class FakeSessionDao : SessionDao {
-  private val rows = MutableStateFlow<List<SessionEntity>>(emptyList())
-
-  override fun getAll(): Flow<List<SessionEntity>> = rows
-
-  override suspend fun insert(entity: SessionEntity) {
-    rows.value = rows.value
-      .filterNot { it.id == entity.id } + entity
-  }
-
-  override suspend fun getById(id: String): SessionEntity? =
-    rows.value.firstOrNull { it.id == id }
-
-  override suspend fun delete(entity: SessionEntity) {
-    rows.value = rows.value.filterNot { it.id == entity.id }
-  }
-
-  override suspend fun deleteById(id: String) {
-    rows.value = rows.value.filterNot { it.id == id }
-  }
 }

@@ -17,5 +17,7 @@ data class SessionEntity(
     val avgPower: Int,
     val maxPower: Int,
     val avgCadence: Int,
-    val avgHr: Int
+    val avgHr: Int,
+    /** ISO-8601 instant of the last successful intervals.icu upload; null = never synced. */
+    val icuSyncedAt: String? = null
 )

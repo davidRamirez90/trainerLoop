@@ -24,6 +24,10 @@ open class SessionRepository(private val dao: SessionDao) {
         dao.deleteById(id)
     }
 
+    suspend fun markIcuSynced(id: String, syncedAt: String) {
+        dao.markIcuSynced(id, syncedAt)
+    }
+
     private fun toEntity(s: SessionData): SessionEntity = SessionEntity(
         id = s.id,
         workoutId = s.workoutId,
@@ -37,7 +41,8 @@ open class SessionRepository(private val dao: SessionDao) {
         avgPower = s.avgPower,
         maxPower = s.maxPower,
         avgCadence = s.avgCadence,
-        avgHr = s.avgHr
+        avgHr = s.avgHr,
+        icuSyncedAt = s.icuSyncedAt
     )
 
     private fun toSummary(e: SessionEntity): SessionSummary = SessionSummary(
@@ -51,7 +56,8 @@ open class SessionRepository(private val dao: SessionDao) {
         avgPower = e.avgPower,
         maxPower = e.maxPower,
         avgCadence = e.avgCadence,
-        avgHr = e.avgHr
+        avgHr = e.avgHr,
+        icuSyncedAt = e.icuSyncedAt
     )
 
     private fun toData(e: SessionEntity): SessionData = SessionData(
@@ -67,7 +73,8 @@ open class SessionRepository(private val dao: SessionDao) {
         avgPower = e.avgPower,
         maxPower = e.maxPower,
         avgCadence = e.avgCadence,
-        avgHr = e.avgHr
+        avgHr = e.avgHr,
+        icuSyncedAt = e.icuSyncedAt
     )
 
     companion object {

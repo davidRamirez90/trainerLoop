@@ -15,7 +15,8 @@ data class SessionSummary(
     val avgPower: Int,
     val maxPower: Int,
     val avgCadence: Int,
-    val avgHr: Int
+    val avgHr: Int,
+    val icuSyncedAt: String? = null
 )
 
 /**
@@ -36,5 +37,6 @@ data class SessionData(
     val avgPower: Int,
     val maxPower: Int,
     val avgCadence: Int,
-    val avgHr: Int
+    val avgHr: Int,
+    val icuSyncedAt: String? = null
 )
