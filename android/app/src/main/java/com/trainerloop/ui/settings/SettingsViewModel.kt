@@ -15,6 +15,8 @@ data class SettingsUiState(
   val weightKg: String = "75.0",
   val maxHr: String = "190",
   val restingHr: String = "55",
+  /** Blank = unset; the coach then estimates LTHR from max HR. */
+  val lthr: String = "",
   val ergBias: String = "0",
   val selectedCoach: String = "default",
   val intervalsAthleteId: String = "",
@@ -36,6 +38,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
       weightKg = profile.weightKg.toString(),
       maxHr = profile.maxHr.toString(),
       restingHr = profile.restingHr.toString(),
+      lthr = profile.lthr?.toString() ?: "",
       ergBias = profile.ergBiasPct.toString(),
       selectedCoach = profile.selectedCoachProfileId,
       intervalsAthleteId = profile.intervalsIcuAthleteId,
@@ -61,6 +64,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
   fun updateRestingHr(value: String) {
     _uiState.value = _uiState.value.copy(restingHr = value, isSaved = false)
+  }
+
+  fun updateLthr(value: String) {
+    _uiState.value = _uiState.value.copy(lthr = value, isSaved = false)
   }
 
   fun updateErgBias(value: String) {
@@ -89,6 +96,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
           weightKg = state.weightKg.toDoubleOrNull() ?: it.weightKg,
           maxHr = state.maxHr.toIntOrNull() ?: it.maxHr,
           restingHr = state.restingHr.toIntOrNull() ?: it.restingHr,
+          lthr = state.lthr.toIntOrNull()?.takeIf { v -> v > 0 },
           ergBiasPct = state.ergBias.toIntOrNull() ?: it.ergBiasPct,
           selectedCoachProfileId = state.selectedCoach,
           intervalsIcuAthleteId = state.intervalsAthleteId.trim(),

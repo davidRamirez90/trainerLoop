@@ -130,6 +130,12 @@ fun SettingsScreen(
           value = uiState.restingHr,
           suffix = "bpm",
           onValueChange = viewModel::updateRestingHr
+        ),
+        ProfileField(
+          label = "LTHR (optional)",
+          value = uiState.lthr,
+          suffix = "bpm",
+          onValueChange = viewModel::updateLthr
         )
       )
     )
