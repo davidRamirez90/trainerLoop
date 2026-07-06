@@ -94,4 +94,4 @@ When the toggle is off: no overlay, no virtual fields in samples, FIT omits spee
 
 ## Phase 2
 
-Designed separately as a follow-up: `2026-07-06-gpx-sim-free-ride-design.md` (GPX upload → FTMS SIM free-ride with GPS in FIT). The "ride a GPX in ERG" hybrid was considered there and deferred.
+Designed separately as a follow-up: `2026-07-06-gpx-sim-free-ride-design.md` (GPX free-ride with ERG-backed virtual gears and GPS in FIT). The "ride a GPX in ERG" hybrid was considered there and deferred.
