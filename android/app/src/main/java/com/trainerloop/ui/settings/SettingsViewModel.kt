@@ -22,6 +22,10 @@ data class SettingsUiState(
   val coachEnabled: Boolean = true,
   val intervalsAthleteId: String = "",
   val intervalsApiKey: String = "",
+  val virtualRideEnabled: Boolean = true,
+  val bikeWeightKg: String = "8.0",
+  val crr: String = "0.005",
+  val cda: String = "0.32",
   val isSaved: Boolean = false
 )
 
@@ -44,7 +48,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
       selectedCoach = profile.selectedCoachProfileId,
       coachEnabled = profile.coachEnabled,
       intervalsAthleteId = profile.intervalsIcuAthleteId,
-      intervalsApiKey = profile.intervalsIcuApiKey
+      intervalsApiKey = profile.intervalsIcuApiKey,
+      virtualRideEnabled = profile.virtualRideEnabled,
+      bikeWeightKg = profile.bikeWeightKg.toString(),
+      crr = profile.rollingResistanceCrr.toString(),
+      cda = profile.dragAreaCda.toString()
     )
   }
 
@@ -92,6 +100,28 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     _uiState.value = _uiState.value.copy(intervalsApiKey = value, isSaved = false)
   }
 
+  fun updateVirtualRideEnabled(value: Boolean) {
+    _uiState.value = _uiState.value.copy(virtualRideEnabled = value, isSaved = false)
+  }
+
+  fun updateBikeWeight(value: String) {
+    _uiState.value = _uiState.value.copy(bikeWeightKg = value, isSaved = false)
+  }
+
+  fun updateCrr(value: String) {
+    _uiState.value = _uiState.value.copy(crr = value, isSaved = false)
+  }
+
+  fun updateCda(value: String) {
+    _uiState.value = _uiState.value.copy(cda = value, isSaved = false)
+  }
+
+  fun resetPhysicsDefaults() {
+    _uiState.value = _uiState.value.copy(
+      bikeWeightKg = "8.0", crr = "0.005", cda = "0.32", isSaved = false
+    )
+  }
+
   fun save() {
     viewModelScope.launch {
       val state = _uiState.value
@@ -107,7 +137,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
           selectedCoachProfileId = state.selectedCoach,
           coachEnabled = state.coachEnabled,
           intervalsIcuAthleteId = state.intervalsAthleteId.trim(),
-          intervalsIcuApiKey = state.intervalsApiKey.trim()
+          intervalsIcuApiKey = state.intervalsApiKey.trim(),
+          virtualRideEnabled = state.virtualRideEnabled,
+          bikeWeightKg = (state.bikeWeightKg.toDoubleOrNull() ?: it.bikeWeightKg)
+            .coerceIn(5.0, 15.0),
+          rollingResistanceCrr = (state.crr.toDoubleOrNull() ?: it.rollingResistanceCrr)
+            .coerceIn(0.002, 0.010),
+          dragAreaCda = (state.cda.toDoubleOrNull() ?: it.dragAreaCda)
+            .coerceIn(0.15, 0.60)
         )
       }
       _uiState.value = _uiState.value.copy(isSaved = true)

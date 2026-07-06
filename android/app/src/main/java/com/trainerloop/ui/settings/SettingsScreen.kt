@@ -192,6 +192,69 @@ fun SettingsScreen(
       )
     }
 
+    SettingsGroupCard(title = "Virtual Ride") {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text("Simulated route + speed", style = MaterialTheme.typography.bodyMedium)
+          Text(
+            "Terrain overlay and physics-based speed during workouts",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
+        androidx.compose.material3.Switch(
+          checked = uiState.virtualRideEnabled,
+          onCheckedChange = viewModel::updateVirtualRideEnabled
+        )
+      }
+
+      var advancedExpanded by remember { mutableStateOf(false) }
+      TextButton(onClick = { advancedExpanded = !advancedExpanded }) {
+        Text(if (advancedExpanded) "Hide advanced" else "Advanced")
+      }
+      if (advancedExpanded) {
+        OutlinedTextField(
+          value = uiState.bikeWeightKg,
+          onValueChange = viewModel::updateBikeWeight,
+          label = { Text("Bike weight (kg, 5–15)") },
+          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = KeyboardType.Decimal
+          ),
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+          value = uiState.crr,
+          onValueChange = viewModel::updateCrr,
+          label = { Text("Rolling resistance Crr (0.002–0.010)") },
+          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = KeyboardType.Decimal
+          ),
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth()
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+          value = uiState.cda,
+          onValueChange = viewModel::updateCda,
+          label = { Text("Drag area CdA m² (0.15–0.60)") },
+          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            keyboardType = KeyboardType.Decimal
+          ),
+          singleLine = true,
+          modifier = Modifier.fillMaxWidth()
+        )
+        TextButton(onClick = { viewModel.resetPhysicsDefaults() }) {
+          Text("Reset to defaults")
+        }
+      }
+    }
+
     Card(modifier = Modifier.fillMaxWidth()) {
       Column(modifier = Modifier.padding(16.dp)) {
         Text(

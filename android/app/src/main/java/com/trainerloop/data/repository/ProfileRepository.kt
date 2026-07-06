@@ -64,7 +64,11 @@ open class ProfileRepository(context: Context) {
       selectedCoachProfileId = prefs.getString(KEY_COACH_PROFILE, "default") ?: "default",
       coachEnabled = prefs.getBoolean(KEY_COACH_ENABLED, true),
       intervalsIcuAthleteId = prefs.getString(KEY_INTERVALS_ATHLETE_ID, "") ?: "",
-      intervalsIcuApiKey = prefs.getString(KEY_INTERVALS_API_KEY, "") ?: ""
+      intervalsIcuApiKey = prefs.getString(KEY_INTERVALS_API_KEY, "") ?: "",
+      virtualRideEnabled = prefs.getBoolean(KEY_VIRTUAL_RIDE, true),
+      bikeWeightKg = prefs.getFloat(KEY_BIKE_WEIGHT, 8.0f).toDouble(),
+      rollingResistanceCrr = prefs.getFloat(KEY_CRR, 0.005f).toDouble(),
+      dragAreaCda = prefs.getFloat(KEY_CDA, 0.32f).toDouble()
     )
   }
 
@@ -81,6 +85,10 @@ open class ProfileRepository(context: Context) {
       .putBoolean(KEY_COACH_ENABLED, profile.coachEnabled)
       .putString(KEY_INTERVALS_ATHLETE_ID, profile.intervalsIcuAthleteId)
       .putString(KEY_INTERVALS_API_KEY, profile.intervalsIcuApiKey)
+      .putBoolean(KEY_VIRTUAL_RIDE, profile.virtualRideEnabled)
+      .putFloat(KEY_BIKE_WEIGHT, profile.bikeWeightKg.toFloat())
+      .putFloat(KEY_CRR, profile.rollingResistanceCrr.toFloat())
+      .putFloat(KEY_CDA, profile.dragAreaCda.toFloat())
       .apply()
   }
 
@@ -97,5 +105,9 @@ open class ProfileRepository(context: Context) {
     private const val KEY_NAME = "name"
     private const val KEY_INTERVALS_ATHLETE_ID = "intervals_icu_athlete_id"
     private const val KEY_INTERVALS_API_KEY = "intervals_icu_api_key"
+    private const val KEY_VIRTUAL_RIDE = "virtual_ride_enabled"
+    private const val KEY_BIKE_WEIGHT = "bike_weight_kg"
+    private const val KEY_CRR = "rolling_resistance_crr"
+    private const val KEY_CDA = "drag_area_cda"
   }
 }

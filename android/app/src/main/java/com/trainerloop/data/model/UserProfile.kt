@@ -13,5 +13,10 @@ data class UserProfile(
   /** Master switch for coach feedback (live cards, TTS, suggestions). */
   val coachEnabled: Boolean = true,
   val intervalsIcuAthleteId: String = "",
-  val intervalsIcuApiKey: String = ""
+  val intervalsIcuApiKey: String = "",
+  /** Virtual ride simulation (route overlay + physics speed) during workouts. */
+  val virtualRideEnabled: Boolean = true,
+  val bikeWeightKg: Double = 8.0,
+  val rollingResistanceCrr: Double = 0.005,
+  val dragAreaCda: Double = 0.32
 )
