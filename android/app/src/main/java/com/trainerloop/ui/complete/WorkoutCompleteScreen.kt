@@ -151,7 +151,12 @@ fun WorkoutCompleteScreen(
         }
       }
 
-      Spacer(modifier = Modifier.height(24.dp))
+      uiState.coachData?.let { coach ->
+        CoachSummaryCard(coach)
+        Spacer(modifier = Modifier.height(16.dp))
+      }
+
+      Spacer(modifier = Modifier.height(8.dp))
 
       // Actions
       Row(

@@ -113,6 +113,19 @@ data class IntervalRecord(
   val avgCadence: Double?
 )
 
+/**
+ * 0–100 interval execution score.
+ * ponytail: §6 formula minus the cadence-band/HR-envelope terms (not
+ * persisted per interval); reweight to the terms we have. Extend when the
+ * ledger carries band-compliance fields.
+ */
+val IntervalRecord.executionScore: Double
+  get() {
+    val timeInBand = timeInTargetPct.coerceIn(0.0, 100.0)
+    val cvPenalty = ((powerCv - 4.0).coerceAtLeast(0.0) * 10).coerceAtMost(100.0)
+    return 0.7 * timeInBand + 0.3 * (100.0 - cvPenalty)
+  }
+
 @Serializable
 data class RecoveryRecord(
   val startHr: Double?,

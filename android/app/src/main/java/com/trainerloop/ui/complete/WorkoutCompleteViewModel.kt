@@ -47,7 +47,8 @@ data class WorkoutCompleteUiState(
   val ftpDecided: Boolean = false,
   val ftpAccepted: Boolean = false,
   val showIcuFtpPrompt: Boolean = false,
-  val ftpPushStatus: String? = null
+  val ftpPushStatus: String? = null,
+  val coachData: com.trainerloop.domain.coach.CoachSessionData? = null
 )
 
 class WorkoutCompleteViewModel(
@@ -67,6 +68,9 @@ class WorkoutCompleteViewModel(
 
   init {
     computeSummary()
+    _uiState.value = _uiState.value.copy(
+      coachData = com.trainerloop.domain.coach.CoachSessionData.fromJson(coachJson)
+    )
     createFitFile()
     saveSession()
     if (RampTest.isRampTest(workoutId)) {
