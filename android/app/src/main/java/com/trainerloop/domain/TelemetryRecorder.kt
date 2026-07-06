@@ -18,7 +18,8 @@ import kotlinx.coroutines.launch
 class TelemetryRecorder(
   private val clock: WorkoutClock,
   private val dataProvider: DataProvider,
-  private val dispatcher: CoroutineDispatcher = Dispatchers.Default
+  private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  private val virtualRide: com.trainerloop.domain.sim.VirtualRideTracker? = null
 ) {
   data class DataProvider(
     val data: StateFlow<IndoorBikeData?>,
@@ -29,14 +30,16 @@ class TelemetryRecorder(
     clock: WorkoutClock,
     ftms: FtmsManager,
     hr: HrManager? = null,
-    dispatcher: CoroutineDispatcher = Dispatchers.Default
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    virtualRide: com.trainerloop.domain.sim.VirtualRideTracker? = null
   ) : this(
     clock,
     DataProvider(
       data = ftms.data,
       heartRate = hr?.heartRate ?: MutableStateFlow<Int?>(null).asStateFlow()
     ),
-    dispatcher
+    dispatcher,
+    virtualRide
   )
 
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -77,13 +80,18 @@ class TelemetryRecorder(
         }
         hrBpm?.let { lastHrBpm = it }
 
+        val virtual = virtualRide?.onTick(elapsedSec, lastPowerWatts, dropout)
         val sample = TelemetrySample(
           timeSec = elapsedSec,
           powerWatts = lastPowerWatts,
           cadenceRpm = lastCadenceRpm,
           hrBpm = lastHrBpm,
           dropout = dropout,
-          lagCompensated = false
+          lagCompensated = false,
+          virtualSpeedKph = virtual?.speedKph,
+          virtualDistanceM = virtual?.distanceM,
+          virtualAltitudeM = virtual?.altitudeM,
+          gradePercent = virtual?.gradePercent
         )
 
         _latest.value = sample

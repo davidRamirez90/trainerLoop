@@ -69,7 +69,12 @@ data class WorkoutUiState(
   val coachEvents: List<CoachEvent> = emptyList(),
   // Live Feedback Coach Mode
   val liveFeedback: FeedbackItem? = null,
-  val feedbackLog: List<FeedbackItem> = emptyList()
+  val feedbackLog: List<FeedbackItem> = emptyList(),
+  val currentVirtualSpeedKph: Double? = null,
+  val currentGradePercent: Double? = null,
+  val virtualDistanceM: Double? = null,
+  /** Expected elevation per second (static per workout); null when sim is off. */
+  val elevationProfile: DoubleArray? = null
 )
 
 data class WorkoutFinishData(
@@ -108,13 +113,29 @@ class WorkoutViewModel(
   private val liveCoach = LiveCoach(workout.segments, userProfile, coachProfile)
   private val isRampTest = RampTest.isRampTest(workout.id)
 
+  private val physicsParams = com.trainerloop.domain.sim.PhysicsParams(
+    riderKg = userProfile.weightKg,
+    bikeKg = userProfile.bikeWeightKg,
+    crr = userProfile.rollingResistanceCrr,
+    cda = userProfile.dragAreaCda
+  )
+  private val route: com.trainerloop.domain.sim.RouteProfile? =
+    if (userProfile.virtualRideEnabled && !isRampTest) {
+      com.trainerloop.domain.sim.RouteGenerator.generate(workout, userProfile.ftp, physicsParams)
+    } else null
+  private val virtualRide = route?.let {
+    com.trainerloop.domain.sim.VirtualRideTracker(it, physicsParams)
+  }
+
   // Ramp-test failure detection: consecutive seconds below 50% of step target.
   private var rampBelowTargetSec = 0
 
   /** Live timeline. Diverges from [workout.segments] once a recovery is extended. */
   private var segments: List<WorkoutSegment> = workout.segments
 
-  private val _uiState = MutableStateFlow(WorkoutUiState(segments = workout.segments))
+  private val _uiState = MutableStateFlow(
+    WorkoutUiState(segments = workout.segments, elevationProfile = route?.expectedAltitudeM)
+  )
   val uiState: StateFlow<WorkoutUiState> = _uiState.asStateFlow()
 
   private val _finishEvent = MutableStateFlow<WorkoutFinishData?>(null)
@@ -147,7 +168,8 @@ class WorkoutViewModel(
         .collect { (ftms, hr) ->
           val previous = recorder.value
           val next = if (ftms != null) {
-            TelemetryRecorder(clock, ftms, hr, dispatcher).also { it.startCollecting() }
+            TelemetryRecorder(clock, ftms, hr, dispatcher, virtualRide)
+              .also { it.startCollecting() }
           } else null
           recorder.value = next
           previous?.stop()
@@ -167,7 +189,10 @@ class WorkoutViewModel(
         .collect { sample ->
           _uiState.value = _uiState.value.copy(
             currentPowerWatts = sample.powerWatts,
-            currentCadenceRpm = sample.cadenceRpm
+            currentCadenceRpm = sample.cadenceRpm,
+            currentVirtualSpeedKph = sample.virtualSpeedKph,
+            currentGradePercent = sample.gradePercent,
+            virtualDistanceM = sample.virtualDistanceM
           )
         }
     }

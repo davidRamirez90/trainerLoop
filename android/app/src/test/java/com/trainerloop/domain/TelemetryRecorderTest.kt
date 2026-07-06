@@ -10,8 +10,13 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import com.trainerloop.domain.sim.PhysicsParams
+import com.trainerloop.domain.sim.RouteProfile
+import com.trainerloop.domain.sim.VirtualRideTracker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -172,6 +177,59 @@ class TelemetryRecorderTest {
 
     assertTrue(recorder.samples.value.isEmpty())
     assertTrue(recorder.latest.value.dropout)
+  }
+
+  @Test
+  fun `samples carry virtual ride fields when a tracker is attached`() = runTest {
+    val testDispatcher = StandardTestDispatcher(testScheduler)
+    val clock = WorkoutClock(shortWorkout(durationSec = 10), testDispatcher)
+    val ftmsData = MutableStateFlow<IndoorBikeData?>(bikeData(powerWatts = 250, cadenceRpm = 90.0))
+    val hrData = MutableStateFlow<Int?>(150)
+    val tracker = VirtualRideTracker(
+      RouteProfile(DoubleArray(600) { 2.0 }, DoubleArray(600)),
+      PhysicsParams(riderKg = 75.0)
+    )
+    val recorder = TelemetryRecorder(
+      clock,
+      TelemetryRecorder.DataProvider(ftmsData, hrData),
+      testDispatcher,
+      tracker
+    )
+
+    recorder.startCollecting()
+    runCurrent()
+    clock.start()
+    runCurrent()
+    advanceTimeBy(3000)
+    runCurrent()
+
+    val sample = recorder.samples.value.last()
+    assertNotNull(sample.virtualSpeedKph)
+    assertTrue(sample.virtualSpeedKph!! > 0.0)
+    assertTrue(sample.virtualDistanceM!! > 0.0)
+    assertEquals(2.0, sample.gradePercent!!, 1e-9)
+  }
+
+  @Test
+  fun `samples have null virtual fields without a tracker`() = runTest {
+    val testDispatcher = StandardTestDispatcher(testScheduler)
+    val clock = WorkoutClock(shortWorkout(durationSec = 5), testDispatcher)
+    val ftmsData = MutableStateFlow<IndoorBikeData?>(bikeData(powerWatts = 200))
+    val hrData = MutableStateFlow<Int?>(150)
+    val recorder = TelemetryRecorder(
+      clock,
+      TelemetryRecorder.DataProvider(ftmsData, hrData),
+      testDispatcher
+    )
+
+    recorder.startCollecting()
+    runCurrent()
+    clock.start()
+    runCurrent()
+    advanceTimeBy(1000)
+    runCurrent()
+
+    assertNull(recorder.samples.value.last().virtualSpeedKph)
   }
 
   private fun bikeData(
