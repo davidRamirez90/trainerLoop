@@ -69,6 +69,14 @@ fun SettingsScreen(
       onDismiss = { activeDialog = null }
     )
     SettingsDialog.ABOUT -> AboutDialog(onDismiss = { activeDialog = null })
+    SettingsDialog.COACH_PROFILE -> CoachPickerDialog(
+      selectedId = uiState.selectedCoach,
+      onSelect = { id ->
+        viewModel.updateSelectedCoach(id)
+        activeDialog = null
+      },
+      onDismiss = { activeDialog = null }
+    )
     null -> Unit
   }
 
@@ -143,12 +151,13 @@ fun SettingsScreen(
         icon = Icons.Default.Person,
         label = "Coach Profile",
         trailing = {
-          CompactNumberField(
-            value = uiState.selectedCoach,
-            keyboardType = KeyboardType.Text,
-            onValueChange = viewModel::updateSelectedCoach
+          Text(
+            text = uiState.selectedCoach,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
           )
-        }
+        },
+        onClick = { activeDialog = SettingsDialog.COACH_PROFILE }
       )
     }
 
@@ -219,7 +228,51 @@ fun SettingsScreen(
   }
 }
 
-private enum class SettingsDialog { POWER_ZONES, HR_ZONES, ABOUT }
+private enum class SettingsDialog { POWER_ZONES, HR_ZONES, ABOUT, COACH_PROFILE }
+
+@Composable
+private fun CoachPickerDialog(
+  selectedId: String,
+  onSelect: (String) -> Unit,
+  onDismiss: () -> Unit
+) {
+  val context = LocalContext.current
+  val profiles = remember {
+    com.trainerloop.data.source.local.CoachProfileLoader.listProfiles(context)
+  }
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Coach Profile") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        profiles.forEach { profile ->
+          Column(
+            modifier = Modifier
+              .fillMaxWidth()
+              .clip(RoundedCornerShape(8.dp))
+              .background(
+                if (profile.id == selectedId) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.surface
+              )
+              .clickable { onSelect(profile.id) }
+              .padding(12.dp)
+          ) {
+            Text(text = profile.name, fontWeight = FontWeight.SemiBold)
+            Text(
+              text = profile.description,
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              maxLines = 2
+            )
+          }
+        }
+      }
+    },
+    confirmButton = {
+      TextButton(onClick = onDismiss) { Text("Close") }
+    }
+  )
+}
 
 private data class Zone(val name: String, val range: String)
 

@@ -24,7 +24,8 @@ class WorkoutViewModelFactory(
   private val hrManagerFlow: StateFlow<HrManager?> = MutableStateFlow(null),
   private val ftmsControlManagerFlow: StateFlow<FtmsControlManager?> = MutableStateFlow(null),
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
-  private val userProfile: UserProfile = UserProfile()
+  private val userProfile: UserProfile = UserProfile(),
+  private val coachProfile: com.trainerloop.data.model.CoachProfile? = null
 ) : ViewModelProvider.Factory {
 
   @Suppress("UNCHECKED_CAST")
@@ -41,7 +42,8 @@ class WorkoutViewModelFactory(
         hrManagerFlow,
         ftmsControlManagerFlow,
         dispatcher,
-        userProfile
+        userProfile,
+        coachProfile
       ) as T
     }
     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

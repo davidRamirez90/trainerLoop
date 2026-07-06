@@ -1,0 +1,60 @@
+{
+  "id": "chris-carmichael-cts",
+  "name": "Chris Carmichael (CTS)",
+  "description": "Fitness First philosophy with minimal intervention approach. Focuses on guiding athletes to highest possible fitness through efficient, data-informed training that teaches independence from metrics.",
+  "voice": {
+    "tone": "professional",
+    "style": "educational"
+  },
+  "rules": {
+    "targetAdherenceWarn": 88,
+    "targetAdherenceIntervene": 75,
+    "hrDriftWarn": 5,
+    "hrDriftIntervene": 8,
+    "cadenceVarianceWarn": 10,
+    "cadenceVarianceIntervene": 15,
+    "minElapsedSecondsForSuggestions": 360,
+    "cooldownSeconds": 180
+  },
+  "interventions": {
+    "intensityAdjustStepPct": 4,
+    "intensityAdjustMinPct": -12,
+    "intensityAdjustMaxPct": 8,
+    "recoveryExtendStepSec": 45,
+    "recoveryExtendMaxSec": 150,
+    "allowSkipRemainingOnIntervals": true
+  },
+  "messages": {
+    "suggestions": {
+      "adjust_intensity_up": [
+        "You're handling this well. Let's increase by {{percent}}% to optimize the stimulus."
+      ],
+      "adjust_intensity_up_rationale": [
+        "Your power is stable with good cadence control and minimal HR drift. This indicates you have more capacity available. Fitness First means optimizing the stimulus when your body shows it can handle more."
+      ],
+      "adjust_intensity_down": [
+        "Let's be smart here. Reduce by {{percent}}% to maintain quality and preserve adaptation."
+      ],
+      "adjust_intensity_down_rationale": [
+        "HR drift is elevated and power is below target, suggesting the current intensity exceeds your capacity today. Reducing intensity preserves the quality of the remaining work and protects the fitness we're building."
+      ],
+      "extend_recovery": [
+        "Recovery is where adaptation happens. Extend by {{seconds}} seconds to ensure quality."
+      ],
+      "extend_recovery_rationale": [
+        "Your recovery metrics indicate incomplete restoration. Remember: you don't get stronger during the work, you get stronger during recovery. Extra recovery time now maximizes the adaptation from what you've already done."
+      ],
+      "skip_remaining_on_intervals": [
+        "You've gotten the stimulus you need. Skip the rest and focus on recovery."
+      ],
+      "skip_remaining_on_intervals_rationale": [
+        "Quality is declining across intervals despite your best effort. The training stimulus has been delivered; continuing risks diminishing returns. Human-first coaching means knowing when to preserve your energy for tomorrow. Recovery now optimizes your fitness development."
+      ]
+    },
+    "completion": [
+      "Session complete. You've taken another step toward peak fitness.",
+      "Well executed. Your body will reward you with adaptation.",
+      "Quality work today. Rest up and prepare for the next session."
+    ]
+  }
+}

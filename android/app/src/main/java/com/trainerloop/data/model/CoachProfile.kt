@@ -1,5 +1,8 @@
 package com.trainerloop.data.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class CoachProfile(
   val id: String,
   val name: String,
@@ -10,6 +13,7 @@ data class CoachProfile(
   val messages: CoachMessages
 )
 
+@Serializable
 data class CoachRules(
   val targetAdherenceWarn: Double,
   val targetAdherenceIntervene: Double,
@@ -21,6 +25,7 @@ data class CoachRules(
   val cooldownSeconds: Int
 )
 
+@Serializable
 data class CoachInterventions(
   val intensityAdjustStepPct: Double,
   val intensityAdjustMinPct: Double,
@@ -30,10 +35,12 @@ data class CoachInterventions(
   val allowSkipRemainingOnIntervals: Boolean
 )
 
+@Serializable
 data class CoachVoice(val tone: String, val style: String)
 
+@Serializable
 data class CoachMessages(
   val suggestions: Map<String, List<String>>,
-  val completion: List<String>,
-  val encouragement: List<String>
+  val completion: List<String> = emptyList(),
+  val encouragement: List<String> = emptyList()
 )

@@ -100,11 +100,12 @@ class WorkoutViewModel(
   private val hrManagerFlow: StateFlow<HrManager?> = MutableStateFlow(null),
   private val ftmsControlManagerFlow: StateFlow<FtmsControlManager?> = MutableStateFlow(null),
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
-  private val userProfile: UserProfile = UserProfile()
+  private val userProfile: UserProfile = UserProfile(),
+  coachProfile: CoachProfile? = null
 ) : ViewModel() {
 
   private val clock = WorkoutClock(workout.segments, dispatcher)
-  private val coachEngine = CoachEngine(defaultProfile(), workout.segments)
+  private val coachEngine = CoachEngine(coachProfile ?: defaultProfile(), workout.segments)
   private val liveCoach = LiveCoach(workout.segments, userProfile)
   private val isRampTest = RampTest.isRampTest(workout.id)
 

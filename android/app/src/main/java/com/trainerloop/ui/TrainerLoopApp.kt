@@ -188,7 +188,12 @@ fun TrainerLoopApp(
               hrManagerFlow = app.hrManager,
               ftmsControlManagerFlow = app.ftmsControlManager,
               userProfile = com.trainerloop.data.repository.ProfileRepository(context)
-                .getProfileSync()
+                .getProfileSync(),
+              coachProfile = com.trainerloop.data.source.local.CoachProfileLoader.load(
+                context,
+                com.trainerloop.data.repository.ProfileRepository(context)
+                  .getProfileSync().selectedCoachProfileId
+              )
             )
           ),
           onSessionFinished = { data ->
