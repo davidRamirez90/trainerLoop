@@ -92,7 +92,6 @@ When the toggle is off: no overlay, no virtual fields in samples, FIT omits spee
 - FIT: encode samples with virtual fields → decode with `FitDecoder` → values survive round-trip.
 - Summary math: distance/ascent accumulate correctly over a synthetic ride.
 
-## Phase 2 sketch (not designed)
+## Phase 2
 
-- GPX upload → distance-domain course → FTMS SIM mode (opcode 0x11, Set Indoor Bike Simulation Parameters) drives resistance; a free-ride workout type, separate from ERG intervals.
-- Possible "ride a GPX in ERG" hybrid: warp GPX elevation onto workout time as the terrain source for Phase 1's generator.
+Designed separately as a follow-up: `2026-07-06-gpx-sim-free-ride-design.md` (GPX upload → FTMS SIM free-ride with GPS in FIT). The "ride a GPX in ERG" hybrid was considered there and deferred.
