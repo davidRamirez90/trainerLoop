@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import android.app.Application
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -24,18 +26,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.trainerloop.data.model.SessionData
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.repository.ProfileRepository
-import com.trainerloop.data.repository.SessionRepository
-import com.trainerloop.data.source.local.AppDatabase
 import com.trainerloop.domain.WorkoutSummaryMath
 import com.trainerloop.ui.components.SampleChart
 import kotlinx.serialization.builtins.ListSerializer
@@ -51,9 +51,14 @@ fun SessionDetailScreen(
   onBack: () -> Unit
 ) {
   val context = LocalContext.current
-  val session by produceState<SessionData?>(initialValue = null, sessionId) {
-    value = SessionRepository.create(AppDatabase.getInstance(context)).getById(sessionId)
-  }
+  val viewModel: SessionDetailViewModel = viewModel(
+    factory = SessionDetailViewModelFactory(
+      context.applicationContext as Application,
+      sessionId
+    )
+  )
+  val state by viewModel.uiState.collectAsState()
+  val session = state.session
 
   Scaffold(
     topBar = {
@@ -128,6 +133,34 @@ fun SessionDetailScreen(
           StatRow("Max Power", "${s.maxPower} W")
           StatRow("Avg Heart Rate", "${s.avgHr} bpm")
           StatRow("Avg Cadence", "${s.avgCadence} rpm")
+        }
+      }
+
+      Spacer(modifier = Modifier.height(16.dp))
+
+      if (s.completed && state.icuConfigured) {
+        if (s.icuSyncedAt != null) {
+          Text(
+            text = "Synced to intervals.icu · ${formatDate(s.icuSyncedAt!!)}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary
+          )
+        } else {
+          Button(
+            onClick = { viewModel.uploadToIcu() },
+            enabled = !state.isUploading,
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Text(if (state.isUploading) "Uploading…" else "Upload to intervals.icu")
+          }
+        }
+        state.uploadStatus?.let {
+          Spacer(modifier = Modifier.height(8.dp))
+          Text(
+            text = it,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
         }
       }
 
