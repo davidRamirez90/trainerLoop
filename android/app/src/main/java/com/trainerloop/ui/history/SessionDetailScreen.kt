@@ -133,6 +133,11 @@ fun SessionDetailScreen(
           StatRow("Max Power", "${s.maxPower} W")
           StatRow("Avg Heart Rate", "${s.avgHr} bpm")
           StatRow("Avg Cadence", "${s.avgCadence} rpm")
+          val distanceKm = WorkoutSummaryMath.totalDistanceKm(samples)
+          if (distanceKm > 0) {
+            StatRow("Distance", "%.1f km".format(distanceKm))
+            StatRow("Elevation Gain", "${WorkoutSummaryMath.totalAscentM(samples)} m")
+          }
         }
       }
 

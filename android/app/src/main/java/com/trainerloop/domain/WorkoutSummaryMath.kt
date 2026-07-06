@@ -90,6 +90,20 @@ object WorkoutSummaryMath {
     return avgFourth.pow(0.25).toInt()
   }
 
+  fun totalDistanceKm(samples: List<TelemetrySample>): Double =
+    (samples.lastOrNull { it.virtualDistanceM != null }?.virtualDistanceM ?: 0.0) / 1000.0
+
+  fun totalAscentM(samples: List<TelemetrySample>): Int {
+    var ascent = 0.0
+    var prev: Double? = null
+    samples.forEach { s ->
+      val alt = s.virtualAltitudeM ?: return@forEach
+      prev?.let { if (alt > it) ascent += alt - it }
+      prev = alt
+    }
+    return ascent.toInt()
+  }
+
   fun caloriesKcal(avgPower: Int, activeSec: Int): Int {
     if (activeSec <= 0) return 0
     return ((avgPower * activeSec) / 1000.0).toInt()

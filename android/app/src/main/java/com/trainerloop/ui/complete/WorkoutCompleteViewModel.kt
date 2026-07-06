@@ -35,6 +35,8 @@ data class WorkoutCompleteUiState(
   val tss: Int = 0,
   val calories: Int = 0,
   val totalWorkKj: Int = 0,
+  val distanceKm: Double = 0.0,
+  val ascentM: Int = 0,
   val fitFile: File? = null,
   val isSaved: Boolean = false,
   val isDiscarded: Boolean = false,
@@ -141,6 +143,8 @@ class WorkoutCompleteViewModel(
     val tss = WorkoutSummaryMath.tss(np, ftp, duration)
     val calories = WorkoutSummaryMath.caloriesKcal(avgPower, duration)
     val totalWork = WorkoutSummaryMath.totalWorkKj(avgPower, duration)
+    val distanceKm = WorkoutSummaryMath.totalDistanceKm(samples)
+    val ascentM = WorkoutSummaryMath.totalAscentM(samples)
 
     _uiState.value = _uiState.value.copy(
       sessionId = sessionId,
@@ -154,7 +158,9 @@ class WorkoutCompleteViewModel(
       intensityFactor = ifactor,
       tss = tss,
       calories = calories,
-      totalWorkKj = totalWork
+      totalWorkKj = totalWork,
+      distanceKm = distanceKm,
+      ascentM = ascentM
     )
   }
 

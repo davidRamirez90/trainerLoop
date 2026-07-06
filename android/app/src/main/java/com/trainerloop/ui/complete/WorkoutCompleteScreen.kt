@@ -126,6 +126,10 @@ fun WorkoutCompleteScreen(
           StatRow("Avg Cadence", "${uiState.avgCadence} rpm")
           StatRow("Calories", "${uiState.calories} kcal")
           StatRow("Total Work", "${uiState.totalWorkKj} kJ")
+          if (uiState.distanceKm > 0) {
+            StatRow("Distance", "%.1f km".format(uiState.distanceKm))
+            StatRow("Elevation Gain", "${uiState.ascentM} m")
+          }
         }
       }
 
