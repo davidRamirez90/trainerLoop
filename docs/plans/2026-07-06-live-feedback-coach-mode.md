@@ -590,7 +590,9 @@ coach personalities differ in voice, thresholds, *and* category budgets (e.g.
 warmer and chattier). Note: the Android app currently ships only
 `assets/coach_profiles/default.json`; the five personality profiles still live
 at the repo root (`profiles/*.json`) from the TS app and need porting into
-assets as part of this feature.
+assets as part of this feature. *(Update 2026-07-06: porting done, but the
+roster is being replaced with 3–4 contrasting archetypes — see §18 for the
+review findings and decisions that supersede the examples above.)*
 
 ---
 
@@ -943,4 +945,58 @@ task-by-task style of the migration plan.
 
 - §13.5 field-ride checklist and threshold tuning against real recorded rides
   (replay harness is ready; needs actual sessions as fixtures).
+- Coach profile differentiation work per §18 (decided 2026-07-06).
 - Phase 2+ items (personalization, W′bal, LLM rendering) per roadmap.
+
+---
+
+## 18. Coach Profile Differentiation (review + decisions, 2026-07-06)
+
+A review of the shipped profiles against the live pipeline found that
+**switching coaches is barely perceivable**: all LiveCoach feedback
+(safety/pacing/technique/fatigue/recovery/motivation) uses hardcoded strings
+in `AnalyticsEngine` and `UserProfile` thresholds — the `CoachProfile` only
+drives v1 modification suggestions (0–3 cards per hour after gating +
+arbitration) and the completion message. Additional findings:
+
+- `voice.tone`/`voice.style` are parsed but never read; `encouragement` is
+  empty everywhere and never read.
+- `CoachMessageBuilder` uses `firstOrNull()` — message *lists* (incl. the
+  three completion variants per profile) collapse to always the first entry.
+- Some threshold combos make coaches near-mute: e.g. Sassi's up-adjust needs
+  HR drift ≤ 3% over a 120 s window (HR naturally rises more than that early
+  in work intervals) on top of 420 s min-elapsed + 300 s cooldown.
+- `aldo-sassi` and `javier-sola` are near-duplicates (same timing/step
+  params, several verbatim-shared sentences — some also shared with
+  `chris-carmichael-cts`).
+
+**Decisions:**
+
+1. **Archetypes, not real names.** Replace the five real-name profiles with
+   3–4 strongly contrasting archetypes (real names are a liability if this
+   ships wider — Michele Ferrari in particular). Working roster:
+   - *The Drill Sergeant* (ex-Ferrari): terse, metric-heavy, aggressive ±8%
+     steps, pushes up readily, near-zero motivation slots.
+   - *The Mentor* (ex-Carmichael): warm, educational rationales,
+     motivation-rich, conservative adjustments, protective of recovery.
+   - *The Silent Scientist* (merge Sassi + Sola): speaks only on
+     data-significant events, long cooldowns, tight zones, no cheerleading —
+     "quiet" as a deliberate trait.
+   - *The Base-Builder* (ex-Overton): sweet-spot bias, moderate chat, guards
+     against over-riding easy days.
+2. **Verbosity is a coach trait**, not a user setting (master coach toggle
+   remains the only user control).
+3. **Implementation scope** (this is the §8.5/§9 work, *not* roadmap
+   Phase 2 personalization — they are independent):
+   - Move `AnalyticsEngine` copy into profile JSON keyed by rule id (or
+     category) with the `{{placeholder}}` system extended (watts, bpm,
+     blockNumber, blocksRemaining); random pick, no-repeat-last-2 (also
+     fixes the `firstOrNull` collapse).
+   - Per-profile `verbosity`/`categoryBudgets`/`tierCooldowns` scaling the
+     decision engine's session budget, motivation budget, and category
+     cooldowns (currently global constants in `FeedbackDecisionEngine`).
+   - Delete or wire up `voice` and `encouragement`; randomize completion
+     messages; sanity-tune the near-impossible up-adjust conditions.
+   - **Coach-diff replay test:** run the same recorded ride through every
+     profile and assert the feedback streams differ meaningfully in count
+     and content — differentiation as a tested property.
