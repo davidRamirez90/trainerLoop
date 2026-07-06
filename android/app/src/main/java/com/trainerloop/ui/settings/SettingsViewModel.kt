@@ -19,6 +19,7 @@ data class SettingsUiState(
   val lthr: String = "",
   val ergBias: String = "0",
   val selectedCoach: String = "default",
+  val coachEnabled: Boolean = true,
   val intervalsAthleteId: String = "",
   val intervalsApiKey: String = "",
   val isSaved: Boolean = false
@@ -41,6 +42,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
       lthr = profile.lthr?.toString() ?: "",
       ergBias = profile.ergBiasPct.toString(),
       selectedCoach = profile.selectedCoachProfileId,
+      coachEnabled = profile.coachEnabled,
       intervalsAthleteId = profile.intervalsIcuAthleteId,
       intervalsApiKey = profile.intervalsIcuApiKey
     )
@@ -74,6 +76,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     _uiState.value = _uiState.value.copy(ergBias = value, isSaved = false)
   }
 
+  fun updateCoachEnabled(value: Boolean) {
+    _uiState.value = _uiState.value.copy(coachEnabled = value, isSaved = false)
+  }
+
   fun updateSelectedCoach(value: String) {
     _uiState.value = _uiState.value.copy(selectedCoach = value, isSaved = false)
   }
@@ -99,6 +105,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
           lthr = state.lthr.toIntOrNull()?.takeIf { v -> v > 0 },
           ergBiasPct = state.ergBias.toIntOrNull() ?: it.ergBiasPct,
           selectedCoachProfileId = state.selectedCoach,
+          coachEnabled = state.coachEnabled,
           intervalsIcuAthleteId = state.intervalsAthleteId.trim(),
           intervalsIcuApiKey = state.intervalsApiKey.trim()
         )

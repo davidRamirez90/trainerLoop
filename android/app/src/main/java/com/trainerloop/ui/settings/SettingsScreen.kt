@@ -155,6 +155,17 @@ fun SettingsScreen(
       HorizontalDivider()
       SettingsRow(
         icon = Icons.Default.Person,
+        label = "Coach",
+        trailing = {
+          androidx.compose.material3.Switch(
+            checked = uiState.coachEnabled,
+            onCheckedChange = viewModel::updateCoachEnabled
+          )
+        }
+      )
+      HorizontalDivider()
+      SettingsRow(
+        icon = Icons.Default.Person,
         label = "Coach Profile",
         trailing = {
           Text(

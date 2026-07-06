@@ -10,6 +10,8 @@ data class UserProfile(
   val lthr: Int? = null,
   val ergBiasPct: Int = 0,
   val selectedCoachProfileId: String = "default",
+  /** Master switch for coach feedback (live cards, TTS, suggestions). */
+  val coachEnabled: Boolean = true,
   val intervalsIcuAthleteId: String = "",
   val intervalsIcuApiKey: String = ""
 )

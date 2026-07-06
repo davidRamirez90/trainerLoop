@@ -194,8 +194,10 @@ class WorkoutViewModel(
       clock.elapsedSec.collect {
         updateFromClock()
         updateInZone()
-        tickCoach()
-        tickLiveCoach()
+        if (userProfile.coachEnabled) {
+          tickCoach()
+          tickLiveCoach()
+        }
         detectRampFailure()
       }
     }

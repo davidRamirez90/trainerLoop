@@ -62,6 +62,7 @@ open class ProfileRepository(context: Context) {
       lthr = prefs.getInt(KEY_LTHR, -1).takeIf { it > 0 },
       ergBiasPct = prefs.getInt(KEY_ERG_BIAS, 0),
       selectedCoachProfileId = prefs.getString(KEY_COACH_PROFILE, "default") ?: "default",
+      coachEnabled = prefs.getBoolean(KEY_COACH_ENABLED, true),
       intervalsIcuAthleteId = prefs.getString(KEY_INTERVALS_ATHLETE_ID, "") ?: "",
       intervalsIcuApiKey = prefs.getString(KEY_INTERVALS_API_KEY, "") ?: ""
     )
@@ -77,6 +78,7 @@ open class ProfileRepository(context: Context) {
       .putInt(KEY_LTHR, profile.lthr ?: -1)
       .putInt(KEY_ERG_BIAS, profile.ergBiasPct)
       .putString(KEY_COACH_PROFILE, profile.selectedCoachProfileId)
+      .putBoolean(KEY_COACH_ENABLED, profile.coachEnabled)
       .putString(KEY_INTERVALS_ATHLETE_ID, profile.intervalsIcuAthleteId)
       .putString(KEY_INTERVALS_API_KEY, profile.intervalsIcuApiKey)
       .apply()
@@ -91,6 +93,7 @@ open class ProfileRepository(context: Context) {
     private const val KEY_LTHR = "lthr"
     private const val KEY_ERG_BIAS = "erg_bias"
     private const val KEY_COACH_PROFILE = "coach_profile"
+    private const val KEY_COACH_ENABLED = "coach_enabled"
     private const val KEY_NAME = "name"
     private const val KEY_INTERVALS_ATHLETE_ID = "intervals_icu_athlete_id"
     private const val KEY_INTERVALS_API_KEY = "intervals_icu_api_key"
