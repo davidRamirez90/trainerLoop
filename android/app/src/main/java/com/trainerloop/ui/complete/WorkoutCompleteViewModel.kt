@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.trainerloop.data.model.SessionData
 import com.trainerloop.data.model.TelemetrySample
+import com.trainerloop.data.repository.IcuActivityUploader
 import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.data.repository.SessionRepository
 import com.trainerloop.data.source.local.AppDatabase
@@ -162,30 +163,31 @@ class WorkoutCompleteViewModel(
     if (samples.isEmpty()) return
 
     val samplesJson = Json.encodeToString(ListSerializer(TelemetrySample.serializer()), samples)
+    val sessionData = SessionData(
+      id = sessionId,
+      workoutId = workoutId,
+      workoutName = workoutName,
+      startedAt = Instant.ofEpochMilli(startTimeMs).toString(),
+      endedAt = Instant.now().toString(),
+      durationSec = state.durationSec,
+      samplesJson = samplesJson,
+      coachEventsJson = coachJson,
+      completed = true,
+      avgPower = state.avgPower,
+      maxPower = state.maxPower,
+      avgCadence = state.avgCadence,
+      avgHr = state.avgHr
+    )
 
     viewModelScope.launch {
       try {
-        sessionRepository.save(
-          SessionData(
-            id = sessionId,
-            workoutId = workoutId,
-            workoutName = workoutName,
-            startedAt = Instant.ofEpochMilli(startTimeMs).toString(),
-            endedAt = Instant.now().toString(),
-            durationSec = state.durationSec,
-            samplesJson = samplesJson,
-            coachEventsJson = coachJson,
-            completed = true,
-            avgPower = state.avgPower,
-            maxPower = state.maxPower,
-            avgCadence = state.avgCadence,
-            avgHr = state.avgHr
-          )
-        )
+        sessionRepository.save(sessionData)
         _uiState.value = _uiState.value.copy(isSaved = true)
       } catch (e: Exception) {
         _uiState.value = _uiState.value.copy(error = "Failed to save session: ${e.message}")
+        return@launch
       }
+      uploadToIntervalsIcu(sessionData)
     }
   }
 
@@ -201,29 +203,26 @@ class WorkoutCompleteViewModel(
         samples = samples
       )
       _uiState.value = _uiState.value.copy(fitFile = file)
-      uploadToIntervalsIcu(file)
     } catch (e: Exception) {
       _uiState.value = _uiState.value.copy(error = "Failed to create FIT: ${e.message}")
     }
   }
 
-  private fun uploadToIntervalsIcu(file: File) {
+  private suspend fun uploadToIntervalsIcu(session: SessionData) {
     val profile = profileRepository.getProfileSync()
     val athleteId = profile.intervalsIcuAthleteId
     val apiKey = profile.intervalsIcuApiKey
     if (athleteId.isBlank() || apiKey.isBlank()) return
 
     _uiState.value = _uiState.value.copy(uploadStatus = "Uploading…")
-    viewModelScope.launch {
-      try {
-        val ok = IntervalsIcuClient(apiKey).uploadActivity(athleteId, file.readBytes(), workoutName)
-        _uiState.value = _uiState.value.copy(
-          uploadStatus = if (ok) "Uploaded to intervals.icu" else "Upload failed"
-        )
-      } catch (e: Exception) {
-        _uiState.value = _uiState.value.copy(uploadStatus = "Upload failed: ${e.message}")
-      }
-    }
+    val uploader = IcuActivityUploader(
+      sessionRepository = sessionRepository,
+      upload = { bytes, name -> IntervalsIcuClient(apiKey).uploadActivity(athleteId, bytes, name) }
+    )
+    val ok = uploader.uploadSession(session)
+    _uiState.value = _uiState.value.copy(
+      uploadStatus = if (ok) "Uploaded to intervals.icu" else "Upload failed — retry from History"
+    )
   }
 
   fun onSave() {
