@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
@@ -124,11 +125,22 @@ private fun SessionCard(session: SessionSummary, onClick: () -> Unit) {
           style = MaterialTheme.typography.titleMedium,
           fontWeight = FontWeight.SemiBold
         )
-        Text(
-          text = formatSessionDate(session.startedAt),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          if (session.icuSyncedAt != null) {
+            Icon(
+              imageVector = Icons.Filled.CloudDone,
+              contentDescription = "Synced to intervals.icu",
+              tint = MaterialTheme.colorScheme.primary,
+              modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+          }
+          Text(
+            text = formatSessionDate(session.startedAt),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
       }
       Spacer(modifier = Modifier.height(12.dp))
       Row(
