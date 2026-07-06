@@ -77,6 +77,17 @@ fun WorkoutCompleteScreen(
 
       Spacer(modifier = Modifier.height(16.dp))
 
+      if (uiState.isRampTest) {
+        RampTestResultCard(
+          uiState = uiState,
+          onAccept = viewModel::acceptFtp,
+          onDiscard = viewModel::discardFtp,
+          onPush = viewModel::pushFtpToIcu,
+          onDeclinePush = viewModel::declineIcuFtpPush
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+      }
+
       // Summary grid: TSS, IF, NP
       Row(
         modifier = Modifier.fillMaxWidth(),
@@ -210,6 +221,101 @@ fun WorkoutCompleteScreen(
         }
       ) {
         Text(error)
+      }
+    }
+  }
+}
+
+@Composable
+private fun RampTestResultCard(
+  uiState: WorkoutCompleteUiState,
+  onAccept: () -> Unit,
+  onDiscard: () -> Unit,
+  onPush: () -> Unit,
+  onDeclinePush: () -> Unit
+) {
+  Card(
+    modifier = Modifier.fillMaxWidth(),
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.secondaryContainer
+    )
+  ) {
+    Column(modifier = Modifier.padding(16.dp)) {
+      Text(
+        text = "FTP Test Result",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold
+      )
+      Spacer(modifier = Modifier.height(8.dp))
+
+      val newFtp = uiState.rampTestNewFtp
+      if (newFtp == null) {
+        Text(
+          text = "Test too short — no FTP calculated",
+          style = MaterialTheme.typography.bodyLarge
+        )
+      } else {
+        val prev = uiState.rampTestPreviousFtp
+        val delta = newFtp - prev
+        val pct = if (prev > 0) delta * 100 / prev else 0
+        Text(
+          text = "$newFtp W",
+          style = MaterialTheme.typography.headlineLarge,
+          fontWeight = FontWeight.Bold
+        )
+        Text(
+          text = "${if (delta >= 0) "up" else "down"} ${kotlin.math.abs(delta)} W " +
+            "(${if (delta >= 0) "+" else ""}$pct%) from $prev W",
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        when {
+          !uiState.ftpDecided -> Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+          ) {
+            OutlinedButton(onClick = onDiscard, modifier = Modifier.weight(1f)) {
+              Text("Discard FTP")
+            }
+            Button(onClick = onAccept, modifier = Modifier.weight(1f)) {
+              Text("Accept FTP")
+            }
+          }
+          uiState.showIcuFtpPrompt -> {
+            Text(
+              text = "FTP saved. Set FTP on intervals.icu now?",
+              style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+              OutlinedButton(onClick = onDeclinePush, modifier = Modifier.weight(1f)) {
+                Text("Later")
+              }
+              Button(onClick = onPush, modifier = Modifier.weight(1f)) {
+                Text("Yes")
+              }
+            }
+          }
+          else -> Text(
+            text = if (uiState.ftpAccepted) "New FTP saved to your profile" else "FTP discarded",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
+          )
+        }
+      }
+
+      uiState.ftpPushStatus?.let { status ->
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+          text = status,
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSecondaryContainer
+        )
       }
     }
   }

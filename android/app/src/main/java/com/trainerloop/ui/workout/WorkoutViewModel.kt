@@ -20,6 +20,7 @@ import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.withDurationSec
 import com.trainerloop.domain.CoachEngine
+import com.trainerloop.domain.RampTest
 import com.trainerloop.domain.TelemetryRecorder
 import com.trainerloop.domain.WorkoutClock
 import com.trainerloop.domain.WorkoutMath
@@ -96,6 +97,10 @@ class WorkoutViewModel(
 
   private val clock = WorkoutClock(workout.segments, dispatcher)
   private val coachEngine = CoachEngine(defaultProfile(), workout.segments)
+  private val isRampTest = RampTest.isRampTest(workout.id)
+
+  // Ramp-test failure detection: consecutive seconds below 50% of step target.
+  private var rampBelowTargetSec = 0
 
   /** Live timeline. Diverges from [workout.segments] once a recovery is extended. */
   private var segments: List<WorkoutSegment> = workout.segments
@@ -176,6 +181,7 @@ class WorkoutViewModel(
         updateFromClock()
         updateInZone()
         tickCoach()
+        detectRampFailure()
       }
     }
     viewModelScope.launch {
@@ -398,7 +404,30 @@ class WorkoutViewModel(
     )
   }
 
+  /**
+   * Ends a ramp test when measured power stays below 50% of the current step
+   * target for 5 consecutive seconds (exhaustion). Warmup is exempt.
+   */
+  private fun detectRampFailure() {
+    if (!isRampTest) return
+    val state = _uiState.value
+    if (!state.isRunning) return
+    val seg = segments.getOrNull(state.segmentIndex)
+    if (seg?.phase != SegmentPhase.WORK) {
+      rampBelowTargetSec = 0
+      return
+    }
+    val target = (state.targetRange.low + state.targetRange.high) / 2
+    if (target > 0 && state.currentPowerWatts < target * 0.5) {
+      rampBelowTargetSec++
+      if (rampBelowTargetSec >= RAMP_FAILURE_SEC) stop()
+    } else {
+      rampBelowTargetSec = 0
+    }
+  }
+
   private fun tickCoach() {
+    if (isRampTest) return // a test is not a workout to be coached through
     val state = _uiState.value
     viewModelScope.launch {
       coachEngine.tick(
@@ -520,6 +549,7 @@ class WorkoutViewModel(
     )
 
     private const val CONTROL_READY_TIMEOUT_MS = 5_000L
+    private const val RAMP_FAILURE_SEC = 5
     private const val RECOVERY_EXTEND_STEP_SEC = 30
   }
 }

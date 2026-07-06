@@ -65,6 +65,16 @@ class IntervalsIcuClient(private val apiKey: String) {
       ok
     }
 
+  suspend fun updateFtp(athleteId: String, ftp: Int): Boolean = withContext(Dispatchers.IO) {
+    val conn = openConnection("PUT", "/api/v1/athlete/$athleteId")
+    conn.doOutput = true
+    conn.setRequestProperty("Content-Type", "application/json")
+    conn.outputStream.use { it.write("""{"ftp":$ftp}""".toByteArray()) }
+    val ok = conn.responseCode in 200..299
+    conn.readBody()
+    ok
+  }
+
   private fun request(method: String, path: String): String {
     val conn = openConnection(method, path)
     return conn.readBody()

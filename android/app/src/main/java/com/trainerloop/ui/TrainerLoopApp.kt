@@ -117,6 +117,11 @@ fun TrainerLoopApp(
           onWorkoutSelected = { workout ->
             context.trainerLoopApp.selectedWorkout = workout
             navController.navigate(Screen.WorkoutDetail.createRoute(workout.id))
+          },
+          onStartRampTest = {
+            val ftp = com.trainerloop.data.repository.ProfileRepository(context).getProfileSync().ftp
+            context.trainerLoopApp.selectedWorkout = com.trainerloop.domain.RampTest.generate(ftp)
+            navController.navigate(Screen.WorkoutPlayer.createRoute(sessionId = 1L))
           }
         )
       }

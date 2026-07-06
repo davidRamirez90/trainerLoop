@@ -54,6 +54,7 @@ import com.trainerloop.ui.components.WorkoutMiniChart
 @Composable
 fun WorkoutLibraryScreen(
   onWorkoutSelected: (Workout) -> Unit,
+  onStartRampTest: () -> Unit,
   viewModel: WorkoutLibraryViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsState()
@@ -135,6 +136,9 @@ fun WorkoutLibraryScreen(
       modifier = Modifier.weight(1f),
       verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+      item(key = "ftp-ramp-test-card") {
+        RampTestCard(onClick = onStartRampTest)
+      }
       items(uiState.filteredWorkouts, key = { it.workout.id }) { item ->
         WorkoutCard(
           item = item,
@@ -160,6 +164,32 @@ fun WorkoutLibraryScreen(
       }
     ) {
       Text(error)
+    }
+  }
+}
+
+@Composable
+private fun RampTestCard(onClick: () -> Unit) {
+  Card(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable(onClick = onClick),
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.primaryContainer
+    )
+  ) {
+    Column(modifier = Modifier.padding(12.dp)) {
+      Text(
+        text = "FTP Ramp Test",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onPrimaryContainer
+      )
+      Text(
+        text = "Ramp to exhaustion — new FTP is 75% of your best 1-minute power",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onPrimaryContainer
+      )
     }
   }
 }

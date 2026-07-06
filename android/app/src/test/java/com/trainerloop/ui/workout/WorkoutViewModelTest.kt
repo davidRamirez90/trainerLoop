@@ -338,6 +338,81 @@ class WorkoutViewModelTest {
     assertEquals("unchanged", 60, viewModel.uiState.value.segments[0].durationSec)
   }
 
+  @Test
+  fun `ramp test ends after 5s below half the step target`() = runTest(testDispatcher) {
+    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
+    val ftms = mockFtmsManager(data = ftmsData)
+    val viewModel = WorkoutViewModel(
+      workout = com.trainerloop.domain.RampTest.generate(250),
+      ftmsManagerFlow = MutableStateFlow<FtmsManager?>(ftms),
+      dispatcher = testDispatcher
+    )
+    ftmsData.value = lowPowerData(30) // first step targets 100W; 30 < 50
+    runCurrent()
+    viewModel.start()
+    viewModel.seek(300) // skip warmup into the first WORK step
+    runCurrent()
+
+    advanceTimeBy(6_000)
+    runCurrent()
+
+    assertFalse("test should auto-stop", viewModel.uiState.value.isRunning)
+    assertTrue("finish emitted", viewModel.finishEvent.value != null)
+  }
+
+  @Test
+  fun `ramp test warmup is exempt from failure detection`() = runTest(testDispatcher) {
+    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
+    val ftms = mockFtmsManager(data = ftmsData)
+    val viewModel = WorkoutViewModel(
+      workout = com.trainerloop.domain.RampTest.generate(250),
+      ftmsManagerFlow = MutableStateFlow<FtmsManager?>(ftms),
+      dispatcher = testDispatcher
+    )
+    ftmsData.value = lowPowerData(10)
+    runCurrent()
+    viewModel.start()
+    runCurrent()
+
+    advanceTimeBy(10_000) // still in the 300s warmup
+    runCurrent()
+
+    assertTrue("warmup keeps running", viewModel.uiState.value.isRunning)
+  }
+
+  @Test
+  fun `non-ramp workouts never auto-stop on low power`() = runTest(testDispatcher) {
+    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
+    val ftms = mockFtmsManager(data = ftmsData)
+    val viewModel = WorkoutViewModel(
+      workout = sampleWorkout(), // WORK step at 200-220W
+      ftmsManagerFlow = MutableStateFlow<FtmsManager?>(ftms),
+      dispatcher = testDispatcher
+    )
+    ftmsData.value = lowPowerData(10)
+    runCurrent()
+    viewModel.start()
+    runCurrent()
+
+    advanceTimeBy(10_000)
+    runCurrent()
+
+    assertTrue("normal workout keeps running", viewModel.uiState.value.isRunning)
+  }
+
+  private fun lowPowerData(watts: Int) = IndoorBikeData(
+    powerWatts = watts,
+    cadenceRpm = 60.0,
+    speedKph = null,
+    resistanceLevel = null,
+    averagePower = null,
+    averageSpeed = null,
+    totalDistanceMeters = null,
+    heartRateBpm = null,
+    elapsedTimeSec = null,
+    remainingTimeSec = null
+  )
+
   private fun recoveryWorkout(): Workout = Workout(
     id = "rec-workout",
     name = "Recovery Test",

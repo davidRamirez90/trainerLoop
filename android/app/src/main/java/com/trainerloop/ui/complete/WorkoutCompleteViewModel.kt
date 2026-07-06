@@ -9,6 +9,7 @@ import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.data.repository.SessionRepository
 import com.trainerloop.data.source.local.AppDatabase
 import com.trainerloop.data.source.remote.IntervalsIcuClient
+import com.trainerloop.domain.RampTest
 import com.trainerloop.domain.WorkoutSummaryMath
 import com.trainerloop.ui.components.FitShareHelper
 import kotlinx.serialization.builtins.ListSerializer
@@ -37,7 +38,16 @@ data class WorkoutCompleteUiState(
   val isSaved: Boolean = false,
   val isDiscarded: Boolean = false,
   val error: String? = null,
-  val uploadStatus: String? = null
+  val uploadStatus: String? = null,
+  // FTP ramp test result
+  val isRampTest: Boolean = false,
+  val rampTestNewFtp: Int? = null,
+  val rampTestPreviousFtp: Int = 0,
+  /** True once the user accepted or discarded the new FTP (one-shot). */
+  val ftpDecided: Boolean = false,
+  val ftpAccepted: Boolean = false,
+  val showIcuFtpPrompt: Boolean = false,
+  val ftpPushStatus: String? = null
 )
 
 class WorkoutCompleteViewModel(
@@ -58,6 +68,51 @@ class WorkoutCompleteViewModel(
     computeSummary()
     createFitFile()
     saveSession()
+    if (RampTest.isRampTest(workoutId)) {
+      _uiState.value = _uiState.value.copy(
+        isRampTest = true,
+        rampTestNewFtp = RampTest.computeFtp(samples),
+        rampTestPreviousFtp = profileRepository.getProfileSync().ftp
+      )
+    }
+  }
+
+  fun acceptFtp() {
+    val newFtp = _uiState.value.rampTestNewFtp ?: return
+    viewModelScope.launch {
+      profileRepository.updateFtp(newFtp)
+      val profile = profileRepository.getProfileSync()
+      val icuConfigured = profile.intervalsIcuAthleteId.isNotBlank() && profile.intervalsIcuApiKey.isNotBlank()
+      _uiState.value = _uiState.value.copy(
+        ftpDecided = true,
+        ftpAccepted = true,
+        showIcuFtpPrompt = icuConfigured
+      )
+    }
+  }
+
+  fun discardFtp() {
+    _uiState.value = _uiState.value.copy(ftpDecided = true, ftpAccepted = false)
+  }
+
+  fun declineIcuFtpPush() {
+    _uiState.value = _uiState.value.copy(showIcuFtpPrompt = false)
+  }
+
+  fun pushFtpToIcu() {
+    val newFtp = _uiState.value.rampTestNewFtp ?: return
+    val profile = profileRepository.getProfileSync()
+    _uiState.value = _uiState.value.copy(showIcuFtpPrompt = false, ftpPushStatus = "Updating FTP on intervals.icu…")
+    viewModelScope.launch {
+      val status = try {
+        val ok = IntervalsIcuClient(profile.intervalsIcuApiKey)
+          .updateFtp(profile.intervalsIcuAthleteId, newFtp)
+        if (ok) "FTP updated on intervals.icu" else "FTP push failed — set it manually on intervals.icu"
+      } catch (e: Exception) {
+        "FTP push failed: ${e.message}"
+      }
+      _uiState.value = _uiState.value.copy(ftpPushStatus = status)
+    }
   }
 
   private fun computeSummary() {
