@@ -9,8 +9,15 @@ data class CoachProfile(
   val description: String,
   val rules: CoachRules,
   val interventions: CoachInterventions,
-  val voice: CoachVoice,
-  val messages: CoachMessages
+  val messages: CoachMessages,
+  /** Live-coach copy keyed by analytics rule id; missing keys fall back to built-in defaults. */
+  val feedback: Map<String, List<String>> = emptyMap(),
+  /** Scales the live-coach session budget (0.5 = half as chatty). */
+  val verbosity: Double = 1.0,
+  /** Scales per-category cooldowns (2.0 = waits twice as long before repeating a category). */
+  val cooldownScale: Double = 1.0,
+  /** Fraction of the session budget available to MOTIVATION items. */
+  val motivationShare: Double = 0.33
 )
 
 @Serializable
@@ -36,11 +43,7 @@ data class CoachInterventions(
 )
 
 @Serializable
-data class CoachVoice(val tone: String, val style: String)
-
-@Serializable
 data class CoachMessages(
   val suggestions: Map<String, List<String>>,
-  val completion: List<String> = emptyList(),
-  val encouragement: List<String> = emptyList()
+  val completion: List<String> = emptyList()
 )

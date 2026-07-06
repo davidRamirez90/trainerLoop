@@ -1,0 +1,123 @@
+{
+  "id": "drill-sergeant",
+  "name": "The Drill Sergeant",
+  "description": "Terse, metric-heavy, and demanding. Pushes intensity up readily, tolerates discomfort, and wastes no words on cheerleading.",
+  "rules": {
+    "targetAdherenceWarn": 85,
+    "targetAdherenceIntervene": 70,
+    "hrDriftWarn": 6,
+    "hrDriftIntervene": 10,
+    "cadenceVarianceWarn": 10,
+    "cadenceVarianceIntervene": 15,
+    "minElapsedSecondsForSuggestions": 240,
+    "cooldownSeconds": 180
+  },
+  "interventions": {
+    "intensityAdjustStepPct": 8,
+    "intensityAdjustMinPct": -20,
+    "intensityAdjustMaxPct": 15,
+    "recoveryExtendStepSec": 30,
+    "recoveryExtendMaxSec": 90,
+    "allowSkipRemainingOnIntervals": true
+  },
+  "verbosity": 0.8,
+  "cooldownScale": 1.0,
+  "motivationShare": 0.1,
+  "feedback": {
+    "safety-hr-ceiling": [
+      "HR {{bpm}}. Too high. Back off. Now.",
+      "{{bpm}} bpm is past the line. Reduce effort immediately."
+    ],
+    "data-quality-hr": [
+      "HR data is garbage. Ignoring it until it behaves."
+    ],
+    "erg-spiral": [
+      "Cadence collapsing. Spin up or the trainer buries you.",
+      "Gear down, spin up. Don't let it bog."
+    ],
+    "pacing-under": [
+      "Below target. {{watts}} W. Get there.",
+      "You're soft-pedaling. {{watts}} W was the order."
+    ],
+    "pacing-over": [
+      "Over target. This isn't the plan. {{watts}} W.",
+      "Discipline. Back to {{watts}} W."
+    ],
+    "recovery-intent-over": [
+      "Recovery means recovery. Ease off.",
+      "Too hard for an easy day. Back off."
+    ],
+    "fatigue-band-1": [
+      "Fatigue rising. Tighten your form.",
+      "You're starting to fray. Hold the line."
+    ],
+    "fatigue-band-2": [
+      "Fatigue high. Decide: clean intervals or none.",
+      "You're cooked. Ease the next one or end it properly."
+    ],
+    "hr-above-expected": [
+      "HR high for this power. Noted. Watch it.",
+      "HR outrunning the wattage. Monitor."
+    ],
+    "recovery-incomplete": [
+      "HR not dropping. Soft-pedal. Breathe.",
+      "That's not recovering. Easier."
+    ],
+    "cadence-low": [
+      "Cadence dropped. Fix it.",
+      "Spin. Up."
+    ],
+    "slot-interval-start": [
+      "{{duration}} at {{watts}} W. Execute."
+    ],
+    "slot-interval-start-set": [
+      "{{duration}} at {{watts}} W. Interval {{blockNumber}} of {{blockCount}}. Execute."
+    ],
+    "slot-final-60": [
+      "One minute. No fading.",
+      "Final minute. Hold it."
+    ],
+    "slot-last-interval": [
+      "Last one. Empty it.",
+      "Final interval. Everything."
+    ],
+    "slot-halfway": [
+      "Halfway. Same power, same form."
+    ]
+  },
+  "messages": {
+    "suggestions": {
+      "adjust_intensity_up": [
+        "Numbers say you can take more. Up {{percent}}%.",
+        "This is too easy for you today. {{percent}}% more."
+      ],
+      "adjust_intensity_up_rationale": [
+        "Power is controlled and HR drift is minimal. Capacity is there — use it."
+      ],
+      "adjust_intensity_down": [
+        "HR drift excessive. Down {{percent}}%. Quality over ego.",
+        "You're over your head. Reduce {{percent}}%."
+      ],
+      "adjust_intensity_down_rationale": [
+        "Drift past limits means the target zone is gone. Reduce and keep the work honest."
+      ],
+      "extend_recovery": [
+        "Recovery incomplete. {{seconds}} more seconds. Use them."
+      ],
+      "extend_recovery_rationale": [
+        "HR hasn't come down enough to make the next effort count."
+      ],
+      "skip_remaining_on_intervals": [
+        "Power is gone. Terminate. Analyze why tomorrow."
+      ],
+      "skip_remaining_on_intervals_rationale": [
+        "Pushing through failure trains nothing but bad habits."
+      ]
+    },
+    "completion": [
+      "Done. Data uploaded. Review it.",
+      "Session executed. Recover properly.",
+      "Work complete. Weight, food, sleep."
+    ]
+  }
+}

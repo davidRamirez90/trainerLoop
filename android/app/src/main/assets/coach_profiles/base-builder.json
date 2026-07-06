@@ -1,0 +1,123 @@
+{
+  "id": "base-builder",
+  "name": "The Base-Builder",
+  "description": "Sweet-spot and aerobic-base focused. Moderate chat, guards hard against over-riding easy days, patient with progression.",
+  "rules": {
+    "targetAdherenceWarn": 90,
+    "targetAdherenceIntervene": 80,
+    "hrDriftWarn": 4,
+    "hrDriftIntervene": 7,
+    "cadenceVarianceWarn": 8,
+    "cadenceVarianceIntervene": 12,
+    "minElapsedSecondsForSuggestions": 300,
+    "cooldownSeconds": 240
+  },
+  "interventions": {
+    "intensityAdjustStepPct": 5,
+    "intensityAdjustMinPct": -15,
+    "intensityAdjustMaxPct": 10,
+    "recoveryExtendStepSec": 30,
+    "recoveryExtendMaxSec": 120,
+    "allowSkipRemainingOnIntervals": true
+  },
+  "verbosity": 1.0,
+  "cooldownScale": 1.0,
+  "motivationShare": 0.3,
+  "feedback": {
+    "safety-hr-ceiling": [
+      "HR at {{bpm}} bpm — way above where base work lives. Come down now.",
+      "{{bpm}} bpm. That's not base training. Ease right off."
+    ],
+    "data-quality-hr": [
+      "HR strap looks flaky — I'll lean on power until it settles."
+    ],
+    "erg-spiral": [
+      "Cadence dropping into grind territory — spin up before the trainer bogs down.",
+      "Keep the legs turning over — low cadence here will spiral."
+    ],
+    "pacing-under": [
+      "A bit under — float back up to {{watts}} W and hold it steady.",
+      "Power's sagging. {{watts}} W, smooth and steady."
+    ],
+    "pacing-over": [
+      "Over target — this zone works best right at {{watts}} W, not above it.",
+      "Ease back to {{watts}} W. More isn't better in this zone, it's just more."
+    ],
+    "recovery-intent-over": [
+      "Easy day means easy. Every watt over target today costs you Saturday.",
+      "You're burning matches on a recovery ride. Back it down."
+    ],
+    "fatigue-band-1": [
+      "Some fatigue showing — keep it smooth and don't chase watts.",
+      "Fatigue's ticking up. Ride within yourself."
+    ],
+    "fatigue-band-2": [
+      "Fatigue is high — dial the next one back. Base is built by consistency, not heroics.",
+      "That's a lot of strain for today. Ease off — tomorrow matters more."
+    ],
+    "hr-above-expected": [
+      "HR is running high for this power — worth watching. Could be a hot room or a hard week.",
+      "Heart rate's above where it should be at these watts. Keep tabs on it."
+    ],
+    "recovery-incomplete": [
+      "HR staying high — properly soft-pedal here, the next block needs you fresh.",
+      "Let the heart rate drop. Easy gear, light pressure."
+    ],
+    "cadence-low": [
+      "Cadence has drifted down — spin it back up, save the muscles for the weekend.",
+      "Quicker feet — grinding builds fatigue, not base."
+    ],
+    "slot-interval-start": [
+      "{{duration}} at {{watts}} W — settle in and make it look easy."
+    ],
+    "slot-interval-start-set": [
+      "Block {{blockNumber}} of {{blockCount}}: {{duration}} at {{watts}} W. Steady does it."
+    ],
+    "slot-final-60": [
+      "Last minute of this block — stay smooth.",
+      "One minute. Keep it boring — boring is perfect."
+    ],
+    "slot-last-interval": [
+      "Final block — finish it as steady as you started.",
+      "Last one. Consistent to the end."
+    ],
+    "slot-halfway": [
+      "Halfway through the block — this steady grind is exactly where the money is."
+    ]
+  },
+  "messages": {
+    "suggestions": {
+      "adjust_intensity_up": [
+        "You're riding this comfortably — {{percent}}% more puts you deeper in the sweet spot.",
+        "Room to nudge up {{percent}}% and still stay productive."
+      ],
+      "adjust_intensity_up_rationale": [
+        "Steady power and low HR drift say the current load is comfortably aerobic. A small bump keeps the stimulus in the productive band."
+      ],
+      "adjust_intensity_down": [
+        "Drift is creeping — {{percent}}% down keeps this aerobic instead of a slow burn-out.",
+        "Let's take {{percent}}% off and stay in the productive zone."
+      ],
+      "adjust_intensity_down_rationale": [
+        "Rising HR drift means you're sliding out of the aerobic zone this session is meant to train. Backing off keeps the work productive."
+      ],
+      "extend_recovery": [
+        "HR's still up from the last block — {{seconds}} more seconds and you'll come back fresh."
+      ],
+      "extend_recovery_rationale": [
+        "Starting the next block with elevated HR compounds fatigue without adding aerobic benefit."
+      ],
+      "skip_remaining_on_intervals": [
+        "The productive work is done — skip the rest and cool down. Live to train tomorrow."
+      ],
+      "skip_remaining_on_intervals_rationale": [
+        "Falling power with rising strain means further blocks dig a hole, not build base."
+      ]
+    },
+    "completion": [
+      "Good, honest base work. Bank it and recover.",
+      "Solid session — consistency like this is what fitness compounds on.",
+      "Done. Eat, sleep, repeat — the base builds itself from here."
+    ]
+  }
+}

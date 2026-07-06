@@ -1,5 +1,6 @@
 package com.trainerloop.domain.coach
 
+import com.trainerloop.data.model.CoachProfile
 import com.trainerloop.data.model.UserProfile
 import com.trainerloop.domain.coach.AthleteStateModel.AthleteState
 
@@ -9,7 +10,9 @@ import com.trainerloop.domain.coach.AthleteStateModel.AthleteState
  * if anything, the athlete actually hears). Stateful only for sustain timers
  * and once-per-X latches.
  */
-class AnalyticsEngine(private val profile: UserProfile) {
+class AnalyticsEngine(private val profile: UserProfile, coach: CoachProfile? = null) {
+
+  private val picker = MessagePicker(coach?.feedback ?: emptyMap())
 
   private val sustain = mutableMapOf<String, Int>()
   private var hrQualityWarned = false
@@ -48,7 +51,9 @@ class AnalyticsEngine(private val profile: UserProfile) {
       if (sustained("safety-hr", 30)) {
         events += AnalysisEvent(
           ruleId = "safety-hr-ceiling", category = FeedbackCategory.SAFETY, severity = 3,
-          message = "Heart rate is very high (${hr.toInt()} bpm). Back off the effort now.",
+          message = picker.message("safety-hr-ceiling",
+            "Heart rate is very high ({{bpm}} bpm). Back off the effort now.",
+            mapOf("bpm" to hr.toInt())),
           signalConfidence = state.hrConfidence, expiresAtSec = activeSec + 10
         )
       }
@@ -59,7 +64,8 @@ class AnalyticsEngine(private val profile: UserProfile) {
       hrQualityWarned = true
       events += AnalysisEvent(
         ruleId = "data-quality-hr", category = FeedbackCategory.DATA_QUALITY, severity = 1,
-        message = "Heart-rate signal looks unreliable — HR-based coaching is paused.",
+        message = picker.message("data-quality-hr",
+          "Heart-rate signal looks unreliable — HR-based coaching is paused."),
         expiresAtSec = activeSec + 30
       )
     }
@@ -73,7 +79,8 @@ class AnalyticsEngine(private val profile: UserProfile) {
         ergSpiralFiresThisSession++
         events += AnalysisEvent(
           ruleId = "erg-spiral", category = FeedbackCategory.TECHNIQUE, severity = 2,
-          message = "Cadence is dropping — spin up now before the trainer bogs down.",
+          message = picker.message("erg-spiral",
+            "Cadence is dropping — spin up now before the trainer bogs down."),
           signalConfidence = state.cadenceConfidence, expiresAtSec = activeSec + 10
         )
       }
@@ -86,13 +93,17 @@ class AnalyticsEngine(private val profile: UserProfile) {
       if (p < envelope.powerBand.start && sustained("pacing-under", 20)) {
         events += AnalysisEvent(
           ruleId = "pacing-under", category = FeedbackCategory.PACING, severity = 1,
-          message = "Power is below target — lift it back to ${ctx.classified.targetMidWatts.toInt()} W.",
+          message = picker.message("pacing-under",
+            "Power is below target — lift it back to {{watts}} W.",
+            mapOf("watts" to ctx.classified.targetMidWatts.toInt())),
           expiresAtSec = activeSec + 15
         )
       } else if (p > envelope.powerBand.endInclusive && sustained("pacing-over", 20)) {
         events += AnalysisEvent(
           ruleId = "pacing-over", category = FeedbackCategory.PACING, severity = 1,
-          message = "You're riding over target — ease back to ${ctx.classified.targetMidWatts.toInt()} W.",
+          message = picker.message("pacing-over",
+            "You're riding over target — ease back to {{watts}} W.",
+            mapOf("watts" to ctx.classified.targetMidWatts.toInt())),
           expiresAtSec = activeSec + 15
         )
       }
@@ -106,7 +117,8 @@ class AnalyticsEngine(private val profile: UserProfile) {
       if (sustained("recovery-intent-over", 30)) {
         events += AnalysisEvent(
           ruleId = "recovery-intent-over", category = FeedbackCategory.PACING, severity = 2,
-          message = "Today is a recovery ride — this is supposed to be easy. Back it off.",
+          message = picker.message("recovery-intent-over",
+            "Today is a recovery ride — this is supposed to be easy. Back it off."),
           expiresAtSec = activeSec + 15
         )
       }
@@ -123,9 +135,11 @@ class AnalyticsEngine(private val profile: UserProfile) {
         ruleId = "fatigue-band-$fatigueBand", category = FeedbackCategory.FATIGUE_MANAGEMENT,
         severity = fatigueBand,
         message = if (fatigueBand == 1)
-          "Fatigue is building — focus on smooth pedaling and keep recoveries genuinely easy."
+          picker.message("fatigue-band-1",
+            "Fatigue is building — focus on smooth pedaling and keep recoveries genuinely easy.")
         else
-          "Fatigue looks high. Consider easing the next interval or extending recovery.",
+          picker.message("fatigue-band-2",
+            "Fatigue looks high. Consider easing the next interval or extending recovery."),
         signalConfidence = state.hrConfidence, expiresAtSec = activeSec + 60
       )
     }
@@ -139,7 +153,8 @@ class AnalyticsEngine(private val profile: UserProfile) {
       if (sustained("interval:hr-high", 45)) {
         events += AnalysisEvent(
           ruleId = "hr-above-expected", category = FeedbackCategory.FATIGUE_MANAGEMENT, severity = 1,
-          message = "Heart rate is running higher than expected for this power — keep an eye on it.",
+          message = picker.message("hr-above-expected",
+            "Heart rate is running higher than expected for this power — keep an eye on it."),
           signalConfidence = state.hrConfidence, expiresAtSec = activeSec + 30
         )
       }
@@ -157,7 +172,8 @@ class AnalyticsEngine(private val profile: UserProfile) {
         if (startHr != null && hr != null && startHr - hr < 15 && startHr > profile.maxHr * 0.8) {
           events += AnalysisEvent(
             ruleId = "recovery-incomplete", category = FeedbackCategory.RECOVERY, severity = 1,
-            message = "Heart rate isn't coming down much — soft-pedal and breathe deep.",
+            message = picker.message("recovery-incomplete",
+              "Heart rate isn't coming down much — soft-pedal and breathe deep."),
             signalConfidence = state.hrConfidence, expiresAtSec = activeSec + 30
           )
         }
@@ -173,7 +189,8 @@ class AnalyticsEngine(private val profile: UserProfile) {
         cadenceDeclineFires++
         events += AnalysisEvent(
           ruleId = "cadence-low", category = FeedbackCategory.TECHNIQUE, severity = 1,
-          message = "Your cadence has dropped below your usual rhythm — try to spin it back up.",
+          message = picker.message("cadence-low",
+            "Your cadence has dropped below your usual rhythm — try to spin it back up."),
           signalConfidence = state.cadenceConfidence, expiresAtSec = activeSec + 20
         )
       }
@@ -182,11 +199,19 @@ class AnalyticsEngine(private val profile: UserProfile) {
     // ---- MOTIVATION slots ----
     if (ctx.isWork && !startSlotFired && ctx.elapsedInSegmentSec in 2..8) {
       startSlotFired = true
-      val setInfo = ctx.set?.let { " — interval ${ctx.blockNumber} of ${it.blockCount}" } ?: ""
+      val data = mapOf(
+        "duration" to formatDuration(ctx.classified.segment.durationSec),
+        "watts" to ctx.classified.targetMidWatts.toInt(),
+        "blockNumber" to ctx.blockNumber,
+        "blockCount" to (ctx.set?.blockCount ?: 1)
+      )
       events += AnalysisEvent(
         ruleId = "slot-interval-start", category = FeedbackCategory.MOTIVATION, severity = 0,
-        message = "${formatDuration(ctx.classified.segment.durationSec)} at " +
-          "${ctx.classified.targetMidWatts.toInt()} W$setInfo.",
+        message = if (ctx.set != null)
+          picker.message("slot-interval-start-set",
+            "{{duration}} at {{watts}} W — interval {{blockNumber}} of {{blockCount}}.", data)
+        else
+          picker.message("slot-interval-start", "{{duration}} at {{watts}} W.", data),
         expiresAtSec = activeSec + 8
       )
     }
@@ -197,7 +222,10 @@ class AnalyticsEngine(private val profile: UserProfile) {
       ctx.remainingInSegmentSec in 45..60 && ctx.classified.segment.durationSec >= 180
     ) {
       final60Fired = true
-      val tail = if (ctx.isFinalWorkInterval) "Last interval — empty the tank." else "Final minute — hold it right here."
+      val tail = if (ctx.isFinalWorkInterval)
+        picker.message("slot-last-interval", "Last interval — empty the tank.")
+      else
+        picker.message("slot-final-60", "Final minute — hold it right here.")
       events += AnalysisEvent(
         ruleId = "slot-final-60", category = FeedbackCategory.MOTIVATION, severity = 0,
         message = tail, expiresAtSec = activeSec + 10
@@ -209,7 +237,8 @@ class AnalyticsEngine(private val profile: UserProfile) {
       halfwayFired = true
       events += AnalysisEvent(
         ruleId = "slot-halfway", category = FeedbackCategory.MOTIVATION, severity = 0,
-        message = "Halfway through this block — settle in and stay smooth.",
+        message = picker.message("slot-halfway",
+          "Halfway through this block — settle in and stay smooth."),
         expiresAtSec = activeSec + 10
       )
     }

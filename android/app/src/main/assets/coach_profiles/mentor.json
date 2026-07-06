@@ -1,0 +1,125 @@
+{
+  "id": "mentor",
+  "name": "The Mentor",
+  "description": "Warm and educational. Explains the why, celebrates progress, protects recovery, and adjusts conservatively.",
+  "rules": {
+    "targetAdherenceWarn": 88,
+    "targetAdherenceIntervene": 75,
+    "hrDriftWarn": 5,
+    "hrDriftIntervene": 8,
+    "cadenceVarianceWarn": 10,
+    "cadenceVarianceIntervene": 15,
+    "minElapsedSecondsForSuggestions": 300,
+    "cooldownSeconds": 180
+  },
+  "interventions": {
+    "intensityAdjustStepPct": 4,
+    "intensityAdjustMinPct": -12,
+    "intensityAdjustMaxPct": 8,
+    "recoveryExtendStepSec": 45,
+    "recoveryExtendMaxSec": 150,
+    "allowSkipRemainingOnIntervals": true
+  },
+  "verbosity": 1.3,
+  "cooldownScale": 0.8,
+  "motivationShare": 0.45,
+  "feedback": {
+    "safety-hr-ceiling": [
+      "Heart rate is very high at {{bpm}} bpm — let's bring the effort down right away.",
+      "{{bpm}} bpm is higher than we want. Ease off now; there's no fitness up there."
+    ],
+    "data-quality-hr": [
+      "Your HR signal looks unreliable, so I'll coach off power for now — maybe check the strap after the ride."
+    ],
+    "erg-spiral": [
+      "Cadence is slipping — shift and spin up before the trainer makes this harder than it needs to be.",
+      "Let's lift that cadence back up; low revs at this force will snowball."
+    ],
+    "pacing-under": [
+      "A touch under target — smoothly bring it back to {{watts}} W.",
+      "Power's drifted low. Find {{watts}} W again, nice and steady."
+    ],
+    "pacing-over": [
+      "You're riding above target — ease back to {{watts}} W and save it for later.",
+      "A little enthusiastic! Settle back to {{watts}} W."
+    ],
+    "recovery-intent-over": [
+      "Remember, today is about recovery — going harder now just borrows from tomorrow. Ease up.",
+      "Easy days make hard days possible. Back it off a touch."
+    ],
+    "fatigue-band-1": [
+      "I'm seeing some fatigue building — nothing alarming, just keep the pedaling smooth and the recoveries genuinely easy.",
+      "Fatigue is creeping in. Stay relaxed and let the recoveries do their job."
+    ],
+    "fatigue-band-2": [
+      "Fatigue is getting high. It's smart, not weak, to ease the next interval — quality beats quantity.",
+      "You've done good work, but the strain is showing. Consider easing off or extending the next recovery."
+    ],
+    "hr-above-expected": [
+      "Heart rate is a bit higher than I'd expect for this power — could be heat or hydration. Keep an eye on it.",
+      "HR is running warm for this effort. No panic, just something to watch."
+    ],
+    "recovery-incomplete": [
+      "Heart rate isn't coming down much — soft-pedal, deep breaths, let it settle.",
+      "Give yourself a real recovery here: lighter gear, easy spin, breathe."
+    ],
+    "cadence-low": [
+      "Cadence has dropped below your natural rhythm — try spinning it back up; it saves your legs.",
+      "Let's find that smooth cadence again — lighter gear, quicker feet."
+    ],
+    "slot-interval-start": [
+      "Here we go: {{duration}} at {{watts}} W. Settle in early and it'll feel easier."
+    ],
+    "slot-interval-start-set": [
+      "Interval {{blockNumber}} of {{blockCount}}: {{duration}} at {{watts}} W. You know what to do."
+    ],
+    "slot-final-60": [
+      "Final minute — you've done the hard part, just hold this.",
+      "One minute left. Stay smooth, stay strong."
+    ],
+    "slot-last-interval": [
+      "Last interval! Everything you've got left — you've earned this finish.",
+      "This is the one that counts. Finish it proud."
+    ],
+    "slot-halfway": [
+      "Halfway through this block — nicely done so far, just keep it steady.",
+      "Half done. Settle in, stay smooth, the back half always goes faster."
+    ]
+  },
+  "messages": {
+    "suggestions": {
+      "adjust_intensity_up": [
+        "You're handling this beautifully — shall we add {{percent}}% and get a bit more from the session?",
+        "Everything looks controlled. A {{percent}}% bump would optimize the stimulus."
+      ],
+      "adjust_intensity_up_rationale": [
+        "Stable power, steady cadence, and minimal HR drift mean you have capacity to spare today. A small increase maximizes the adaptation without risking the rest of the session."
+      ],
+      "adjust_intensity_down": [
+        "Let's be smart here — dropping {{percent}}% keeps the quality high.",
+        "Today's a bit harder than planned. {{percent}}% down protects the work you've already banked."
+      ],
+      "adjust_intensity_down_rationale": [
+        "HR drift says the current load exceeds what your body has today. Reducing now preserves the remaining intervals — fitness is built by finishing well, not by suffering."
+      ],
+      "extend_recovery": [
+        "Recovery is where you actually get stronger — let's take {{seconds}} more seconds.",
+        "Your HR is still elevated. {{seconds}} extra seconds will make the next one count."
+      ],
+      "extend_recovery_rationale": [
+        "Incomplete recovery means the next interval starts in a hole. Extra time now buys quality later."
+      ],
+      "skip_remaining_on_intervals": [
+        "You've captured the training benefit — let's call the intervals and cool down well."
+      ],
+      "skip_remaining_on_intervals_rationale": [
+        "Power decline plus rising HR says the productive work is done. Stopping now protects tomorrow."
+      ]
+    },
+    "completion": [
+      "Great session! The consistency you showed today is exactly how fitness gets built.",
+      "Well done. Recover properly — that's where today's work becomes strength.",
+      "Solid work today. Small, repeated efforts like this are what change you as a rider."
+    ]
+  }
+}

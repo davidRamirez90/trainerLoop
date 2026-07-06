@@ -6,7 +6,12 @@ import java.util.UUID
  * Arbitration (§8.3–8.4): rate limits, per-rule cooldowns, dedupe, session
  * budget, and ranking. Called once per arbitration cycle; emits ≤ 1 item.
  */
-class FeedbackDecisionEngine(private val totalDurationSec: Int) {
+class FeedbackDecisionEngine(
+  private val totalDurationSec: Int,
+  private val verbosity: Double = 1.0,
+  private val cooldownScale: Double = 1.0,
+  private val motivationShare: Double = 0.33
+) {
 
   private val pending = mutableListOf<AnalysisEvent>()
   private val lastFiredByRule = mutableMapOf<String, Int>()
@@ -22,8 +27,8 @@ class FeedbackDecisionEngine(private val totalDurationSec: Int) {
     pending.removeAll { it.expiresAtSec < activeSec }
     if (pending.isEmpty()) return null
 
-    val budget = (totalDurationSec / BUDGET_SECONDS_PER_ITEM).coerceAtLeast(4)
-    val motivationBudget = budget / 3
+    val budget = (totalDurationSec * verbosity / BUDGET_SECONDS_PER_ITEM).toInt().coerceAtLeast(4)
+    val motivationBudget = (budget * motivationShare).toInt()
 
     val candidate = pending
       .filter { event ->
@@ -62,13 +67,16 @@ class FeedbackDecisionEngine(private val totalDurationSec: Int) {
     )
   }
 
-  private fun categoryCooldownSec(category: FeedbackCategory): Int = when (category) {
-    FeedbackCategory.FATIGUE_MANAGEMENT -> 240
-    FeedbackCategory.PACING -> 90
-    FeedbackCategory.RECOVERY -> 120
-    FeedbackCategory.TECHNIQUE -> 180
-    FeedbackCategory.MOTIVATION -> 120
-    else -> 60
+  private fun categoryCooldownSec(category: FeedbackCategory): Int {
+    val base = when (category) {
+      FeedbackCategory.FATIGUE_MANAGEMENT -> 240
+      FeedbackCategory.PACING -> 90
+      FeedbackCategory.RECOVERY -> 120
+      FeedbackCategory.TECHNIQUE -> 180
+      FeedbackCategory.MOTIVATION -> 120
+      else -> 60
+    }
+    return (base * cooldownScale).toInt()
   }
 
   companion object {

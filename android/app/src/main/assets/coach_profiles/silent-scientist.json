@@ -1,0 +1,119 @@
+{
+  "id": "silent-scientist",
+  "name": "The Silent Scientist",
+  "description": "Speaks only when the data says something significant. Tight zones, long silences, no cheerleading — quiet is a feature.",
+  "rules": {
+    "targetAdherenceWarn": 92,
+    "targetAdherenceIntervene": 85,
+    "hrDriftWarn": 5,
+    "hrDriftIntervene": 8,
+    "cadenceVarianceWarn": 6,
+    "cadenceVarianceIntervene": 10,
+    "minElapsedSecondsForSuggestions": 300,
+    "cooldownSeconds": 300
+  },
+  "interventions": {
+    "intensityAdjustStepPct": 3,
+    "intensityAdjustMinPct": -10,
+    "intensityAdjustMaxPct": 6,
+    "recoveryExtendStepSec": 45,
+    "recoveryExtendMaxSec": 180,
+    "allowSkipRemainingOnIntervals": false
+  },
+  "verbosity": 0.5,
+  "cooldownScale": 2.0,
+  "motivationShare": 0.0,
+  "feedback": {
+    "safety-hr-ceiling": [
+      "HR {{bpm}} bpm — above safe ceiling. Reduce effort.",
+      "{{bpm}} bpm exceeds threshold parameters. Back off."
+    ],
+    "data-quality-hr": [
+      "HR signal unreliable. HR-derived analysis suspended."
+    ],
+    "erg-spiral": [
+      "Cadence below sustainable torque range. Increase to avoid power collapse."
+    ],
+    "pacing-under": [
+      "Power {{watts}} W target not met. Adjust.",
+      "Sustained deficit versus {{watts}} W target."
+    ],
+    "pacing-over": [
+      "Output above prescription. Return to {{watts}} W.",
+      "Exceeding target. {{watts}} W is the parameter."
+    ],
+    "recovery-intent-over": [
+      "Intensity inconsistent with recovery prescription. Reduce."
+    ],
+    "fatigue-band-1": [
+      "Fatigue markers elevated: drift and variability rising.",
+      "Composite fatigue crossing first threshold. Noted."
+    ],
+    "fatigue-band-2": [
+      "Fatigue markers high. Data supports reducing next interval.",
+      "Multiple indicators degraded. Recommend load reduction."
+    ],
+    "hr-above-expected": [
+      "HR exceeds modeled envelope for current power.",
+      "Cardiac cost above expectation at this output."
+    ],
+    "recovery-incomplete": [
+      "HR clearance below expected rate. Reduce output further.",
+      "Recovery incomplete per HR trajectory."
+    ],
+    "cadence-low": [
+      "Self-selected cadence declining. Technique degradation indicator.",
+      "Cadence below baseline. Monitor."
+    ],
+    "slot-interval-start": [
+      "{{duration}} at {{watts}} W."
+    ],
+    "slot-interval-start-set": [
+      "{{duration}} at {{watts}} W. {{blockNumber}}/{{blockCount}}."
+    ],
+    "slot-final-60": [
+      "60 seconds remaining."
+    ],
+    "slot-last-interval": [
+      "Final interval."
+    ],
+    "slot-halfway": [
+      "Midpoint."
+    ]
+  },
+  "messages": {
+    "suggestions": {
+      "adjust_intensity_up": [
+        "Data supports +{{percent}}%: stable output, drift within parameters.",
+        "Adaptation confirmed. Increase {{percent}}%."
+      ],
+      "adjust_intensity_up_rationale": [
+        "Power stability and HR drift are both within tolerance. A measured increase extends the stimulus without leaving the target zone."
+      ],
+      "adjust_intensity_down": [
+        "Drift outside parameters. Reduce {{percent}}% to preserve zone integrity.",
+        "Data indicates overload. −{{percent}}%."
+      ],
+      "adjust_intensity_down_rationale": [
+        "HR drift beyond the modeled envelope means the prescribed zone is no longer being trained. Reduction restores validity."
+      ],
+      "extend_recovery": [
+        "Recovery metrics incomplete. Extend {{seconds}} s."
+      ],
+      "extend_recovery_rationale": [
+        "HR has not returned to the expected recovery band. The next effort would begin under residual load."
+      ],
+      "skip_remaining_on_intervals": [
+        "Power decline significant. Recommend termination and analysis."
+      ],
+      "skip_remaining_on_intervals_rationale": [
+        "Sustained output decline indicates today's capacity is exhausted. Further intervals produce noise, not adaptation."
+      ]
+    },
+    "completion": [
+      "Session recorded. Review the data.",
+      "Complete. The numbers will show what happened.",
+      "Done. Analysis available in summary."
+    ]
+  }
+}

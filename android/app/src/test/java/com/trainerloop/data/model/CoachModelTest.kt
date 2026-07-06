@@ -42,17 +42,12 @@ class CoachModelTest {
       recoveryExtendMaxSec = 300,
       allowSkipRemainingOnIntervals = true
     ),
-    voice = CoachVoice(
-      tone = "encouraging",
-      style = "concise"
-    ),
     messages = CoachMessages(
       suggestions = mapOf(
         "lowPower" to listOf("Try to lift power a bit.", "Pedal with more intent."),
         "highHr" to listOf("Ease off slightly.")
       ),
-      completion = listOf("Workout complete!", "Great job."),
-      encouragement = listOf("Keep it up!", "Smooth pedal stroke.")
+      completion = listOf("Workout complete!", "Great job.")
     )
   )
 }

@@ -9,19 +9,19 @@ object CoachMessageBuilder {
 
   fun suggestionMessage(profile: CoachProfile, action: CoachAction): String {
     val (key, data) = action.templateKeyAndData()
-    val template = profile.messages.suggestions[key]?.firstOrNull() ?: defaultMessage(action)
+    val template = profile.messages.suggestions[key]?.randomOrNull() ?: defaultMessage(action)
     return apply(template, data)
   }
 
   fun rationale(profile: CoachProfile, action: CoachAction): String {
     val (key, data) = action.templateKeyAndData()
     val rationaleKey = "${key}_rationale"
-    val template = profile.messages.suggestions[rationaleKey]?.firstOrNull() ?: defaultRationale(action)
+    val template = profile.messages.suggestions[rationaleKey]?.randomOrNull() ?: defaultRationale(action)
     return apply(template, data)
   }
 
   fun completionMessage(profile: CoachProfile): String {
-    return profile.messages.completion.firstOrNull() ?: "Session complete."
+    return profile.messages.completion.randomOrNull() ?: "Session complete."
   }
 
   private fun apply(template: String, data: TemplateData): String {

@@ -13,7 +13,8 @@ import kotlinx.coroutines.flow.StateFlow
  */
 class LiveCoach(
   segments: List<WorkoutSegment>,
-  private val profile: UserProfile
+  private val profile: UserProfile,
+  coach: com.trainerloop.data.model.CoachProfile? = null
 ) {
   var plan: WorkoutPlanModel = WorkoutInterpreter.interpret(segments, profile.ftp)
     private set
@@ -25,8 +26,13 @@ class LiveCoach(
 
   private val stateModel = AthleteStateModel(profile)
   private val expectationEngine = ExpectationEngine(profile)
-  private val analytics = AnalyticsEngine(profile)
-  private val decisionEngine = FeedbackDecisionEngine(plan.totalDurationSec)
+  private val analytics = AnalyticsEngine(profile, coach)
+  private val decisionEngine = FeedbackDecisionEngine(
+    plan.totalDurationSec,
+    verbosity = coach?.verbosity ?: 1.0,
+    cooldownScale = coach?.cooldownScale ?: 1.0,
+    motivationShare = coach?.motivationShare ?: 0.33
+  )
 
   private val _currentFeedback = MutableStateFlow<FeedbackItem?>(null)
   val currentFeedback: StateFlow<FeedbackItem?> = _currentFeedback

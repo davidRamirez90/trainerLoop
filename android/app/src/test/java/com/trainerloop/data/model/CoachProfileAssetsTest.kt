@@ -14,7 +14,7 @@ class CoachProfileAssetsTest {
     val json = Json { ignoreUnknownKeys = true }
     val dir = File("src/main/assets/coach_profiles")
     val files = dir.listFiles { f -> f.name.endsWith(".json") }.orEmpty()
-    assertEquals(6, files.size)
+    assertEquals(5, files.size)
     files.forEach { f ->
       val profile = json.decodeFromString(CoachProfile.serializer(), f.readText())
       assertEquals(f.nameWithoutExtension, profile.id)

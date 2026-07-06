@@ -945,8 +945,28 @@ task-by-task style of the migration plan.
 
 - §13.5 field-ride checklist and threshold tuning against real recorded rides
   (replay harness is ready; needs actual sessions as fixtures).
-- Coach profile differentiation work per §18 (decided 2026-07-06).
 - Phase 2+ items (personalization, W′bal, LLM rendering) per roadmap.
+
+### Coach profile differentiation — implemented 2026-07-06 (§18 scope)
+
+- Five real-name profiles replaced by four archetypes in
+  `assets/coach_profiles/`: `drill-sergeant`, `mentor`, `silent-scientist`
+  (merged Sassi+Sola, drift thresholds sanity-tuned to 5/8), `base-builder`.
+  `default.json` retained as fallback (stale selected ids fall back to the
+  in-code default).
+- `CoachProfile` gains `feedback` (rule-id → template list for all live-coach
+  copy), `verbosity`, `cooldownScale`, `motivationShare`; `voice` and
+  `encouragement` deleted (were never read).
+- `MessagePicker` (seeded, deterministic for replays): random pick with
+  no-repeat-last-2 + `{{placeholder}}` fill (watts, bpm, duration,
+  blockNumber, blockCount). `AnalyticsEngine` copy now profile-driven with
+  built-in fallbacks; `CoachMessageBuilder` `firstOrNull` collapse fixed.
+- `FeedbackDecisionEngine` budget/motivation-budget/category-cooldowns now
+  scale by the profile knobs; `LiveCoach` takes the `CoachProfile` and wires
+  it through (WorkoutViewModel passes the selected one).
+- `CoachDiffTest`: same simulated ride through every bundled profile —
+  asserts distinct message streams, silent-scientist emits fewer items than
+  mentor and zero MOTIVATION.
 
 ---
 

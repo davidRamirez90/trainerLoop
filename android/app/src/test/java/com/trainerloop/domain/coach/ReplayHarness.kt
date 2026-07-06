@@ -17,9 +17,10 @@ object ReplayHarness {
     segments: List<WorkoutSegment>,
     profile: UserProfile,
     samples: List<TelemetrySample>,
-    ergEnabled: Boolean = true
+    ergEnabled: Boolean = true,
+    coachProfile: com.trainerloop.data.model.CoachProfile? = null
   ): List<FeedbackItem> {
-    val coach = LiveCoach(segments, profile)
+    val coach = LiveCoach(segments, profile, coachProfile)
     val items = mutableListOf<FeedbackItem>()
     for (sample in samples) {
       val t = sample.timeSec

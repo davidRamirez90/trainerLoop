@@ -12,7 +12,6 @@ import com.trainerloop.data.model.CoachProfile
 import com.trainerloop.data.model.CoachRules
 import com.trainerloop.data.model.CoachAction
 import com.trainerloop.data.model.CoachSuggestion
-import com.trainerloop.data.model.CoachVoice
 import com.trainerloop.data.model.SegmentPhase
 import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.TelemetrySample
@@ -106,7 +105,7 @@ class WorkoutViewModel(
 
   private val clock = WorkoutClock(workout.segments, dispatcher)
   private val coachEngine = CoachEngine(coachProfile ?: defaultProfile(), workout.segments)
-  private val liveCoach = LiveCoach(workout.segments, userProfile)
+  private val liveCoach = LiveCoach(workout.segments, userProfile, coachProfile)
   private val isRampTest = RampTest.isRampTest(workout.id)
 
   // Ramp-test failure detection: consecutive seconds below 50% of step target.
@@ -620,7 +619,6 @@ class WorkoutViewModel(
         recoveryExtendMaxSec = 120,
         allowSkipRemainingOnIntervals = false
       ),
-      voice = CoachVoice(tone = "neutral", style = "concise"),
       messages = CoachMessages(
         suggestions = mapOf(
           "adjust_intensity_up" to listOf("Increase intensity by {{percent}}%."),
@@ -632,8 +630,7 @@ class WorkoutViewModel(
           "skip_remaining_on_intervals" to listOf("Skip remaining intervals."),
           "skip_remaining_on_intervals_rationale" to listOf("Multiple indicators suggest terminating the session.")
         ),
-        completion = listOf("Session complete."),
-        encouragement = emptyList()
+        completion = listOf("Session complete.")
       )
     )
 

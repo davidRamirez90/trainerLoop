@@ -232,7 +232,6 @@ class CoachEngineTest {
       recoveryExtendMaxSec = 120,
       allowSkipRemainingOnIntervals = false
     ),
-    voice = CoachVoice(tone = "neutral", style = "concise"),
     messages = CoachMessages(
       suggestions = mapOf(
         "adjust_intensity_up" to listOf("Increase intensity by {{percent}}%."),
@@ -244,8 +243,7 @@ class CoachEngineTest {
         "skip_remaining_on_intervals" to listOf("Skip remaining intervals."),
         "skip_remaining_on_intervals_rationale" to listOf("Multiple indicators suggest terminating the session.")
       ),
-      completion = listOf("Session complete."),
-      encouragement = emptyList()
+      completion = listOf("Session complete.")
     )
   )
 
