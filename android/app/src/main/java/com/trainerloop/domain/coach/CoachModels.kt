@@ -94,7 +94,9 @@ data class FeedbackItem(
   val category: FeedbackCategory,
   val severity: Int,
   val message: String,
-  val ruleId: String
+  val ruleId: String,
+  /** Metric snapshot at emission (§13.6) — "why did the coach say this". */
+  val snapshot: Map<String, String> = emptyMap()
 )
 
 @Serializable

@@ -91,7 +91,8 @@ class LiveCoach(
     decisionEngine.submit(analytics.analyze(state, envelope, ctx, input.activeSec, input.ergEnabled))
 
     if (input.activeSec % ARBITRATION_PERIOD_SEC != 0) return null
-    val item = decisionEngine.arbitrate(input.activeSec, input.modificationPending) ?: return null
+    val emitted = decisionEngine.arbitrate(input.activeSec, input.modificationPending) ?: return null
+    val item = emitted.copy(snapshot = snapshot(state, envelope, ctx, input))
     _currentFeedback.value = item
     _feedbackLog.value = _feedbackLog.value + item
     return item
@@ -117,6 +118,25 @@ class LiveCoach(
     fatigueCurve = fatigueCurve.toList(),
     finalFatigueScore = lastFatigue
   )
+
+  /** §13.6: the metric state behind an emission, for the post-ride debug view. */
+  private fun snapshot(
+    state: AthleteStateModel.AthleteState,
+    envelope: ExpectationEnvelope,
+    ctx: IntervalContext,
+    input: TickInput
+  ): Map<String, String> = buildMap {
+    put("segment", "${ctx.segmentClass} +${ctx.elapsedInSegmentSec}s")
+    put("target", "${input.targetMidWatts.toInt()} W (band ${envelope.powerBand.start.toInt()}–${envelope.powerBand.endInclusive.toInt()})")
+    put("power30s", "${state.power30s.toInt()} W")
+    state.hr10s?.let {
+      val band = envelope.hrBand?.let { b -> " (exp ${b.start.toInt()}–${b.endInclusive.toInt()})" } ?: ""
+      put("hr", "${it.toInt()} bpm$band")
+    }
+    state.cadence10s?.let { put("cadence", "${it.toInt()} rpm") }
+    put("fatigue", "%.0f".format(state.fatigueScore))
+    put("confidence", "hr %.2f · cad %.2f".format(state.hrConfidence, state.cadenceConfidence))
+  }
 
   fun dismissCurrent() {
     _currentFeedback.value = null

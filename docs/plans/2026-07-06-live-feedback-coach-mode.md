@@ -949,6 +949,21 @@ task-by-task style of the migration plan.
   fields) and `ReplayHarness.replayFromFit` feeds them through the pipeline;
   the three `rides/*.fit` files (incl. a Wahoo-recorded one) decode in tests.
   Tuning replays need each ride paired with its workout's segment list.
+
+### Debug view + scenario simulator — implemented 2026-07-06 (§13.3, §13.6)
+
+- **"Why did the coach say this"**: `FeedbackItem.snapshot` captures the
+  metric state at emission (segment position, target/power band, power30s,
+  HR vs expected band, cadence, fatigue, per-signal confidence); persisted
+  with the session and shown by tapping a feedback row in `CoachSummaryCard`
+  (rule id, category, severity, snapshot).
+- **`AthleteSimulator`** (test source): deterministic synthetic athlete with
+  configurable HR kinetics/drift, cadence fade, power adherence, and failure
+  injections — strap death, blow-up/ERG spiral, sandbagging, dropout windows.
+- **`ScenarioTest`**: strap dies mid-VO2 set (one data-quality warning, HR
+  rules silent after), ERG spiral fires technique warning, sandbagging fires
+  pacing-under, dropout churn preserves the ≥45 s gap property, seek storm
+  doesn't crash, every emission carries a snapshot.
 - Phase 2+ items (personalization, W′bal, LLM rendering) per roadmap.
 
 ### Coach profile differentiation — implemented 2026-07-06 (§18 scope)

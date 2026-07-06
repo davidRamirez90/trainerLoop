@@ -11,7 +11,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -21,6 +26,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trainerloop.domain.coach.CoachSessionData
+import com.trainerloop.domain.coach.FeedbackItem
 import com.trainerloop.domain.coach.executionScore
 import kotlin.math.roundToInt
 
@@ -105,16 +111,44 @@ fun CoachSummaryCard(data: CoachSessionData) {
           style = MaterialTheme.typography.labelMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        data.feedback.forEach { item ->
-          Row(modifier = Modifier.padding(vertical = 2.dp)) {
-            Text(
-              text = formatTimestamp(item.timestampSec),
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.primary,
-              modifier = Modifier.padding(end = 8.dp)
-            )
-            Text(text = item.message, style = MaterialTheme.typography.bodySmall)
-          }
+        data.feedback.forEach { item -> FeedbackRow(item) }
+      }
+    }
+  }
+}
+
+/** Tap a feedback row to see why the coach said it (§13.6): rule + metric snapshot. */
+@Composable
+private fun FeedbackRow(item: FeedbackItem) {
+  var expanded by remember { mutableStateOf(false) }
+  Column(
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable { expanded = !expanded }
+      .padding(vertical = 2.dp)
+  ) {
+    Row {
+      Text(
+        text = formatTimestamp(item.timestampSec),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(end = 8.dp)
+      )
+      Text(text = item.message, style = MaterialTheme.typography.bodySmall)
+    }
+    if (expanded) {
+      Column(modifier = Modifier.padding(start = 8.dp, top = 2.dp, bottom = 4.dp)) {
+        Text(
+          text = "rule ${item.ruleId} · ${item.category.name.lowercase()} · sev ${item.severity}",
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        item.snapshot.forEach { (k, v) ->
+          Text(
+            text = "$k: $v",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
         }
       }
     }
