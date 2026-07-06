@@ -1,0 +1,7 @@
+t=605 MOTIVATION sev=0 slot-interval-start
+t=900 MOTIVATION sev=0 slot-halfway
+t=1140 MOTIVATION sev=0 slot-final-60
+t=1505 MOTIVATION sev=0 slot-interval-start
+t=1800 MOTIVATION sev=0 slot-halfway
+t=2040 MOTIVATION sev=0 slot-final-60
+t=2405 MOTIVATION sev=0 slot-interval-start
