@@ -57,6 +57,7 @@ class WorkoutCompleteViewModel(
   private val workoutName: String,
   val samples: List<TelemetrySample>,
   private val startTimeMs: Long = System.currentTimeMillis(),
+  private val coachJson: String = "",
   private val profileRepository: ProfileRepository = ProfileRepository(application),
   private val sessionRepository: SessionRepository = SessionRepository.create(AppDatabase.getInstance(application))
 ) : AndroidViewModel(application) {
@@ -169,7 +170,7 @@ class WorkoutCompleteViewModel(
             endedAt = Instant.now().toString(),
             durationSec = state.durationSec,
             samplesJson = samplesJson,
-            coachEventsJson = "",
+            coachEventsJson = coachJson,
             completed = true,
             avgPower = state.avgPower,
             maxPower = state.maxPower,

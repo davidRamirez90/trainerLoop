@@ -37,6 +37,8 @@ class LiveCoach(
   private var cadenceBaseline: Double? = null
   private var baselineClass: SegmentClass? = null
   private var lastElapsedSec = -1
+  private var lastFatigue = 0.0
+  private val fatigueCurve = mutableListOf<Double>()
 
   data class TickInput(
     val elapsedSec: Int,
@@ -73,6 +75,9 @@ class LiveCoach(
       expectationEngine.calibrate(it, input.targetMidWatts, ctx.elapsedInSegmentSec, ctx.segmentClass)
     }
 
+    lastFatigue = state.fatigueScore
+    if (input.activeSec > 0 && input.activeSec % 60 == 0) fatigueCurve.add(state.fatigueScore)
+
     val envelope = expectationEngine.expectationFor(
       ctx, input.targetMidWatts, state.fatigueScore, cadenceBaseline
     )
@@ -88,6 +93,15 @@ class LiveCoach(
 
   /** Latest fatigue/confidence snapshot for summary screens. */
   fun ledger(): List<IntervalRecord> = stateModel.ledger.toList()
+
+  /** Snapshot of all derived session data for persistence (§9). */
+  fun sessionData(): CoachSessionData = CoachSessionData(
+    feedback = _feedbackLog.value,
+    intervals = stateModel.ledger.toList(),
+    recoveries = stateModel.recoveries.toList(),
+    fatigueCurve = fatigueCurve.toList(),
+    finalFatigueScore = lastFatigue
+  )
 
   fun dismissCurrent() {
     _currentFeedback.value = null

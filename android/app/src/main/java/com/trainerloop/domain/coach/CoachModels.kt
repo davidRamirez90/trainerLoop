@@ -1,6 +1,8 @@
 package com.trainerloop.domain.coach
 
 import com.trainerloop.data.model.WorkoutSegment
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 enum class SegmentClass {
   WARMUP, RECOVERY, ENDURANCE, TEMPO, SWEET_SPOT, THRESHOLD,
@@ -85,6 +87,7 @@ data class AnalysisEvent(
 )
 
 /** Arbitration output — what the athlete actually sees. */
+@Serializable
 data class FeedbackItem(
   val id: String,
   val timestampSec: Int,
@@ -94,6 +97,7 @@ data class FeedbackItem(
   val ruleId: String
 )
 
+@Serializable
 data class IntervalRecord(
   val setId: String?,
   val blockNumber: Int,
@@ -109,8 +113,31 @@ data class IntervalRecord(
   val avgCadence: Double?
 )
 
+@Serializable
 data class RecoveryRecord(
   val startHr: Double?,
   val hrr60: Double?,
   val endHr: Double?
 )
+
+/**
+ * Everything the coach derived during a session, persisted as one JSON blob
+ * in the session row (§9 — derived rows only; raw samples persist elsewhere).
+ */
+@Serializable
+data class CoachSessionData(
+  val feedback: List<FeedbackItem> = emptyList(),
+  val intervals: List<IntervalRecord> = emptyList(),
+  val recoveries: List<RecoveryRecord> = emptyList(),
+  /** Fatigue score sampled once per active minute. */
+  val fatigueCurve: List<Double> = emptyList(),
+  val finalFatigueScore: Double = 0.0
+) {
+  fun toJson(): String = json.encodeToString(serializer(), this)
+
+  companion object {
+    private val json = Json { ignoreUnknownKeys = true }
+    fun fromJson(s: String): CoachSessionData? =
+      if (s.isBlank()) null else runCatching { json.decodeFromString(serializer(), s) }.getOrNull()
+  }
+}

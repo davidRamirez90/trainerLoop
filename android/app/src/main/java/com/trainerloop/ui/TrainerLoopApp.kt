@@ -193,6 +193,7 @@ fun TrainerLoopApp(
           ),
           onSessionFinished = { data ->
             app.pendingSessionSamples = data.samples
+            app.pendingCoachJson = data.coachJson
             navController.navigate(
               Screen.WorkoutComplete.createRoute(
                 sessionId = data.startTimeMs.toString(),
@@ -223,6 +224,8 @@ fun TrainerLoopApp(
         val startTimeMs = backStackEntry.arguments?.getLong("startTimeMs") ?: System.currentTimeMillis()
         val samples = app.pendingSessionSamples ?: emptyList()
         app.pendingSessionSamples = null
+        val coachJson = app.pendingCoachJson ?: ""
+        app.pendingCoachJson = null
 
         WorkoutCompleteScreen(
           viewModel = androidx.lifecycle.viewmodel.compose.viewModel(
@@ -232,7 +235,8 @@ fun TrainerLoopApp(
               workoutId = workoutId,
               workoutName = workoutName,
               samples = samples,
-              startTimeMs = startTimeMs
+              startTimeMs = startTimeMs,
+              coachJson = coachJson
             )
           ),
           onDiscard = { navController.popBackStack(Screen.Home.route, inclusive = false) },

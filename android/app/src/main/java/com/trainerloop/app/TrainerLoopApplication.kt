@@ -42,6 +42,7 @@ class TrainerLoopApplication : Application(), ManagerProvider {
 
   var selectedWorkout: Workout? = null
   var pendingSessionSamples: List<TelemetrySample>? = null
+  var pendingCoachJson: String? = null
 
   fun attachTrainer(device: BluetoothDevice) {
     val previousConnection = trainerConnection

@@ -11,7 +11,8 @@ class WorkoutCompleteViewModelFactory(
   private val workoutId: String,
   private val workoutName: String,
   private val samples: List<TelemetrySample>,
-  private val startTimeMs: Long
+  private val startTimeMs: Long,
+  private val coachJson: String = ""
 ) : ViewModelProvider.Factory {
 
   @Suppress("UNCHECKED_CAST")
@@ -23,7 +24,8 @@ class WorkoutCompleteViewModelFactory(
         workoutId = workoutId,
         workoutName = workoutName,
         samples = samples,
-        startTimeMs = startTimeMs
+        startTimeMs = startTimeMs,
+        coachJson = coachJson
       ) as T
     }
     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
