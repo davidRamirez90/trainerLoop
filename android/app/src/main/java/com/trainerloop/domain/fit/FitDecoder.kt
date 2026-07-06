@@ -30,6 +30,16 @@ object FitDecoder {
     val devFieldBytes: Int
   )
 
+  private data class RecordRow(
+    val ts: Long,
+    val power: Int?,
+    val cadence: Int?,
+    val hr: Int?,
+    val speedMms: Int?,
+    val distanceCm: Long?,
+    val altitudeRaw: Int?
+  )
+
   fun decode(bytes: ByteArray): Decoded {
     require(bytes.size >= 12) { "Not a FIT file: too short" }
     val headerSize = bytes[0].toInt() and 0xff
@@ -40,7 +50,7 @@ object FitDecoder {
     val end = minOf(bytes.size.toLong(), headerSize + dataSize).toInt()
 
     val defs = mutableMapOf<Int, MsgDef>()
-    val records = mutableListOf<Triple<Long, Int?, Pair<Int?, Int?>>>() // ts, power, (cadence, hr)
+    val records = mutableListOf<RecordRow>()
     var lastTimestamp = 0L
     var pos = headerSize
 
@@ -94,6 +104,9 @@ object FitDecoder {
         var power: Int? = null
         var cadence: Int? = null
         var hr: Int? = null
+        var speedMms: Int? = null
+        var distanceCm: Long? = null
+        var altitudeRaw: Int? = null
         for (f in def.fields) {
           if (def.globalNum == RECORD_MSG || f.num == 253) {
             val v = readValue(bytes, pos, f, def.littleEndian)
@@ -102,6 +115,9 @@ object FitDecoder {
               7 -> power = v?.toInt()
               4 -> cadence = v?.toInt()
               3 -> hr = v?.toInt()
+              6 -> speedMms = v?.toInt()
+              5 -> distanceCm = v
+              2 -> altitudeRaw = v?.toInt()
             }
           }
           pos += f.size
@@ -109,19 +125,22 @@ object FitDecoder {
         pos += def.devFieldBytes
         if (timestamp != null) lastTimestamp = timestamp
         if (def.globalNum == RECORD_MSG) {
-          records += Triple(lastTimestamp, power, cadence to hr)
+          records += RecordRow(lastTimestamp, power, cadence, hr, speedMms, distanceCm, altitudeRaw)
         }
       }
     }
 
     if (records.isEmpty()) return Decoded(emptyList(), 0L)
-    val t0 = records.first().first
-    val samples = records.map { (ts, power, ch) ->
+    val t0 = records.first().ts
+    val samples = records.map { r ->
       TelemetrySample(
-        timeSec = (ts - t0).toInt(),
-        powerWatts = power ?: 0,
-        cadenceRpm = ch.first ?: 0,
-        hrBpm = ch.second ?: 0
+        timeSec = (r.ts - t0).toInt(),
+        powerWatts = r.power ?: 0,
+        cadenceRpm = r.cadence ?: 0,
+        hrBpm = r.hr ?: 0,
+        virtualSpeedKph = r.speedMms?.let { it / 1000.0 * 3.6 },
+        virtualDistanceM = r.distanceCm?.let { it / 100.0 },
+        virtualAltitudeM = r.altitudeRaw?.let { it / 5.0 - 500.0 }
       )
     }
     return Decoded(samples, t0 * 1000 + FIT_EPOCH_MS)

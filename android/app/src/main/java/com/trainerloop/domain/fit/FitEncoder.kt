@@ -220,7 +220,10 @@ object FitEncoder {
       FitField(253, 4, BASE_TYPE_UINT32),
       FitField(7, 2, BASE_TYPE_UINT16),
       FitField(4, 1, BASE_TYPE_UINT8),
-      FitField(3, 1, BASE_TYPE_UINT8)
+      FitField(3, 1, BASE_TYPE_UINT8),
+      FitField(6, 2, BASE_TYPE_UINT16),  // speed, m/s * 1000
+      FitField(5, 4, BASE_TYPE_UINT32),  // distance, cm
+      FitField(2, 2, BASE_TYPE_UINT16)   // altitude, (m + 500) * 5
     )
     val sessionFields = listOf(
       FitField(253, 4, BASE_TYPE_UINT32),
@@ -228,6 +231,7 @@ object FitEncoder {
       FitField(5, 1, BASE_TYPE_ENUM),
       FitField(7, 4, BASE_TYPE_UINT32),
       FitField(8, 4, BASE_TYPE_UINT32),
+      FitField(9, 4, BASE_TYPE_UINT32),  // total_distance, cm
       FitField(15, 1, BASE_TYPE_UINT8),
       FitField(16, 1, BASE_TYPE_UINT8),
       FitField(17, 1, BASE_TYPE_UINT8),
@@ -253,14 +257,24 @@ object FitEncoder {
     normalizedSamples.forEach { sample ->
       val cadence = if (sample.cadenceRpm > 0) sample.cadenceRpm else null
       val hr = if (sample.hrBpm > 0) sample.hrBpm else null
+      val speed = sample.virtualSpeedKph?.let { (it / 3.6 * 1000).toInt() }
+      val distance = sample.virtualDistanceM?.let { (it * 100).toInt() }
+      val altitude = sample.virtualAltitudeM?.let { ((it + 500.0) * 5).toInt() }
       dataBytes.addAll(
         buildDataMessage(
           2,
           recordFields,
-          listOf(fitStartTimestamp + sample.timeSec, sample.powerWatts, cadence, hr)
+          listOf(
+            fitStartTimestamp + sample.timeSec, sample.powerWatts, cadence, hr,
+            speed, distance, altitude
+          )
         )
       )
     }
+
+    val totalDistanceCm = normalizedSamples
+      .lastOrNull { it.virtualDistanceM != null }
+      ?.virtualDistanceM?.let { (it * 100).toInt() }
 
     dataBytes.addAll(buildDefinitionMessage(3, 18, sessionFields))
     dataBytes.addAll(
@@ -273,6 +287,7 @@ object FitEncoder {
           sport,
           totalElapsedMs,
           totalTimerMs,
+          totalDistanceCm,
           avgCadence?.toInt(),
           avgHr?.toInt(),
           maxHr,

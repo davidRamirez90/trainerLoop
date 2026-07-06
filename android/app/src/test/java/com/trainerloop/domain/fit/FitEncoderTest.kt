@@ -8,6 +8,7 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class FitEncoderTest {
@@ -40,6 +41,37 @@ class FitEncoderTest {
     assertEquals(0x46.toByte(), encoded[9])
     assertEquals(0x49.toByte(), encoded[10])
     assertEquals(0x54.toByte(), encoded[11])
+  }
+
+  @Test
+  fun `virtual ride fields survive an encode decode round trip`() {
+    val samples = (1..10).map { t ->
+      TelemetrySample(
+        timeSec = t, powerWatts = 200, cadenceRpm = 90, hrBpm = 140,
+        virtualSpeedKph = 36.0,
+        virtualDistanceM = t * 10.0,
+        virtualAltitudeM = 100.0 + t,
+        gradePercent = 2.5
+      )
+    }
+    val bytes = FitEncoder.encode(startTimeMs = 1_700_000_000_000L, elapsedSec = 10, samples = samples)
+    val decoded = FitDecoder.decode(bytes)
+    val last = decoded.samples.last()
+    assertEquals(36.0, last.virtualSpeedKph!!, 0.1)
+    assertEquals(100.0, last.virtualDistanceM!!, 0.1)
+    assertEquals(110.0, last.virtualAltitudeM!!, 0.3)
+  }
+
+  @Test
+  fun `samples without virtual data decode with null virtual fields`() {
+    val samples = (1..5).map { t ->
+      TelemetrySample(timeSec = t, powerWatts = 200, cadenceRpm = 90, hrBpm = 140)
+    }
+    val bytes = FitEncoder.encode(1_700_000_000_000L, 5, samples)
+    val decoded = FitDecoder.decode(bytes)
+    assertNull(decoded.samples.last().virtualSpeedKph)
+    assertNull(decoded.samples.last().virtualDistanceM)
+    assertNull(decoded.samples.last().virtualAltitudeM)
   }
 
   private fun utcMillis(year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int): Long {
