@@ -912,21 +912,35 @@ task-by-task style of the migration plan.
   pipeline runs (ERG spiral, safety, quiet ride sparseness, ≥45 s-gap
   property, low-HR-confidence suppression).
 
-### Deferred / follow-ups
+### Follow-up items — completed 2026-07-06 (Mac dev machine)
 
-1. **Device build + field test** — dev VPS (2 vCPU/4 GB) OOMs on
-   `assembleDebug`; unit tests compile+pass. Run `./gradlew :app:assembleDebug`
-   and the §13.5 device checklist on a real machine.
-2. **Room persistence** of feedback events / interval records / physio summary
-   (§9) — ledger exists in memory; schema + DAO not yet added.
-3. **Replay harness over recorded sessions** (§13.2) — synthetic-stream
-   pipeline tests exist; Room-session/FIT-fixture replay + golden files not yet.
-4. **Summary-screen integration** (§11) — execution score/fatigue curve not
-   yet surfaced post-ride.
-5. **v1 rule rehoming** — v1 CoachEngine still runs side-by-side rather than
-   as the WORKOUT_MODIFICATION category inside the arbiter.
-6. **Profile JSON extensions + porting the five personality profiles** from
-   repo-root `profiles/` into assets (§8.5); message templating still v1-style.
-7. **LTHR onboarding prompt** in Settings (field exists, no UI yet).
-8. **Threshold tuning pass** with real rides (§16 steps 6/8) and the settings
-   toggle to enable/disable coach mode.
+1. **Device build** — `assembleDebug` + unit tests pass; installed and
+   launched on the attached Pixel. §13.5 field-ride checklist still needs a
+   human on the trainer.
+2. **Persistence** — `CoachSessionData` (feedback log, interval ledger,
+   recoveries, 1/min fatigue curve, final fatigue) serialized into the
+   previously unused `coachEventsJson` session column; no schema migration.
+3. **Replay harness** — `ReplayHarness` (test sources) replays any sample
+   stream (incl. straight from a session's `samplesJson`) through the full
+   pipeline; golden-file test over a simulated 3×10 threshold ride
+   (`REGENERATE_GOLDEN=1` to re-baseline).
+4. **Summary integration** — `CoachSummaryCard` on the complete screen:
+   workout/interval execution scores (reduced-term formula; see
+   `executionScore` in CoachModels), fatigue sparkline, feedback timeline.
+5. **v1 rehoming** — CoachEngine keeps detection + accept/reject; its
+   suggestion enters arbitration as WORKOUT_MODIFICATION and only surfaces on
+   winning, so the global gap/budget/log now cover it. Expired-unemitted
+   suggestions auto-reject.
+6. **Profiles** — five personality profiles converted into
+   `assets/coach_profiles/` (flat v1 schema), loaded via `CoachProfileLoader`,
+   selected profile drives CoachEngine; settings coach row is a picker dialog.
+   Message templating still v1-style (§8.5 category budgets/extensions remain
+   Phase 2 work).
+7. **LTHR** — editable field in Settings (blank = estimated from max HR).
+8. **Coach toggle** — master switch in Settings gating live + v1 coach ticks.
+
+### Still open
+
+- §13.5 field-ride checklist and threshold tuning against real recorded rides
+  (replay harness is ready; needs actual sessions as fixtures).
+- Phase 2+ items (personalization, W′bal, LLM rendering) per roadmap.
