@@ -62,7 +62,8 @@ fun WorkoutChart(
   samples: List<TelemetrySample>,
   elapsedSec: Int,
   ftp: Int,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
+  elevationProfile: DoubleArray? = null
 ) {
   val totalDuration = remember(segments) { WorkoutMath.totalDurationSec(segments) }
   // Segment bounds (startSec, endSec) for tap hit-testing.
@@ -93,6 +94,7 @@ fun WorkoutChart(
   val cursorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
   val hrLineColor = MaterialTheme.colorScheme.error
   val powerLineColor = MaterialTheme.colorScheme.secondary
+  val elevationColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f)
 
   Column(modifier = modifier.fillMaxWidth()) {
     Row(
@@ -140,6 +142,26 @@ fun WorkoutChart(
         fun yForHr(bpm: Int): Float {
           val ratio = ((bpm - HR_AXIS_MIN) / (HR_AXIS_MAX - HR_AXIS_MIN)).coerceIn(0f, 1f)
           return chartBottom - ratio * chartHeight
+        }
+
+        // Soft terrain silhouette across the bottom 30% of the chart.
+        if (elevationProfile != null && elevationProfile.isNotEmpty()) {
+          val minAlt = elevationProfile.min()
+          val altSpan = (elevationProfile.max() - minAlt).coerceAtLeast(1.0)
+          val bandHeight = chartHeight * 0.3f
+          val elevPath = Path()
+          elevPath.moveTo(xForTime(winStart), chartBottom)
+          val elevStep = (winSpan / 200).coerceAtLeast(1)
+          var t = winStart
+          while (t <= winEnd) {
+            val alt = elevationProfile[t.coerceIn(0, elevationProfile.lastIndex)]
+            val y = chartBottom - ((alt - minAlt) / altSpan).toFloat() * bandHeight
+            elevPath.lineTo(xForTime(t), y)
+            t += elevStep
+          }
+          elevPath.lineTo(xForTime(winEnd), chartBottom)
+          elevPath.close()
+          drawPath(elevPath, color = elevationColor)
         }
 
         // Gridlines at FTP and FTP/2.

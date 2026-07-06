@@ -328,6 +328,33 @@ fun WorkoutScreen(
         )
       }
 
+      uiState.currentVirtualSpeedKph?.let { speedKph ->
+        Spacer(modifier = Modifier.height(8.dp))
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+          BigMetric(
+            label = "Speed",
+            value = "%.1f".format(speedKph),
+            unit = "km/h",
+            modifier = Modifier.weight(1f)
+          )
+          BigMetric(
+            label = "Grade",
+            value = "%.1f".format(uiState.currentGradePercent ?: 0.0),
+            unit = "%",
+            modifier = Modifier.weight(1f)
+          )
+          BigMetric(
+            label = "Distance",
+            value = "%.1f".format((uiState.virtualDistanceM ?: 0.0) / 1000.0),
+            unit = "km",
+            modifier = Modifier.weight(1f)
+          )
+        }
+      }
+
       Spacer(modifier = Modifier.height(16.dp))
 
       // Chart section with tabs
@@ -354,7 +381,8 @@ fun WorkoutScreen(
           samples = uiState.samples,
           elapsedSec = uiState.elapsedSec,
           ftp = ftp,
-          modifier = Modifier.fillMaxWidth()
+          modifier = Modifier.fillMaxWidth(),
+          elevationProfile = uiState.elevationProfile
         )
 
         Spacer(modifier = Modifier.height(8.dp))
