@@ -48,6 +48,19 @@ object ReplayHarness {
     ergEnabled
   )
 
+  /** Replays a recorded FIT activity file (§13.2 — the docs/rides fixtures). */
+  fun replayFromFit(
+    segments: List<WorkoutSegment>,
+    profile: UserProfile,
+    fitBytes: ByteArray,
+    ergEnabled: Boolean = true,
+    coachProfile: com.trainerloop.data.model.CoachProfile? = null
+  ): List<FeedbackItem> = replay(
+    segments, profile,
+    com.trainerloop.domain.fit.FitDecoder.decode(fitBytes).samples,
+    ergEnabled, coachProfile
+  )
+
   /** One line per emitted item — the golden-file format. */
   fun timeline(items: List<FeedbackItem>): String =
     items.joinToString("\n") { "t=${it.timestampSec} ${it.category} sev=${it.severity} ${it.ruleId}" }

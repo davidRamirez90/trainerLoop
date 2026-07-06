@@ -943,8 +943,12 @@ task-by-task style of the migration plan.
 
 ### Still open
 
-- §13.5 field-ride checklist and threshold tuning against real recorded rides
-  (replay harness is ready; needs actual sessions as fixtures).
+- §13.5 field-ride checklist and threshold tuning against real recorded rides.
+  The FIT-decoder gap is closed (2026-07-06): `domain/fit/FitDecoder.kt`
+  decodes activity files (both endiannesses, compressed timestamps, developer
+  fields) and `ReplayHarness.replayFromFit` feeds them through the pipeline;
+  the three `rides/*.fit` files (incl. a Wahoo-recorded one) decode in tests.
+  Tuning replays need each ride paired with its workout's segment list.
 - Phase 2+ items (personalization, W′bal, LLM rendering) per roadmap.
 
 ### Coach profile differentiation — implemented 2026-07-06 (§18 scope)
