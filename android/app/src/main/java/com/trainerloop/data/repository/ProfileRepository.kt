@@ -59,6 +59,7 @@ open class ProfileRepository(context: Context) {
       weightKg = prefs.getFloat(KEY_WEIGHT, 75.0f).toDouble(),
       maxHr = prefs.getInt(KEY_MAX_HR, 190),
       restingHr = prefs.getInt(KEY_RESTING_HR, 55),
+      lthr = prefs.getInt(KEY_LTHR, -1).takeIf { it > 0 },
       ergBiasPct = prefs.getInt(KEY_ERG_BIAS, 0),
       selectedCoachProfileId = prefs.getString(KEY_COACH_PROFILE, "default") ?: "default",
       intervalsIcuAthleteId = prefs.getString(KEY_INTERVALS_ATHLETE_ID, "") ?: "",
@@ -73,6 +74,7 @@ open class ProfileRepository(context: Context) {
       .putFloat(KEY_WEIGHT, profile.weightKg.toFloat())
       .putInt(KEY_MAX_HR, profile.maxHr)
       .putInt(KEY_RESTING_HR, profile.restingHr)
+      .putInt(KEY_LTHR, profile.lthr ?: -1)
       .putInt(KEY_ERG_BIAS, profile.ergBiasPct)
       .putString(KEY_COACH_PROFILE, profile.selectedCoachProfileId)
       .putString(KEY_INTERVALS_ATHLETE_ID, profile.intervalsIcuAthleteId)
@@ -86,6 +88,7 @@ open class ProfileRepository(context: Context) {
     private const val KEY_WEIGHT = "weight_kg"
     private const val KEY_MAX_HR = "max_hr"
     private const val KEY_RESTING_HR = "resting_hr"
+    private const val KEY_LTHR = "lthr"
     private const val KEY_ERG_BIAS = "erg_bias"
     private const val KEY_COACH_PROFILE = "coach_profile"
     private const val KEY_NAME = "name"

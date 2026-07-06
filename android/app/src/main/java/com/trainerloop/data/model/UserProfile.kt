@@ -6,6 +6,8 @@ data class UserProfile(
   val weightKg: Double = 75.0,
   val maxHr: Int = 190,
   val restingHr: Int = 55,
+  /** Lactate-threshold HR; when absent the coach estimates it from maxHr. */
+  val lthr: Int? = null,
   val ergBiasPct: Int = 0,
   val selectedCoachProfileId: String = "default",
   val intervalsIcuAthleteId: String = "",

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.trainerloop.ble.FtmsControlManager
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
+import com.trainerloop.data.model.UserProfile
 import com.trainerloop.data.model.Workout
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +23,8 @@ class WorkoutViewModelFactory(
   private val ftmsManagerFlow: StateFlow<FtmsManager?> = MutableStateFlow(null),
   private val hrManagerFlow: StateFlow<HrManager?> = MutableStateFlow(null),
   private val ftmsControlManagerFlow: StateFlow<FtmsControlManager?> = MutableStateFlow(null),
-  private val dispatcher: CoroutineDispatcher = Dispatchers.Default
+  private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  private val userProfile: UserProfile = UserProfile()
 ) : ViewModelProvider.Factory {
 
   @Suppress("UNCHECKED_CAST")
@@ -38,7 +40,8 @@ class WorkoutViewModelFactory(
         ftmsManagerFlow,
         hrManagerFlow,
         ftmsControlManagerFlow,
-        dispatcher
+        dispatcher,
+        userProfile
       ) as T
     }
     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

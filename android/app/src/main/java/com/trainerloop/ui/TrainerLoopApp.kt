@@ -186,7 +186,9 @@ fun TrainerLoopApp(
               workout = workout,
               ftmsManagerFlow = app.ftmsManager,
               hrManagerFlow = app.hrManager,
-              ftmsControlManagerFlow = app.ftmsControlManager
+              ftmsControlManagerFlow = app.ftmsControlManager,
+              userProfile = com.trainerloop.data.repository.ProfileRepository(context)
+                .getProfileSync()
             )
           ),
           onSessionFinished = { data ->

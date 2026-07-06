@@ -141,6 +141,25 @@ fun WorkoutScreen(
     }
   }
 
+  // Speak urgent coach feedback (safety / fatigue / sensor tiers) so it lands
+  // eyes-free mid-interval; lower tiers stay visual-only.
+  LaunchedEffect(uiState.liveFeedback?.id) {
+    val feedback = uiState.liveFeedback ?: return@LaunchedEffect
+    val spokenCategories = setOf(
+      com.trainerloop.domain.coach.FeedbackCategory.SAFETY,
+      com.trainerloop.domain.coach.FeedbackCategory.DATA_QUALITY,
+      com.trainerloop.domain.coach.FeedbackCategory.FATIGUE_MANAGEMENT
+    )
+    if (feedback.category in spokenCategories) {
+      tts.speak(
+        feedback.message,
+        android.speech.tts.TextToSpeech.QUEUE_FLUSH,
+        null,
+        "coach-${feedback.id}"
+      )
+    }
+  }
+
   LaunchedEffect(uiState.isRunning) {
     if (uiState.isRunning) {
       val timeStr = formatDuration(uiState.elapsedSec)
@@ -354,6 +373,12 @@ fun WorkoutScreen(
       }
 
       Spacer(modifier = Modifier.weight(1f))
+
+      // Live coach feedback (auto-dismisses after 12 s)
+      uiState.liveFeedback?.let { feedback ->
+        com.trainerloop.ui.coach.LiveFeedbackCard(item = feedback)
+        Spacer(modifier = Modifier.height(8.dp))
+      }
 
       // Extend recovery — only meaningful while a recovery interval is active.
       if (uiState.segments.getOrNull(uiState.segmentIndex)?.phase ==

@@ -16,10 +16,13 @@ import com.trainerloop.data.model.CoachVoice
 import com.trainerloop.data.model.SegmentPhase
 import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.TelemetrySample
+import com.trainerloop.data.model.UserProfile
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.withDurationSec
 import com.trainerloop.domain.CoachEngine
+import com.trainerloop.domain.coach.FeedbackItem
+import com.trainerloop.domain.coach.LiveCoach
 import com.trainerloop.domain.RampTest
 import com.trainerloop.domain.TelemetryRecorder
 import com.trainerloop.domain.WorkoutClock
@@ -64,7 +67,10 @@ data class WorkoutUiState(
   val error: String? = null,
   // Coach state
   val pendingSuggestion: CoachSuggestion? = null,
-  val coachEvents: List<CoachEvent> = emptyList()
+  val coachEvents: List<CoachEvent> = emptyList(),
+  // Live Feedback Coach Mode
+  val liveFeedback: FeedbackItem? = null,
+  val feedbackLog: List<FeedbackItem> = emptyList()
 )
 
 data class WorkoutFinishData(
@@ -92,11 +98,13 @@ class WorkoutViewModel(
   private val ftmsManagerFlow: StateFlow<FtmsManager?> = MutableStateFlow(null),
   private val hrManagerFlow: StateFlow<HrManager?> = MutableStateFlow(null),
   private val ftmsControlManagerFlow: StateFlow<FtmsControlManager?> = MutableStateFlow(null),
-  private val dispatcher: CoroutineDispatcher = Dispatchers.Default
+  private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  private val userProfile: UserProfile = UserProfile()
 ) : ViewModel() {
 
   private val clock = WorkoutClock(workout.segments, dispatcher)
   private val coachEngine = CoachEngine(defaultProfile(), workout.segments)
+  private val liveCoach = LiveCoach(workout.segments, userProfile)
   private val isRampTest = RampTest.isRampTest(workout.id)
 
   // Ramp-test failure detection: consecutive seconds below 50% of step target.
@@ -181,6 +189,7 @@ class WorkoutViewModel(
         updateFromClock()
         updateInZone()
         tickCoach()
+        tickLiveCoach()
         detectRampFailure()
       }
     }
@@ -206,6 +215,16 @@ class WorkoutViewModel(
     viewModelScope.launch {
       coachEngine.pendingSuggestion.collect { suggestion ->
         _uiState.value = _uiState.value.copy(pendingSuggestion = suggestion)
+      }
+    }
+    viewModelScope.launch {
+      liveCoach.currentFeedback.collect { feedback ->
+        _uiState.value = _uiState.value.copy(liveFeedback = feedback)
+      }
+    }
+    viewModelScope.launch {
+      liveCoach.feedbackLog.collect { log ->
+        _uiState.value = _uiState.value.copy(feedbackLog = log)
       }
     }
 
@@ -326,6 +345,7 @@ class WorkoutViewModel(
       it[idx] = seg.withDurationSec(seg.durationSec + deltaSec)
     }
     clock.extendTotalDuration(deltaSec)
+    liveCoach.replan(segments)
     _uiState.value = _uiState.value.copy(segments = segments)
     updateFromClock()
   }
@@ -455,6 +475,33 @@ class WorkoutViewModel(
    * within ~5% of the interval's target band. Resets on interval change so the
    * bar reflects the *current* interval, not the whole session.
    */
+  private fun tickLiveCoach() {
+    if (isRampTest) return
+    val state = _uiState.value
+    val target = (state.targetRange.low + state.targetRange.high) / 2.0
+    liveCoach.onTick(
+      LiveCoach.TickInput(
+        elapsedSec = state.elapsedSec,
+        activeSec = state.activeSec,
+        isRunning = state.isRunning,
+        sample = TelemetrySample(
+          timeSec = state.activeSec,
+          powerWatts = state.currentPowerWatts,
+          cadenceRpm = state.currentCadenceRpm,
+          hrBpm = state.currentHrBpm
+        ),
+        targetMidWatts = target,
+        ergEnabled = state.isErgEnabled,
+        modificationPending = state.pendingSuggestion != null
+      )
+    )
+    // Informational cards auto-dismiss into the log after 12 s.
+    val feedback = state.liveFeedback
+    if (feedback != null && state.activeSec - feedback.timestampSec > FEEDBACK_AUTO_DISMISS_SEC) {
+      liveCoach.dismissCurrent()
+    }
+  }
+
   private fun updateInZone() {
     val state = _uiState.value
     if (state.segmentIndex != inZoneSegmentIndex) {
@@ -549,6 +596,7 @@ class WorkoutViewModel(
     )
 
     private const val CONTROL_READY_TIMEOUT_MS = 5_000L
+    private const val FEEDBACK_AUTO_DISMISS_SEC = 12
     private const val RAMP_FAILURE_SEC = 5
     private const val RECOVERY_EXTEND_STEP_SEC = 30
   }
