@@ -217,37 +217,32 @@ fun SettingsScreen(
         Text(if (advancedExpanded) "Hide advanced" else "Advanced")
       }
       if (advancedExpanded) {
-        OutlinedTextField(
-          value = uiState.bikeWeightKg,
-          onValueChange = viewModel::updateBikeWeight,
-          label = { Text("Bike weight (kg, 5–15)") },
-          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-            keyboardType = KeyboardType.Decimal
-          ),
-          singleLine = true,
-          modifier = Modifier.fillMaxWidth()
+        LabeledSlider(
+          label = "Bike weight",
+          valueText = "${uiState.bikeWeightKg} kg",
+          hint = null,
+          value = uiState.bikeWeightKg.toFloatOrNull() ?: 8.0f,
+          valueRange = 5f..15f,
+          steps = 19, // 0.5 kg increments
+          onValueChange = { viewModel.updateBikeWeight(fmt(it, 1)) }
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-          value = uiState.crr,
-          onValueChange = viewModel::updateCrr,
-          label = { Text("Rolling resistance Crr (0.002–0.010)") },
-          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-            keyboardType = KeyboardType.Decimal
-          ),
-          singleLine = true,
-          modifier = Modifier.fillMaxWidth()
+        LabeledSlider(
+          label = "Rolling resistance (Crr)",
+          valueText = uiState.crr,
+          hint = crrHint(uiState.crr.toDoubleOrNull() ?: 0.005),
+          value = uiState.crr.toFloatOrNull() ?: 0.005f,
+          valueRange = 0.002f..0.010f,
+          steps = 15, // 0.0005 increments
+          onValueChange = { viewModel.updateCrr(fmt(it, 4)) }
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-          value = uiState.cda,
-          onValueChange = viewModel::updateCda,
-          label = { Text("Drag area CdA m² (0.15–0.60)") },
-          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-            keyboardType = KeyboardType.Decimal
-          ),
-          singleLine = true,
-          modifier = Modifier.fillMaxWidth()
+        LabeledSlider(
+          label = "Aero drag (CdA)",
+          valueText = "${uiState.cda} m²",
+          hint = cdaHint(uiState.cda.toDoubleOrNull() ?: 0.32),
+          value = uiState.cda.toFloatOrNull() ?: 0.32f,
+          valueRange = 0.15f..0.60f,
+          steps = 44, // 0.01 increments
+          onValueChange = { viewModel.updateCda(fmt(it, 2)) }
         )
         TextButton(onClick = { viewModel.resetPhysicsDefaults() }) {
           Text("Reset to defaults")
@@ -566,6 +561,58 @@ private fun SettingsGroupCard(
       content()
     }
   }
+}
+
+@Composable
+internal fun LabeledSlider(
+  label: String,
+  valueText: String,
+  hint: String?,
+  value: Float,
+  valueRange: ClosedFloatingPointRange<Float>,
+  steps: Int,
+  onValueChange: (Float) -> Unit
+) {
+  Column(modifier = Modifier.fillMaxWidth()) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+      Text(label, style = MaterialTheme.typography.bodyMedium)
+      Text(valueText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+    }
+    androidx.compose.material3.Slider(
+      value = value,
+      onValueChange = onValueChange,
+      valueRange = valueRange,
+      steps = steps
+    )
+    if (hint != null) {
+      Text(
+        hint,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+      )
+    }
+  }
+}
+
+/** Locale-safe decimal formatting — the ViewModel parses with toDoubleOrNull(). */
+private fun fmt(v: Float, decimals: Int): String =
+  String.format(java.util.Locale.US, "%.${decimals}f", v)
+
+private fun crrHint(v: Double): String = when {
+  v <= 0.0035 -> "Very fast surface (track, new asphalt)"
+  v <= 0.0055 -> "Smooth asphalt road"
+  v <= 0.0080 -> "Rough or worn road"
+  else -> "Gravel / poor surface"
+}
+
+private fun cdaHint(v: Double): String = when {
+  v <= 0.25 -> "Aggressive aero position (drops / TT)"
+  v <= 0.35 -> "Road position on the hoods"
+  v <= 0.45 -> "Upright endurance position"
+  else -> "Very upright (MTB / city bike)"
 }
 
 @Composable
