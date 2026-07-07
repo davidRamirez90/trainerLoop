@@ -38,5 +38,9 @@ data class SessionData(
     val maxPower: Int,
     val avgCadence: Int,
     val avgHr: Int,
-    val icuSyncedAt: String? = null
+    val icuSyncedAt: String? = null,
+    /** "WORKOUT" or "FREE_RIDE". */
+    val sessionType: String = "WORKOUT",
+    /** RouteEntity id for free rides; null for workouts. */
+    val routeId: String? = null
 )

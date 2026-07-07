@@ -42,7 +42,9 @@ open class SessionRepository(private val dao: SessionDao) {
         maxPower = s.maxPower,
         avgCadence = s.avgCadence,
         avgHr = s.avgHr,
-        icuSyncedAt = s.icuSyncedAt
+        icuSyncedAt = s.icuSyncedAt,
+        sessionType = s.sessionType,
+        routeId = s.routeId
     )
 
     private fun toSummary(e: SessionEntity): SessionSummary = SessionSummary(
@@ -74,7 +76,9 @@ open class SessionRepository(private val dao: SessionDao) {
         maxPower = e.maxPower,
         avgCadence = e.avgCadence,
         avgHr = e.avgHr,
-        icuSyncedAt = e.icuSyncedAt
+        icuSyncedAt = e.icuSyncedAt,
+        sessionType = e.sessionType,
+        routeId = e.routeId
     )
 
     companion object {

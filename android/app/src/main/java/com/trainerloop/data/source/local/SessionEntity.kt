@@ -19,5 +19,9 @@ data class SessionEntity(
     val avgCadence: Int,
     val avgHr: Int,
     /** ISO-8601 instant of the last successful intervals.icu upload; null = never synced. */
-    val icuSyncedAt: String? = null
+    val icuSyncedAt: String? = null,
+    /** "WORKOUT" or "FREE_RIDE". */
+    val sessionType: String = "WORKOUT",
+    /** RouteEntity id for free rides; null for workouts. */
+    val routeId: String? = null
 )
