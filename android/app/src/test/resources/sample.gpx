@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="test">
+  <trk>
+    <name>Test Climb</name>
+    <trkseg>
+      <trkpt lat="47.00000" lon="8.00000"><ele>500.0</ele></trkpt>
+      <trkpt lat="47.00009" lon="8.00000"><ele>500.4</ele></trkpt>
+      <trkpt lat="47.00018" lon="8.00000"><ele>500.8</ele></trkpt>
+      <trkpt lat="47.00027" lon="8.00000"><ele>501.2</ele></trkpt>
+      <trkpt lat="47.00036" lon="8.00000"><ele>501.6</ele></trkpt>
+      <trkpt lat="47.00045" lon="8.00000"><ele>502.0</ele></trkpt>
+      <trkpt lat="47.00054" lon="8.00000"><ele>502.4</ele></trkpt>
+      <trkpt lat="47.00063" lon="8.00000"><ele>502.8</ele></trkpt>
+      <trkpt lat="47.00072" lon="8.00000"><ele>503.2</ele></trkpt>
+      <trkpt lat="47.00081" lon="8.00000"><ele>503.6</ele></trkpt>
+      <trkpt lat="47.00090" lon="8.00000"><ele>504.0</ele></trkpt>
+      <trkpt lat="47.00099" lon="8.00000"><ele>504.4</ele></trkpt>
+      <trkpt lat="47.00108" lon="8.00000"><ele>504.8</ele></trkpt>
+      <trkpt lat="47.00117" lon="8.00000"><ele>505.2</ele></trkpt>
+      <trkpt lat="47.00126" lon="8.00000"><ele>505.6</ele></trkpt>
+      <trkpt lat="47.00135" lon="8.00000"><ele>514.0</ele></trkpt>
+      <trkpt lat="47.00144" lon="8.00000"><ele>506.4</ele></trkpt>
+      <trkpt lat="47.00153" lon="8.00000"><ele>506.8</ele></trkpt>
+      <trkpt lat="47.00162" lon="8.00000"><ele>507.2</ele></trkpt>
+      <trkpt lat="47.00171" lon="8.00000"><ele>507.6</ele></trkpt>
+      <trkpt lat="47.00180" lon="8.00000"><ele>508.0</ele></trkpt>
+      <trkpt lat="47.00189" lon="8.00000"><ele>508.4</ele></trkpt>
+      <trkpt lat="47.00198" lon="8.00000"><ele>508.8</ele></trkpt>
+      <trkpt lat="47.00207" lon="8.00000"><ele>509.2</ele></trkpt>
+      <trkpt lat="47.00216" lon="8.00000"><ele>509.6</ele></trkpt>
+      <trkpt lat="47.00225" lon="8.00000"><ele>510.0</ele></trkpt>
+      <trkpt lat="47.00234" lon="8.00000"><ele>510.4</ele></trkpt>
+      <trkpt lat="47.00243" lon="8.00000"><ele>510.8</ele></trkpt>
+      <trkpt lat="47.00252" lon="8.00000"><ele>511.2</ele></trkpt>
+      <trkpt lat="47.00261" lon="8.00000"><ele>511.6</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>
