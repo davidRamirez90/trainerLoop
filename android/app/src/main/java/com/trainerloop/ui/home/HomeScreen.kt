@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothConnected
@@ -64,6 +65,7 @@ fun HomeScreen(
   onNavigateToBuilder: () -> Unit,
   onStartFreeRide: () -> Unit,
   onStartPlanned: (com.trainerloop.data.model.Workout) -> Unit,
+  onGpxRoutes: () -> Unit,
   viewModel: HomeViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsState()
@@ -122,7 +124,8 @@ fun HomeScreen(
     item {
       ActionRows(
         onWorkoutLibrary = onNavigateToWorkouts,
-        onWorkoutBuilder = onNavigateToBuilder
+        onWorkoutBuilder = onNavigateToBuilder,
+        onGpxRoutes = onGpxRoutes
       )
     }
 
@@ -415,7 +418,8 @@ private fun DeviceChip(
 @Composable
 private fun ActionRows(
   onWorkoutLibrary: () -> Unit,
-  onWorkoutBuilder: () -> Unit
+  onWorkoutBuilder: () -> Unit,
+  onGpxRoutes: () -> Unit
 ) {
   Card(modifier = Modifier.fillMaxWidth()) {
     Column {
@@ -429,6 +433,12 @@ private fun ActionRows(
         icon = Icons.Default.Build,
         label = "Workout Builder",
         onClick = onWorkoutBuilder
+      )
+      HorizontalDivider()
+      ActionRow(
+        icon = Icons.AutoMirrored.Filled.DirectionsBike,
+        label = "GPX Routes",
+        onClick = onGpxRoutes
       )
     }
   }

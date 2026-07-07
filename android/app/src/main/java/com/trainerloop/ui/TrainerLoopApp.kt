@@ -94,7 +94,27 @@ fun TrainerLoopApp(
           onStartPlanned = { workout ->
             context.trainerLoopApp.selectedWorkout = workout
             navController.navigate(Screen.WorkoutPlayer.createRoute(sessionId = 1L))
-          }
+          },
+          onGpxRoutes = { navController.navigate(Screen.Routes.route) }
+        )
+      }
+
+      composable(Screen.Routes.route) {
+        com.trainerloop.ui.routes.RoutesScreen(
+          onRouteClick = { id -> navController.navigate(Screen.RouteDetail.createRoute(id)) },
+          onBack = { navController.popBackStack() }
+        )
+      }
+
+      composable(
+        route = Screen.RouteDetail.route,
+        arguments = listOf(navArgument("routeId") { type = NavType.StringType })
+      ) { backStackEntry ->
+        val routeId = backStackEntry.arguments?.getString("routeId") ?: return@composable
+        com.trainerloop.ui.routes.RouteDetailScreen(
+          routeId = routeId,
+          onStartRide = { id -> navController.navigate(Screen.FreeRide.createRoute(id)) },
+          onBack = { navController.popBackStack() }
         )
       }
 

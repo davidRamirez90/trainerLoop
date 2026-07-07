@@ -26,6 +26,14 @@ sealed class Screen(val route: String) {
     }
   }
 
+  object Routes : Screen("routes")
+  object RouteDetail : Screen("route_detail/{routeId}") {
+    fun createRoute(routeId: String): String = "route_detail/$routeId"
+  }
+  object FreeRide : Screen("free_ride/{routeId}") {
+    fun createRoute(routeId: String): String = "free_ride/$routeId"
+  }
+
   companion object {
     val bottomTabs = listOf(Home, Workouts, History, Profile)
   }
