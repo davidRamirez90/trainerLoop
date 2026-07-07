@@ -14,5 +14,8 @@ data class TelemetrySample(
   val virtualSpeedKph: Double? = null,
   val virtualDistanceM: Double? = null,
   val virtualAltitudeM: Double? = null,
-  val gradePercent: Double? = null
+  val gradePercent: Double? = null,
+  /** GPS position from the GPX route at the simulated distance (free rides only). */
+  val positionLat: Double? = null,
+  val positionLon: Double? = null
 )

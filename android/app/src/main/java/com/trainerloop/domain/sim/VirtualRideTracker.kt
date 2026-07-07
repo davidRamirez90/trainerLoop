@@ -9,7 +9,13 @@ package com.trainerloop.domain.sim
 class VirtualRideTracker(
   private val route: RouteProfile,
   private val params: PhysicsParams
-) {
+) : SampleStamper {
+
+  override fun stamp(timeSec: Int, powerWatts: Int, cadenceRpm: Int, dropout: Boolean): VirtualStamp =
+    onTick(timeSec, powerWatts, dropout).let {
+      VirtualStamp(it.speedKph, it.distanceM, it.altitudeM, it.gradePercent)
+    }
+
   data class VirtualPoint(
     val speedKph: Double,
     val distanceM: Double,
