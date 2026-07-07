@@ -26,6 +26,7 @@ data class SettingsUiState(
   val bikeWeightKg: String = "8.0",
   val crr: String = "0.005",
   val cda: String = "0.32",
+  val trainerDifficultyPct: Int = 100,
   val isSaved: Boolean = false
 )
 
@@ -52,7 +53,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
       virtualRideEnabled = profile.virtualRideEnabled,
       bikeWeightKg = profile.bikeWeightKg.toString(),
       crr = profile.rollingResistanceCrr.toString(),
-      cda = profile.dragAreaCda.toString()
+      cda = profile.dragAreaCda.toString(),
+      trainerDifficultyPct = profile.trainerDifficultyPct
     )
   }
 
@@ -116,6 +118,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     _uiState.value = _uiState.value.copy(cda = value, isSaved = false)
   }
 
+  fun updateTrainerDifficulty(value: Int) {
+    _uiState.value = _uiState.value.copy(trainerDifficultyPct = value, isSaved = false)
+  }
+
   fun resetPhysicsDefaults() {
     _uiState.value = _uiState.value.copy(
       bikeWeightKg = "8.0", crr = "0.005", cda = "0.32", isSaved = false
@@ -144,7 +150,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
           rollingResistanceCrr = (state.crr.toDoubleOrNull() ?: it.rollingResistanceCrr)
             .coerceIn(0.002, 0.010),
           dragAreaCda = (state.cda.toDoubleOrNull() ?: it.dragAreaCda)
-            .coerceIn(0.15, 0.60)
+            .coerceIn(0.15, 0.60),
+          trainerDifficultyPct = state.trainerDifficultyPct.coerceIn(0, 100)
         )
       }
       _uiState.value = _uiState.value.copy(isSaved = true)

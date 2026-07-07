@@ -68,7 +68,8 @@ open class ProfileRepository(context: Context) {
       virtualRideEnabled = prefs.getBoolean(KEY_VIRTUAL_RIDE, true),
       bikeWeightKg = prefs.getFloat(KEY_BIKE_WEIGHT, 8.0f).toDouble(),
       rollingResistanceCrr = prefs.getFloat(KEY_CRR, 0.005f).toDouble(),
-      dragAreaCda = prefs.getFloat(KEY_CDA, 0.32f).toDouble()
+      dragAreaCda = prefs.getFloat(KEY_CDA, 0.32f).toDouble(),
+      trainerDifficultyPct = prefs.getInt(KEY_TRAINER_DIFFICULTY, 100)
     )
   }
 
@@ -89,6 +90,7 @@ open class ProfileRepository(context: Context) {
       .putFloat(KEY_BIKE_WEIGHT, profile.bikeWeightKg.toFloat())
       .putFloat(KEY_CRR, profile.rollingResistanceCrr.toFloat())
       .putFloat(KEY_CDA, profile.dragAreaCda.toFloat())
+      .putInt(KEY_TRAINER_DIFFICULTY, profile.trainerDifficultyPct)
       .apply()
   }
 
@@ -109,5 +111,6 @@ open class ProfileRepository(context: Context) {
     private const val KEY_BIKE_WEIGHT = "bike_weight_kg"
     private const val KEY_CRR = "rolling_resistance_crr"
     private const val KEY_CDA = "drag_area_cda"
+    private const val KEY_TRAINER_DIFFICULTY = "trainer_difficulty_pct"
   }
 }

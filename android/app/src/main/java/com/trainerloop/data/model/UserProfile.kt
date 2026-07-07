@@ -18,5 +18,7 @@ data class UserProfile(
   val virtualRideEnabled: Boolean = true,
   val bikeWeightKg: Double = 8.0,
   val rollingResistanceCrr: Double = 0.005,
-  val dragAreaCda: Double = 0.32
+  val dragAreaCda: Double = 0.32,
+  /** Scales the grade used for free-ride target power (0–100 %); 100 = realistic. */
+  val trainerDifficultyPct: Int = 100
 )

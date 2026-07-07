@@ -244,6 +244,15 @@ fun SettingsScreen(
           steps = 44, // 0.01 increments
           onValueChange = { viewModel.updateCda(fmt(it, 2)) }
         )
+        LabeledSlider(
+          label = "Trainer difficulty",
+          valueText = "${uiState.trainerDifficultyPct} %",
+          hint = "How much of a GPX route's gradient you feel on free rides",
+          value = uiState.trainerDifficultyPct.toFloat(),
+          valueRange = 0f..100f,
+          steps = 19, // 5 % increments
+          onValueChange = { viewModel.updateTrainerDifficulty(it.toInt()) }
+        )
         TextButton(onClick = { viewModel.resetPhysicsDefaults() }) {
           Text("Reset to defaults")
         }
