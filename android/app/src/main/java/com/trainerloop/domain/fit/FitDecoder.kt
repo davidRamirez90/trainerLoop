@@ -37,7 +37,9 @@ object FitDecoder {
     val hr: Int?,
     val speedMms: Int?,
     val distanceCm: Long?,
-    val altitudeRaw: Int?
+    val altitudeRaw: Int?,
+    val latSemi: Int?,
+    val lonSemi: Int?
   )
 
   fun decode(bytes: ByteArray): Decoded {
@@ -107,6 +109,8 @@ object FitDecoder {
         var speedMms: Int? = null
         var distanceCm: Long? = null
         var altitudeRaw: Int? = null
+        var latSemi: Int? = null
+        var lonSemi: Int? = null
         for (f in def.fields) {
           if (def.globalNum == RECORD_MSG || f.num == 253) {
             val v = readValue(bytes, pos, f, def.littleEndian)
@@ -118,6 +122,8 @@ object FitDecoder {
               6 -> speedMms = v?.toInt()
               5 -> distanceCm = v
               2 -> altitudeRaw = v?.toInt()
+              0 -> latSemi = v?.toInt()
+              1 -> lonSemi = v?.toInt()
             }
           }
           pos += f.size
@@ -125,7 +131,9 @@ object FitDecoder {
         pos += def.devFieldBytes
         if (timestamp != null) lastTimestamp = timestamp
         if (def.globalNum == RECORD_MSG) {
-          records += RecordRow(lastTimestamp, power, cadence, hr, speedMms, distanceCm, altitudeRaw)
+          records += RecordRow(
+            lastTimestamp, power, cadence, hr, speedMms, distanceCm, altitudeRaw, latSemi, lonSemi
+          )
         }
       }
     }
@@ -140,7 +148,9 @@ object FitDecoder {
         hrBpm = r.hr ?: 0,
         virtualSpeedKph = r.speedMms?.let { it / 1000.0 * 3.6 },
         virtualDistanceM = r.distanceCm?.let { it / 100.0 },
-        virtualAltitudeM = r.altitudeRaw?.let { it / 5.0 - 500.0 }
+        virtualAltitudeM = r.altitudeRaw?.let { it / 5.0 - 500.0 },
+        positionLat = r.latSemi?.let { it * 180.0 / (1L shl 31) },
+        positionLon = r.lonSemi?.let { it * 180.0 / (1L shl 31) }
       )
     }
     return Decoded(samples, t0 * 1000 + FIT_EPOCH_MS)
@@ -160,6 +170,11 @@ object FitDecoder {
       0x06, 0x0c -> { // uint32, uint32z
         val v = if (le) readUint32Le(bytes, pos) else readUint32Be(bytes, pos)
         if (v == INVALID_UINT32) null else v
+      }
+      0x05 -> { // sint32
+        val v = if (le) readUint32Le(bytes, pos) else readUint32Be(bytes, pos)
+        val signed = v.toInt() // reinterpret as two's complement
+        if (signed == 0x7fffffff) null else signed.toLong()
       }
       else -> null // signed/float/string types unused by the fields we read
     }

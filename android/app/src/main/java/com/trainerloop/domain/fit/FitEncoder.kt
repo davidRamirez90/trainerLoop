@@ -12,6 +12,10 @@ object FitEncoder {
   private const val BASE_TYPE_UINT8 = 0x02
   private const val BASE_TYPE_UINT16 = 0x84
   private const val BASE_TYPE_UINT32 = 0x86
+  private const val BASE_TYPE_SINT32 = 0x85
+
+  private const val INVALID_SINT32 = 0x7fffffff
+  private val SEMICIRCLES_PER_DEGREE = (1L shl 31) / 180.0
 
   private const val INVALID_UINT8 = 0xff
   private const val INVALID_UINT16 = 0xffff
@@ -48,6 +52,10 @@ object FitEncoder {
   )
 
   private fun encodeValue(field: FitField, value: Int?): List<Int> {
+    if (field.baseType == BASE_TYPE_SINT32) {
+      val v = value ?: INVALID_SINT32
+      return encodeUint32(v.toLong() and 0xffffffffL) // two's complement LE
+    }
     if (value == null) {
       return when (field.baseType) {
         BASE_TYPE_UINT16 -> encodeUint16(INVALID_UINT16)
@@ -223,7 +231,9 @@ object FitEncoder {
       FitField(3, 1, BASE_TYPE_UINT8),
       FitField(6, 2, BASE_TYPE_UINT16),  // speed, m/s * 1000
       FitField(5, 4, BASE_TYPE_UINT32),  // distance, cm
-      FitField(2, 2, BASE_TYPE_UINT16)   // altitude, (m + 500) * 5
+      FitField(2, 2, BASE_TYPE_UINT16),  // altitude, (m + 500) * 5
+      FitField(0, 4, BASE_TYPE_SINT32),  // position_lat, semicircles
+      FitField(1, 4, BASE_TYPE_SINT32)   // position_long, semicircles
     )
     val sessionFields = listOf(
       FitField(253, 4, BASE_TYPE_UINT32),
@@ -260,13 +270,15 @@ object FitEncoder {
       val speed = sample.virtualSpeedKph?.let { (it / 3.6 * 1000).toInt() }
       val distance = sample.virtualDistanceM?.let { (it * 100).toInt() }
       val altitude = sample.virtualAltitudeM?.let { ((it + 500.0) * 5).toInt() }
+      val lat = sample.positionLat?.let { (it * SEMICIRCLES_PER_DEGREE).toInt() }
+      val lon = sample.positionLon?.let { (it * SEMICIRCLES_PER_DEGREE).toInt() }
       dataBytes.addAll(
         buildDataMessage(
           2,
           recordFields,
           listOf(
             fitStartTimestamp + sample.timeSec, sample.powerWatts, cadence, hr,
-            speed, distance, altitude
+            speed, distance, altitude, lat, lon
           )
         )
       )

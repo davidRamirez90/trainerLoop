@@ -74,6 +74,33 @@ class FitEncoderTest {
     assertNull(decoded.samples.last().virtualAltitudeM)
   }
 
+  @Test
+  fun `gps position survives an encode decode round trip`() {
+    val samples = (1..10).map { t ->
+      TelemetrySample(
+        timeSec = t, powerWatts = 200, cadenceRpm = 90, hrBpm = 140,
+        virtualSpeedKph = 25.0, virtualDistanceM = t * 7.0, virtualAltitudeM = 500.0,
+        positionLat = 47.05 + t * 0.0001,
+        positionLon = -8.5 // negative longitude must survive (signed field)
+      )
+    }
+    val bytes = FitEncoder.encode(1_700_000_000_000L, 10, samples)
+    val decoded = FitDecoder.decode(bytes)
+    val last = decoded.samples.last()
+    assertEquals(47.051, last.positionLat!!, 1e-5)
+    assertEquals(-8.5, last.positionLon!!, 1e-5)
+  }
+
+  @Test
+  fun `samples without position decode with null position`() {
+    val samples = (1..5).map { t ->
+      TelemetrySample(timeSec = t, powerWatts = 200, cadenceRpm = 90, hrBpm = 140)
+    }
+    val decoded = FitDecoder.decode(FitEncoder.encode(1_700_000_000_000L, 5, samples))
+    assertNull(decoded.samples.last().positionLat)
+    assertNull(decoded.samples.last().positionLon)
+  }
+
   private fun utcMillis(year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int): Long {
     val calendar = java.util.Calendar.getInstance(TimeZone.getTimeZone("UTC"))
     calendar.set(year, month, day, hour, minute, second)
