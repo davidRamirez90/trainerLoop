@@ -466,16 +466,6 @@ fun WorkoutScreen(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
       ) {
         when {
-          !uiState.isRunning && !uiState.isComplete -> {
-            Button(
-              onClick = { viewModel.start() },
-              modifier = Modifier.weight(1f)
-            ) {
-              Icon(Icons.Default.PlayArrow, contentDescription = null)
-              Spacer(modifier = Modifier.width(4.dp))
-              Text("Start")
-            }
-          }
           uiState.isRunning -> {
             Button(
               onClick = { viewModel.pause() },
@@ -487,13 +477,14 @@ fun WorkoutScreen(
             }
           }
           else -> {
+            val resumable = uiState.elapsedSec > 0 && !uiState.isComplete
             Button(
-              onClick = { viewModel.resume() },
+              onClick = { if (resumable) viewModel.resume() else viewModel.start() },
               modifier = Modifier.weight(1f)
             ) {
               Icon(Icons.Default.PlayArrow, contentDescription = null)
               Spacer(modifier = Modifier.width(4.dp))
-              Text("Resume")
+              Text(if (resumable) "Resume" else "Start")
             }
           }
         }

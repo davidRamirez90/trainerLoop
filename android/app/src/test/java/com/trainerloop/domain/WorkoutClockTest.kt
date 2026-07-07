@@ -203,6 +203,46 @@ class WorkoutClockTest {
     }
   }
 
+  @Test
+  fun `start while paused resumes without resetting elapsed`() = runTest {
+    val clock = WorkoutClock(shortWorkout(durationSec = 60), StandardTestDispatcher(testScheduler))
+    clock.elapsedSec.test {
+      assertEquals(0, awaitItem())
+      clock.start()
+      runCurrent()
+      advanceTimeBy(5000)
+      assertEquals(1, awaitItem())
+      assertEquals(2, awaitItem())
+      assertEquals(3, awaitItem())
+      assertEquals(4, awaitItem())
+      assertEquals(5, awaitItem())
+      clock.pause()
+      runCurrent()
+      clock.start() // the bug: this used to reset elapsed to 0
+      runCurrent()
+      expectNoEvents() // no reset-to-0 emission
+      advanceTimeBy(1000)
+      assertEquals(6, awaitItem())
+    }
+  }
+
+  @Test
+  fun `start while paused does not bump session id`() = runTest {
+    val clock = WorkoutClock(shortWorkout(durationSec = 60), StandardTestDispatcher(testScheduler))
+    clock.sessionId.test {
+      assertEquals(0, awaitItem())
+      clock.start()
+      runCurrent()
+      assertEquals(1, awaitItem())
+      advanceTimeBy(3000)
+      clock.pause()
+      runCurrent()
+      clock.start()
+      runCurrent()
+      expectNoEvents()
+    }
+  }
+
   private fun shortWorkout(durationSec: Int = 5): List<WorkoutSegment> {
     return listOf(
       WorkoutSegment.Step(

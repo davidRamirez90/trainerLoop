@@ -43,6 +43,13 @@ class WorkoutClock(
     scope.launch {
       mutex.withLock {
         if (_isRunning.value) return@withLock
+        // A start while paused mid-session is a resume — never wipe progress.
+        // Only stop()/completion reset elapsed, so elapsed > 0 means "paused".
+        if (_elapsedSec.value > 0 && !_isComplete.value) {
+          _isRunning.value = true
+          tickJob = launchTickLoop()
+          return@withLock
+        }
         tickJob?.cancel()
         _sessionId.value = _sessionId.value + 1
         _elapsedSec.value = 0
