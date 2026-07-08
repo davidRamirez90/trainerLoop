@@ -1,7 +1,7 @@
 # GPX Free-Ride with Virtual Gears — Design (Phase 2)
 
 **Date:** 2026-07-06
-**Status:** Follow-up — do not implement until Phase 1 (`2026-07-06-virtual-ride-simulation-design.md`) has shipped. This spec depends on Phase 1's physics params and advanced settings.
+**Status:** Implemented — see `2026-07-07-gpx-free-ride-plan.md`.
 **Scope:** A new free-ride workout type: upload a GPX route, ride it with virtual gears. Resistance is produced by driving standard FTMS ERG from a physics model — no FTMS SIM opcode, no proprietary Zwift protocol. Not an enhancement to ERG interval workouts.
 
 ## Goal
