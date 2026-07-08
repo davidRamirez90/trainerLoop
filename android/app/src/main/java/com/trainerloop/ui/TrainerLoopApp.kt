@@ -17,6 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -115,6 +116,51 @@ fun TrainerLoopApp(
           routeId = routeId,
           onStartRide = { id -> navController.navigate(Screen.FreeRide.createRoute(id)) },
           onBack = { navController.popBackStack() }
+        )
+      }
+
+      composable(
+        route = Screen.FreeRide.route,
+        arguments = listOf(navArgument("routeId") { type = NavType.StringType })
+      ) { backStackEntry ->
+        val context = LocalContext.current
+        val app = context.trainerLoopApp
+        val routeId = backStackEntry.arguments?.getString("routeId") ?: return@composable
+        var route by androidx.compose.runtime.remember {
+          androidx.compose.runtime.mutableStateOf<com.trainerloop.data.model.Route?>(null)
+        }
+        LaunchedEffect(routeId) {
+          route = com.trainerloop.data.repository.RouteRepository
+            .create(com.trainerloop.data.source.local.AppDatabase.getInstance(context))
+            .getById(routeId)
+        }
+        val loaded = route ?: return@composable
+        com.trainerloop.ui.freeride.FreeRideScreen(
+          viewModel = androidx.lifecycle.viewmodel.compose.viewModel(
+            factory = com.trainerloop.ui.freeride.FreeRideViewModelFactory(
+              route = loaded,
+              routeId = routeId,
+              ftmsManagerFlow = app.ftmsManager,
+              hrManagerFlow = app.hrManager,
+              ftmsControlManagerFlow = app.ftmsControlManager,
+              userProfile = com.trainerloop.data.repository.ProfileRepository(context).getProfileSync()
+            )
+          ),
+          onSessionFinished = { data ->
+            app.pendingSessionSamples = data.samples
+            app.pendingCoachJson = data.coachJson
+            app.pendingSessionType = "FREE_RIDE"
+            app.pendingRouteId = routeId
+            navController.navigate(
+              Screen.WorkoutComplete.createRoute(
+                sessionId = data.startTimeMs.toString(),
+                workoutId = data.workoutId,
+                workoutName = data.workoutName,
+                startTimeMs = data.startTimeMs
+              )
+            )
+          },
+          onExit = { navController.popBackStack() }
         )
       }
 
@@ -251,6 +297,10 @@ fun TrainerLoopApp(
         app.pendingSessionSamples = null
         val coachJson = app.pendingCoachJson ?: ""
         app.pendingCoachJson = null
+        val sessionType = app.pendingSessionType ?: "WORKOUT"
+        app.pendingSessionType = null
+        val freeRideRouteId = app.pendingRouteId
+        app.pendingRouteId = null
 
         WorkoutCompleteScreen(
           viewModel = androidx.lifecycle.viewmodel.compose.viewModel(
@@ -261,7 +311,9 @@ fun TrainerLoopApp(
               workoutName = workoutName,
               samples = samples,
               startTimeMs = startTimeMs,
-              coachJson = coachJson
+              coachJson = coachJson,
+              sessionType = sessionType,
+              routeId = freeRideRouteId
             )
           ),
           onDiscard = { navController.popBackStack(Screen.Home.route, inclusive = false) },

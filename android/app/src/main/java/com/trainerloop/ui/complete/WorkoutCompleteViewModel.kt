@@ -62,6 +62,8 @@ class WorkoutCompleteViewModel(
   val samples: List<TelemetrySample>,
   private val startTimeMs: Long = System.currentTimeMillis(),
   private val coachJson: String = "",
+  private val sessionType: String = "WORKOUT",
+  private val routeId: String? = null,
   private val profileRepository: ProfileRepository = ProfileRepository(application),
   private val sessionRepository: SessionRepository = SessionRepository.create(AppDatabase.getInstance(application))
 ) : AndroidViewModel(application) {
@@ -182,7 +184,9 @@ class WorkoutCompleteViewModel(
       avgPower = state.avgPower,
       maxPower = state.maxPower,
       avgCadence = state.avgCadence,
-      avgHr = state.avgHr
+      avgHr = state.avgHr,
+      sessionType = sessionType,
+      routeId = routeId
     )
 
     viewModelScope.launch {

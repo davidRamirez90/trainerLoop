@@ -44,6 +44,11 @@ class TrainerLoopApplication : Application(), ManagerProvider {
   var pendingSessionSamples: List<TelemetrySample>? = null
   var pendingCoachJson: String? = null
 
+  /** Set by FreeRideScreen while active: volume keys shift gears (true = up). */
+  var volumeShiftHandler: ((Boolean) -> Unit)? = null
+  var pendingSessionType: String? = null
+  var pendingRouteId: String? = null
+
   fun attachTrainer(device: BluetoothDevice) {
     val previousConnection = trainerConnection
     val previousFtms = _ftmsManager.value

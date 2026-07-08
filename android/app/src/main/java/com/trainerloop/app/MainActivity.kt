@@ -21,6 +21,18 @@ class MainActivity : ComponentActivity() {
     }
   }
 
+  override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+    val handler = trainerLoopApp.volumeShiftHandler
+    if (handler != null &&
+      (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP ||
+        keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN)
+    ) {
+      handler(keyCode == android.view.KeyEvent.KEYCODE_VOLUME_UP)
+      return true
+    }
+    return super.onKeyDown(keyCode, event)
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
