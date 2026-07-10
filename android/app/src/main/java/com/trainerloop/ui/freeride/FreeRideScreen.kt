@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.ui.components.RouteProfileChart
+import com.trainerloop.ui.components.AnimatedMetricValue
 import com.trainerloop.ui.workout.WorkoutFinishData
 
 @Composable
@@ -204,13 +205,21 @@ fun FreeRideScreen(
       RideMetric("To go", "%.1f".format(uiState.remainingM / 1000.0), "km", Modifier.weight(1f))
     }
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      RideMetric("Power", "${uiState.currentPowerWatts}", "W", Modifier.weight(1f))
+      RideMetric(
+        label = "Power",
+        value = "${uiState.currentPowerWatts}",
+        unit = "W",
+        modifier = Modifier.weight(1f),
+        animatedValue = uiState.currentPowerWatts
+      )
       RideMetric("Target", "${uiState.targetPowerWatts}", "W", Modifier.weight(1f))
       RideMetric(
         "HR",
         if (uiState.currentHrBpm > 0) "${uiState.currentHrBpm}" else "--",
         "bpm",
-        Modifier.weight(1f)
+        Modifier.weight(1f),
+        animatedValue = uiState.currentHrBpm,
+        animatedShowDashWhenZero = true
       )
     }
     RideMetric("Time", formatTime(uiState.elapsedSec), "", Modifier.fillMaxWidth())
@@ -246,7 +255,15 @@ fun FreeRideScreen(
 }
 
 @Composable
-private fun RideMetric(label: String, value: String, unit: String, modifier: Modifier = Modifier) {
+private fun RideMetric(
+  label: String,
+  value: String,
+  unit: String,
+  modifier: Modifier = Modifier,
+  animatedValue: Int? = null,
+  animatedShowDashWhenZero: Boolean = false
+) {
+  val valueColor = MaterialTheme.colorScheme.onSurface
   Card(modifier = modifier) {
     Column(
       modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
@@ -255,13 +272,20 @@ private fun RideMetric(label: String, value: String, unit: String, modifier: Mod
       Text(label, style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant)
       Row(verticalAlignment = Alignment.Bottom) {
-        Text(
-          value,
-          style = MaterialTheme.typography.headlineSmall.copy(
-            fontWeight = FontWeight.Bold,
-            fontFeatureSettings = "tnum"
-          )
+        val valueStyle = MaterialTheme.typography.headlineSmall.copy(
+          fontWeight = FontWeight.Bold,
+          fontFeatureSettings = "tnum"
         )
+        if (animatedValue != null) {
+          AnimatedMetricValue(
+            value = animatedValue,
+            showDashWhenZero = animatedShowDashWhenZero,
+            style = valueStyle,
+            color = valueColor
+          )
+        } else {
+          Text(value, style = valueStyle, color = valueColor)
+        }
         if (unit.isNotEmpty()) {
           Spacer(modifier = Modifier.width(2.dp))
           Text(unit, style = MaterialTheme.typography.labelSmall,

@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -77,6 +79,7 @@ import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
 import com.trainerloop.ui.components.WorkoutChart
+import com.trainerloop.ui.components.AnimatedMetricValue
 import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.theme.Green40
 import com.trainerloop.ui.theme.NumericMedium
@@ -84,6 +87,8 @@ import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.zoneColorSet
+import com.trainerloop.ui.theme.MotionSpec
+import com.trainerloop.ui.theme.reducedMotionAware
 import com.trainerloop.ui.workout.WorkoutStatsPager
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -321,10 +326,9 @@ fun WorkoutScreen(
           )
         }
         Spacer(modifier = Modifier.height(4.dp))
-        androidx.compose.material3.LinearProgressIndicator(
-          progress = { (uiState.inZoneSec.toFloat() / segElapsed).coerceIn(0f, 1f) },
-          modifier = Modifier.fillMaxWidth(),
-          color = Green40
+        InZoneProgressIndicator(
+          inZoneSec = uiState.inZoneSec,
+          segmentElapsedSec = segElapsed
         )
       }
 
@@ -342,6 +346,8 @@ fun WorkoutScreen(
           unit = "W",
           modifier = Modifier.weight(1f),
           highlight = sessionHasStarted,
+          animatedValue = uiState.currentPowerWatts,
+          animatedShowDashWhenZero = !sessionHasStarted,
           valueColor = if (sessionHasStarted) {
             currentPowerColor
           } else null
@@ -350,12 +356,16 @@ fun WorkoutScreen(
           label = "HR",
           value = if (uiState.currentHrBpm > 0) uiState.currentHrBpm.toString() else "—",
           unit = "bpm",
+          animatedValue = uiState.currentHrBpm,
+          animatedShowDashWhenZero = true,
           modifier = Modifier.weight(1f)
         )
         BigMetric(
           label = "Cadence",
           value = if (uiState.currentCadenceRpm > 0) uiState.currentCadenceRpm.toString() else "—",
           unit = "rpm",
+          animatedValue = uiState.currentCadenceRpm,
+          animatedShowDashWhenZero = true,
           modifier = Modifier.weight(1f)
         )
         BigMetric(
@@ -590,6 +600,23 @@ private fun StopConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
   )
 }
 
+@Composable
+private fun InZoneProgressIndicator(
+  inZoneSec: Int,
+  segmentElapsedSec: Int
+) {
+  val progress by animateFloatAsState(
+    targetValue = (inZoneSec.toFloat() / segmentElapsedSec).coerceIn(0f, 1f),
+    animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
+    label = "In-zone progress"
+  )
+  androidx.compose.material3.LinearProgressIndicator(
+    progress = { progress },
+    modifier = Modifier.fillMaxWidth(),
+    color = Green40
+  )
+}
+
 /**
  * Landscape mode: the chart is the hero. Big scrollable/zoomable interval graph
  * with a compact metric rail. Editing controls (skip / intensity / extend) are
@@ -623,17 +650,22 @@ private fun LandscapeWorkout(
         value = uiState.currentPowerWatts.toString(),
         unit = "W",
         color = powerColor,
+        animatedValue = uiState.currentPowerWatts,
         big = true
       )
       RailMetric(
         label = "HEART",
         value = if (uiState.currentHrBpm > 0) uiState.currentHrBpm.toString() else "—",
-        unit = "bpm"
+        unit = "bpm",
+        animatedValue = uiState.currentHrBpm,
+        animatedShowDashWhenZero = true
       )
       RailMetric(
         label = "CADENCE",
         value = if (uiState.currentCadenceRpm > 0) uiState.currentCadenceRpm.toString() else "—",
-        unit = "rpm"
+        unit = "rpm",
+        animatedValue = uiState.currentCadenceRpm,
+        animatedShowDashWhenZero = true
       )
       RailMetric(
         label = "ELAPSED",
@@ -690,8 +722,21 @@ private fun RailMetric(
   value: String,
   unit: String,
   color: androidx.compose.ui.graphics.Color? = null,
+  animatedValue: Int? = null,
+  animatedShowDashWhenZero: Boolean = false,
   big: Boolean = false
 ) {
+  val resolvedColor = if (color != null) {
+    val animatedColor by animateColorAsState(
+      targetValue = color,
+      animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
+      label = "Power zone color"
+    )
+    animatedColor
+  } else {
+    MaterialTheme.colorScheme.onSurface
+  }
+
   Column {
     Text(
       text = label,
@@ -699,21 +744,27 @@ private fun RailMetric(
       color = MaterialTheme.colorScheme.onSurfaceVariant
     )
     Row(verticalAlignment = Alignment.Bottom) {
-      Text(
-        text = value,
-        style = if (big) {
-          MaterialTheme.typography.displayMedium.copy(
-            fontWeight = FontWeight.Bold,
-            fontFeatureSettings = "tnum"
-          )
-        } else {
-          MaterialTheme.typography.headlineMedium.copy(
-            fontWeight = FontWeight.Bold,
-            fontFeatureSettings = "tnum"
-          )
-        },
-        color = color ?: MaterialTheme.colorScheme.onSurface
-      )
+      val valueStyle = if (big) {
+        MaterialTheme.typography.displayMedium.copy(
+          fontWeight = FontWeight.Bold,
+          fontFeatureSettings = "tnum"
+        )
+      } else {
+        MaterialTheme.typography.headlineMedium.copy(
+          fontWeight = FontWeight.Bold,
+          fontFeatureSettings = "tnum"
+        )
+      }
+      if (animatedValue != null) {
+        AnimatedMetricValue(
+          value = animatedValue,
+          showDashWhenZero = animatedShowDashWhenZero,
+          style = valueStyle,
+          color = resolvedColor
+        )
+      } else {
+        Text(text = value, style = valueStyle, color = resolvedColor)
+      }
       if (unit.isNotEmpty()) {
         Spacer(Modifier.width(2.dp))
         Text(
@@ -902,8 +953,26 @@ private fun BigMetric(
   unit: String,
   modifier: Modifier = Modifier,
   highlight: Boolean = false,
-  valueColor: androidx.compose.ui.graphics.Color? = null
+  valueColor: androidx.compose.ui.graphics.Color? = null,
+  animatedValue: Int? = null,
+  animatedShowDashWhenZero: Boolean = false
 ) {
+  val defaultValueColor = if (highlight) {
+    MaterialTheme.colorScheme.onPrimaryContainer
+  } else {
+    MaterialTheme.colorScheme.onSurface
+  }
+  val resolvedValueColor = if (valueColor != null) {
+    val animatedColor by animateColorAsState(
+      targetValue = valueColor,
+      animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
+      label = "Power zone color"
+    )
+    animatedColor
+  } else {
+    defaultValueColor
+  }
+
   Card(
     modifier = modifier,
     colors = CardDefaults.cardColors(
@@ -923,16 +992,20 @@ private fun BigMetric(
         color = MaterialTheme.colorScheme.onSurfaceVariant
       )
       Row(verticalAlignment = Alignment.Bottom) {
-        Text(
-          text = value,
-          style = MaterialTheme.typography.displaySmall.copy(
-            fontWeight = FontWeight.Bold,
-            fontFeatureSettings = "tnum"
-          ),
-          color = valueColor
-            ?: if (highlight) MaterialTheme.colorScheme.onPrimaryContainer
-            else MaterialTheme.colorScheme.onSurface
+        val valueStyle = MaterialTheme.typography.displaySmall.copy(
+          fontWeight = FontWeight.Bold,
+          fontFeatureSettings = "tnum"
         )
+        if (animatedValue != null) {
+          AnimatedMetricValue(
+            value = animatedValue,
+            showDashWhenZero = animatedShowDashWhenZero,
+            style = valueStyle,
+            color = resolvedValueColor
+          )
+        } else {
+          Text(text = value, style = valueStyle, color = resolvedValueColor)
+        }
         Spacer(modifier = Modifier.width(2.dp))
         Text(
           text = unit,
