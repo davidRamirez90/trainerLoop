@@ -323,13 +323,16 @@ fun WorkoutScreen(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
       ) {
+        val sessionHasStarted = uiState.isRunning || uiState.elapsedSec > 0
         BigMetric(
           label = "Power",
-          value = uiState.currentPowerWatts.toString(),
+          value = if (sessionHasStarted) uiState.currentPowerWatts.toString() else "—",
           unit = "W",
           modifier = Modifier.weight(1f),
-          highlight = true,
-          valueColor = zoneColor(uiState.currentPowerWatts, ftp).copy(alpha = 1f)
+          highlight = sessionHasStarted,
+          valueColor = if (sessionHasStarted) {
+            zoneColor(uiState.currentPowerWatts, ftp).copy(alpha = 1f)
+          } else null
         )
         BigMetric(
           label = "HR",

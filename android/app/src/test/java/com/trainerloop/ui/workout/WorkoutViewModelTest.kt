@@ -134,6 +134,15 @@ class WorkoutViewModelTest {
     assertEquals(0, state.currentHrBpm)
   }
 
+  @Test
+  fun `pre-start state exposes the first interval target`() = runTest(testDispatcher) {
+    val viewModel = WorkoutViewModel(workout = sampleWorkout(), dispatcher = testDispatcher)
+
+    val state = viewModel.uiState.value
+    assertFalse(state.isRunning)
+    assertEquals(TargetRange(200, 220), state.targetRange)
+  }
+
   /**
    * Regression test for the watts-not-showing bug. The original bug was that
    * the ViewModel captured the manager reference at construction time, so

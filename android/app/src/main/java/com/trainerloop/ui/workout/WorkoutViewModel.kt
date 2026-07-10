@@ -169,6 +169,10 @@ class WorkoutViewModel(
   private var awaitingSuggestionSinceSec: Int = 0
 
   init {
+    // Populate the first interval target before the ride starts. The clock is
+    // still at zero, so this does not start the workout or send ERG control.
+    updateFromClock()
+
     // (Re)create the recorder whenever the manager references change.
     viewModelScope.launch {
       combine(ftmsManagerFlow, hrManagerFlow) { ftms, hr -> ftms to hr }
