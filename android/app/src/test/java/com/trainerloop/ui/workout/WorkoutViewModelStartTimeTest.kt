@@ -3,6 +3,7 @@ package com.trainerloop.ui.workout
 import android.bluetooth.BluetoothDevice
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.model.IndoorBikeData
+import com.trainerloop.ble.model.Stamped
 import com.trainerloop.data.model.SegmentPhase
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
@@ -55,7 +56,7 @@ class WorkoutViewModelStartTimeTest {
 
   @Test
   fun `finish start time is wall clock at first start, unaffected by pause`() = runTest(dispatcher) {
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(lowPowerData())
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(stamp(lowPowerData()))
     val ftms = mockFtmsManager(ftmsData)
     var wallClock = 1_000_000L
     val viewModel = WorkoutViewModel(
@@ -83,7 +84,7 @@ class WorkoutViewModelStartTimeTest {
     assertEquals(1_000_000L, viewModel.finishEvent.value?.startTimeMs ?: -1L)
   }
 
-  private fun mockFtmsManager(data: MutableStateFlow<IndoorBikeData?>): FtmsManager {
+  private fun mockFtmsManager(data: MutableStateFlow<Stamped<IndoorBikeData>?>): FtmsManager {
     val manager = mockk<FtmsManager>(relaxed = true)
     every { manager.device } returns mockk<BluetoothDevice>(relaxed = true)
     every { manager.data } returns data
@@ -106,4 +107,7 @@ class WorkoutViewModelStartTimeTest {
     elapsedTimeSec = null,
     remainingTimeSec = null
   )
+
+  private fun <T> stamp(value: T): Stamped<T> =
+    Stamped(value, android.os.SystemClock.elapsedRealtime())
 }

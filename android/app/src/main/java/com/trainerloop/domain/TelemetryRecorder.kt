@@ -3,6 +3,7 @@ package com.trainerloop.domain
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
 import com.trainerloop.ble.model.IndoorBikeData
+import com.trainerloop.ble.model.Stamped
 import com.trainerloop.data.model.TelemetrySample
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -19,11 +20,12 @@ class TelemetryRecorder(
   private val clock: WorkoutClock,
   private val dataProvider: DataProvider,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
-  private val stamper: com.trainerloop.domain.sim.SampleStamper? = null
+  private val stamper: com.trainerloop.domain.sim.SampleStamper? = null,
+  private val now: () -> Long = android.os.SystemClock::elapsedRealtime
 ) {
   data class DataProvider(
-    val data: StateFlow<IndoorBikeData?>,
-    val heartRate: StateFlow<Int?>
+    val data: StateFlow<Stamped<IndoorBikeData>?>,
+    val heartRate: StateFlow<Stamped<Int>?>
   )
 
   constructor(
@@ -31,15 +33,18 @@ class TelemetryRecorder(
     ftms: FtmsManager,
     hr: HrManager? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
-    stamper: com.trainerloop.domain.sim.SampleStamper? = null
+    stamper: com.trainerloop.domain.sim.SampleStamper? = null,
+    now: () -> Long = android.os.SystemClock::elapsedRealtime
   ) : this(
     clock,
     DataProvider(
       data = ftms.data,
-      heartRate = hr?.heartRate ?: MutableStateFlow<Int?>(null).asStateFlow()
+      heartRate = hr?.heartRate
+        ?: MutableStateFlow<Stamped<Int>?>(null).asStateFlow()
     ),
     dispatcher,
-    stamper
+    stamper,
+    now
   )
 
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -71,21 +76,24 @@ class TelemetryRecorder(
       ) { elapsedSec, ftmsData, hrBpm ->
         Triple(elapsedSec, ftmsData, hrBpm)
       }.collect { (elapsedSec, ftmsData, hrBpm) ->
-        val dropout = ftmsData == null
+        val nowMs = now()
+        val ftmsFresh = ftmsData != null && nowMs - ftmsData.atMs <= STALE_AFTER_MS
+        val hrFresh = hrBpm != null && nowMs - hrBpm.atMs <= HR_STALE_AFTER_MS
+        val dropout = !ftmsFresh
 
-        if (ftmsData != null) {
+        if (ftmsFresh) {
           lastDataReceivedAtSec = elapsedSec
-          ftmsData.powerWatts?.let { lastPowerWatts = it }
-          ftmsData.cadenceRpm?.let { lastCadenceRpm = it.toInt() }
+          ftmsData!!.value.powerWatts?.let { lastPowerWatts = it }
+          ftmsData.value.cadenceRpm?.let { lastCadenceRpm = it.toInt() }
         }
-        hrBpm?.let { lastHrBpm = it }
+        if (hrFresh) lastHrBpm = hrBpm!!.value
 
         val virtual = stamper?.stamp(elapsedSec, lastPowerWatts, lastCadenceRpm, dropout)
         val sample = TelemetrySample(
           timeSec = elapsedSec,
           powerWatts = lastPowerWatts,
           cadenceRpm = lastCadenceRpm,
-          hrBpm = lastHrBpm,
+          hrBpm = if (hrFresh) lastHrBpm else 0,
           dropout = dropout,
           lagCompensated = false,
           virtualSpeedKph = virtual?.speedKph,
@@ -129,5 +137,10 @@ class TelemetryRecorder(
   fun stop() {
     collecting = false
     scope.cancel()
+  }
+
+  companion object {
+    const val STALE_AFTER_MS = 3_000L
+    const val HR_STALE_AFTER_MS = 5_000L
   }
 }

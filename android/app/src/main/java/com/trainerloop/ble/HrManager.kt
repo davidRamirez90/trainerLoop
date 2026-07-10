@@ -3,6 +3,7 @@ package com.trainerloop.ble
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import com.trainerloop.ble.model.HeartRateMeasurementParser
+import com.trainerloop.ble.model.Stamped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,8 +20,8 @@ class HrManager(
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
   private var connection: BleConnection? = null
 
-  private val _heartRate = MutableStateFlow<Int?>(null)
-  val heartRate: StateFlow<Int?> = _heartRate.asStateFlow()
+  private val _heartRate = MutableStateFlow<Stamped<Int>?>(null)
+  val heartRate: StateFlow<Stamped<Int>?> = _heartRate.asStateFlow()
 
   private val _isConnected = MutableStateFlow(false)
   val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
@@ -69,7 +70,7 @@ class HrManager(
         notificationFlow.collect { bytes ->
           val hr = HeartRateMeasurementParser.parse(bytes)
           if (hr != null) {
-            _heartRate.value = hr
+            _heartRate.value = Stamped(hr, android.os.SystemClock.elapsedRealtime())
             BleLog.d("HR update: $hr bpm")
           } else {
             BleLog.w("HR parse returned null, dropping ${bytes.size} bytes")

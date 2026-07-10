@@ -1,6 +1,7 @@
 package com.trainerloop.domain
 
 import com.trainerloop.ble.model.IndoorBikeData
+import com.trainerloop.ble.model.Stamped
 import com.trainerloop.data.model.SegmentPhase
 import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.WorkoutSegment
@@ -24,11 +25,41 @@ import org.junit.Test
 class TelemetryRecorderTest {
 
   @Test
+  fun `sample is flagged dropout when ftms data is stale`() = runTest {
+    var nowMs = 0L
+    val testDispatcher = StandardTestDispatcher(testScheduler)
+    val clock = WorkoutClock(shortWorkout(durationSec = 10), testDispatcher)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
+    val hrData = MutableStateFlow<Stamped<Int>?>(null)
+    val recorder = TelemetryRecorder(
+      clock,
+      TelemetryRecorder.DataProvider(ftmsData, hrData),
+      dispatcher = testDispatcher,
+      now = { nowMs }
+    )
+
+    recorder.startCollecting()
+    clock.start()
+    runCurrent()
+
+    ftmsData.value = Stamped(bikeData(powerWatts = 150, cadenceRpm = 90.0), atMs = 0L)
+    advanceTimeBy(2_000)
+    nowMs = 2_000
+    runCurrent()
+    assertFalse(recorder.latest.value.dropout)
+
+    advanceTimeBy(4_000)
+    nowMs = 6_000
+    runCurrent()
+    assertTrue(recorder.latest.value.dropout)
+  }
+
+  @Test
   fun `records sample on each clock tick merging ftms and hr`() = runTest {
     val testDispatcher = StandardTestDispatcher(testScheduler)
     val clock = WorkoutClock(shortWorkout(durationSec = 5), testDispatcher)
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
-    val hrData = MutableStateFlow<Int?>(null)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
+    val hrData = MutableStateFlow<Stamped<Int>?>(null)
     val recorder = TelemetryRecorder(
       clock,
       TelemetryRecorder.DataProvider(ftmsData, hrData),
@@ -38,8 +69,8 @@ class TelemetryRecorderTest {
     recorder.startCollecting()
     runCurrent()
 
-    ftmsData.value = bikeData(powerWatts = 200, cadenceRpm = 85.0)
-    hrData.value = 150
+    ftmsData.value = stamp(bikeData(powerWatts = 200, cadenceRpm = 85.0))
+    hrData.value = stamp(150)
 
     clock.start()
     runCurrent()
@@ -58,8 +89,8 @@ class TelemetryRecorderTest {
   fun `marks dropout when no ftms data`() = runTest {
     val testDispatcher = StandardTestDispatcher(testScheduler)
     val clock = WorkoutClock(shortWorkout(durationSec = 5), testDispatcher)
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
-    val hrData = MutableStateFlow<Int?>(150)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
+    val hrData = MutableStateFlow<Stamped<Int>?>(stamp(150))
     val recorder = TelemetryRecorder(
       clock,
       TelemetryRecorder.DataProvider(ftmsData, hrData),
@@ -82,8 +113,8 @@ class TelemetryRecorderTest {
   fun `keeps last known values during dropout`() = runTest {
     val testDispatcher = StandardTestDispatcher(testScheduler)
     val clock = WorkoutClock(shortWorkout(durationSec = 10), testDispatcher)
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
-    val hrData = MutableStateFlow<Int?>(null)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
+    val hrData = MutableStateFlow<Stamped<Int>?>(null)
     val recorder = TelemetryRecorder(
       clock,
       TelemetryRecorder.DataProvider(ftmsData, hrData),
@@ -93,8 +124,8 @@ class TelemetryRecorderTest {
     recorder.startCollecting()
     runCurrent()
 
-    ftmsData.value = bikeData(powerWatts = 200, cadenceRpm = 85.0)
-    hrData.value = 150
+    ftmsData.value = stamp(bikeData(powerWatts = 200, cadenceRpm = 85.0))
+    hrData.value = stamp(150)
 
     clock.start()
     runCurrent()
@@ -125,8 +156,8 @@ class TelemetryRecorderTest {
   fun `updates power when new ftms data arrives`() = runTest {
     val testDispatcher = StandardTestDispatcher(testScheduler)
     val clock = WorkoutClock(shortWorkout(durationSec = 10), testDispatcher)
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
-    val hrData = MutableStateFlow<Int?>(150)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
+    val hrData = MutableStateFlow<Stamped<Int>?>(stamp(150))
     val recorder = TelemetryRecorder(
       clock,
       TelemetryRecorder.DataProvider(ftmsData, hrData),
@@ -138,11 +169,11 @@ class TelemetryRecorderTest {
     clock.start()
     runCurrent()
 
-    ftmsData.value = bikeData(powerWatts = 150, cadenceRpm = 80.0)
+    ftmsData.value = stamp(bikeData(powerWatts = 150, cadenceRpm = 80.0))
     advanceTimeBy(1000)
     runCurrent()
 
-    ftmsData.value = bikeData(powerWatts = 250, cadenceRpm = 90.0)
+    ftmsData.value = stamp(bikeData(powerWatts = 250, cadenceRpm = 90.0))
     advanceTimeBy(1000)
     runCurrent()
 
@@ -156,8 +187,8 @@ class TelemetryRecorderTest {
   fun `reset clears samples`() = runTest {
     val testDispatcher = StandardTestDispatcher(testScheduler)
     val clock = WorkoutClock(shortWorkout(durationSec = 5), testDispatcher)
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(bikeData(powerWatts = 200))
-    val hrData = MutableStateFlow<Int?>(150)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(stamp(bikeData(powerWatts = 200)))
+    val hrData = MutableStateFlow<Stamped<Int>?>(stamp(150))
     val recorder = TelemetryRecorder(
       clock,
       TelemetryRecorder.DataProvider(ftmsData, hrData),
@@ -183,8 +214,10 @@ class TelemetryRecorderTest {
   fun `samples carry virtual ride fields when a tracker is attached`() = runTest {
     val testDispatcher = StandardTestDispatcher(testScheduler)
     val clock = WorkoutClock(shortWorkout(durationSec = 10), testDispatcher)
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(bikeData(powerWatts = 250, cadenceRpm = 90.0))
-    val hrData = MutableStateFlow<Int?>(150)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(
+      stamp(bikeData(powerWatts = 250, cadenceRpm = 90.0))
+    )
+    val hrData = MutableStateFlow<Stamped<Int>?>(stamp(150))
     val tracker = VirtualRideTracker(
       RouteProfile(DoubleArray(600) { 2.0 }, DoubleArray(600)),
       PhysicsParams(riderKg = 75.0)
@@ -214,8 +247,8 @@ class TelemetryRecorderTest {
   fun `samples have null virtual fields without a tracker`() = runTest {
     val testDispatcher = StandardTestDispatcher(testScheduler)
     val clock = WorkoutClock(shortWorkout(durationSec = 5), testDispatcher)
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(bikeData(powerWatts = 200))
-    val hrData = MutableStateFlow<Int?>(150)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(stamp(bikeData(powerWatts = 200)))
+    val hrData = MutableStateFlow<Stamped<Int>?>(stamp(150))
     val recorder = TelemetryRecorder(
       clock,
       TelemetryRecorder.DataProvider(ftmsData, hrData),
@@ -248,6 +281,9 @@ class TelemetryRecorderTest {
     elapsedTimeSec = null,
     remainingTimeSec = null
   )
+
+  private fun <T> stamp(value: T): Stamped<T> =
+    Stamped(value, android.os.SystemClock.elapsedRealtime())
 
   private fun shortWorkout(durationSec: Int = 5): List<WorkoutSegment> {
     return listOf(

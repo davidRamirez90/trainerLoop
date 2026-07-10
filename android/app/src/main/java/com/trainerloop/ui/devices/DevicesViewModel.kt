@@ -455,7 +455,7 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
     hrCollectorJob = viewModelScope.launch {
       launch {
         manager.heartRate.collect { bpm ->
-          _uiState.value = _uiState.value.copy(latestHrBpm = bpm)
+          _uiState.value = _uiState.value.copy(latestHrBpm = bpm?.value)
         }
       }
       launch {

@@ -3,6 +3,7 @@ package com.trainerloop.ble
 import android.bluetooth.BluetoothDevice
 import com.trainerloop.ble.model.IndoorBikeData
 import com.trainerloop.ble.model.IndoorBikeDataParser
+import com.trainerloop.ble.model.Stamped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -27,8 +28,8 @@ class FtmsManager(
 ) {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-  private val _data = MutableStateFlow<IndoorBikeData?>(null)
-  val data: StateFlow<IndoorBikeData?> = _data.asStateFlow()
+  private val _data = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
+  val data: StateFlow<Stamped<IndoorBikeData>?> = _data.asStateFlow()
 
   private val _batteryLevel = MutableStateFlow<Int?>(null)
   val batteryLevel: StateFlow<Int?> = _batteryLevel.asStateFlow()
@@ -106,7 +107,7 @@ class FtmsManager(
         notificationFlow.collect { bytes ->
           val parsed = IndoorBikeDataParser.parse(bytes)
           if (parsed != null) {
-            _data.value = parsed
+            _data.value = Stamped(parsed, android.os.SystemClock.elapsedRealtime())
           } else {
             BleLog.w("FTMS parse returned null, dropping ${bytes.size} bytes")
           }

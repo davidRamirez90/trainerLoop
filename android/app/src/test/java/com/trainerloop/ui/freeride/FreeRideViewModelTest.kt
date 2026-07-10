@@ -5,6 +5,7 @@ import com.trainerloop.ble.HrManager
 import com.trainerloop.ble.ClickShift
 import com.trainerloop.ble.ZwiftClickManager
 import com.trainerloop.ble.model.IndoorBikeData
+import com.trainerloop.ble.model.Stamped
 import com.trainerloop.data.model.Route
 import com.trainerloop.data.model.RoutePoint
 import io.mockk.every
@@ -45,10 +46,10 @@ class FreeRideViewModelTest {
     heartRateBpm = null, elapsedTimeSec = null, remainingTimeSec = null
   )
 
-  private fun mockFtms(data: MutableStateFlow<IndoorBikeData?>): FtmsManager =
+  private fun mockFtms(data: MutableStateFlow<Stamped<IndoorBikeData>?>): FtmsManager =
     mockk(relaxed = true) { every { this@mockk.data } returns data }
 
-  private fun viewModel(ftmsData: MutableStateFlow<IndoorBikeData?>) = FreeRideViewModel(
+  private fun viewModel(ftmsData: MutableStateFlow<Stamped<IndoorBikeData>?>) = FreeRideViewModel(
     route = route(),
     routeId = "r1",
     ftmsManagerFlow = MutableStateFlow<FtmsManager?>(mockFtms(ftmsData)),
@@ -58,7 +59,7 @@ class FreeRideViewModelTest {
 
   @Test
   fun `pedaling advances distance and computes a target`() = runTest(testDispatcher) {
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(bikeData(180, 90.0))
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(stamp(bikeData(180, 90.0)))
     val vm = viewModel(ftmsData)
     vm.start()
     runCurrent()
@@ -72,7 +73,7 @@ class FreeRideViewModelTest {
 
   @Test
   fun `shifting changes gear and is clamped`() = runTest(testDispatcher) {
-    val vm = viewModel(MutableStateFlow(bikeData(180, 90.0)))
+    val vm = viewModel(MutableStateFlow(stamp(bikeData(180, 90.0))))
     vm.shiftUp()
     assertEquals(8, vm.uiState.value.gear)
     repeat(20) { vm.shiftDown() }
@@ -81,7 +82,7 @@ class FreeRideViewModelTest {
 
   @Test
   fun `pause freezes distance`() = runTest(testDispatcher) {
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(bikeData(180, 90.0))
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(stamp(bikeData(180, 90.0)))
     val vm = viewModel(ftmsData)
     vm.start()
     runCurrent()
@@ -97,7 +98,7 @@ class FreeRideViewModelTest {
 
   @Test
   fun `stop emits finish data with samples`() = runTest(testDispatcher) {
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(bikeData(180, 90.0))
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(stamp(bikeData(180, 90.0)))
     val vm = viewModel(ftmsData)
     vm.start()
     runCurrent()
@@ -121,7 +122,7 @@ class FreeRideViewModelTest {
     val vm = FreeRideViewModel(
       route = route(),
       routeId = "r1",
-      ftmsManagerFlow = MutableStateFlow(mockFtms(MutableStateFlow(bikeData(180, 90.0)))),
+      ftmsManagerFlow = MutableStateFlow(mockFtms(MutableStateFlow(stamp(bikeData(180, 90.0))))),
       hrManagerFlow = MutableStateFlow(null),
       clickManagerFlow = MutableStateFlow<ZwiftClickManager?>(click),
       dispatcher = testDispatcher
@@ -140,10 +141,13 @@ class FreeRideViewModelTest {
 
   @Test
   fun `no click paired behaves as today`() = runTest(testDispatcher) {
-    val vm = viewModel(MutableStateFlow(bikeData(180, 90.0)))
+    val vm = viewModel(MutableStateFlow(stamp(bikeData(180, 90.0))))
     runCurrent()
     assertEquals(7, vm.uiState.value.gear)
     vm.shiftUp()
     assertEquals(8, vm.uiState.value.gear)
   }
+
+  private fun <T> stamp(value: T): Stamped<T> =
+    Stamped(value, android.os.SystemClock.elapsedRealtime())
 }

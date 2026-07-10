@@ -56,6 +56,7 @@ data class WorkoutUiState(
   val currentPowerWatts: Int = 0,
   val currentCadenceRpm: Int = 0,
   val currentHrBpm: Int = 0,
+  val sensorDropout: Boolean = true,
   val samples: List<TelemetrySample> = emptyList(),
   /** Live segment list — mutated when a recovery is extended mid-ride. */
   val segments: List<WorkoutSegment> = emptyList(),
@@ -193,6 +194,7 @@ class WorkoutViewModel(
           _uiState.value = _uiState.value.copy(
             currentPowerWatts = sample.powerWatts,
             currentCadenceRpm = sample.cadenceRpm,
+            sensorDropout = sample.dropout,
             currentVirtualSpeedKph = sample.virtualSpeedKph,
             currentGradePercent = sample.gradePercent,
             virtualDistanceM = sample.virtualDistanceM
@@ -212,7 +214,7 @@ class WorkoutViewModel(
     // next 1 Hz clock tick.
     viewModelScope.launch {
       hrManagerFlow
-        .flatMapLatest { hr -> hr?.heartRate ?: flowOf(null) }
+        .flatMapLatest { hr -> hr?.heartRate?.map { it?.value } ?: flowOf(null) }
         .filterNotNull()
         .collect { bpm -> _uiState.value = _uiState.value.copy(currentHrBpm = bpm) }
     }
@@ -550,7 +552,8 @@ class WorkoutViewModel(
           timeSec = state.activeSec,
           powerWatts = state.currentPowerWatts,
           cadenceRpm = state.currentCadenceRpm,
-          hrBpm = state.currentHrBpm
+          hrBpm = state.currentHrBpm,
+          dropout = state.sensorDropout
         ),
         targetMidWatts = target,
         ergEnabled = state.isErgEnabled,

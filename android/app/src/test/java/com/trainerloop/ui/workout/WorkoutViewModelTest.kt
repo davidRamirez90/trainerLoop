@@ -5,6 +5,7 @@ import com.trainerloop.ble.FtmsControlManager
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
 import com.trainerloop.ble.model.IndoorBikeData
+import com.trainerloop.ble.model.Stamped
 import com.trainerloop.data.model.SegmentPhase
 import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.Workout
@@ -45,8 +46,8 @@ class WorkoutViewModelTest {
 
   @Test
   fun `emitted telemetry updates current power cadence and hr`() = runTest(testDispatcher) {
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
-    val heartRate = MutableStateFlow<Int?>(null)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
+    val heartRate = MutableStateFlow<Stamped<Int>?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
     val hr = mockHrManager(heartRate = heartRate)
     val ftmsFlow = MutableStateFlow<FtmsManager?>(ftms)
@@ -59,7 +60,7 @@ class WorkoutViewModelTest {
       dispatcher = testDispatcher
     )
 
-    ftmsData.value = IndoorBikeData(
+    ftmsData.value = stamp(IndoorBikeData(
       powerWatts = 250,
       cadenceRpm = 90.0,
       speedKph = null,
@@ -70,8 +71,8 @@ class WorkoutViewModelTest {
       heartRateBpm = null,
       elapsedTimeSec = null,
       remainingTimeSec = null
-    )
-    heartRate.value = 145
+    ))
+    heartRate.value = stamp(145)
 
     runCurrent()
 
@@ -83,8 +84,8 @@ class WorkoutViewModelTest {
 
   @Test
   fun `dropout keeps last known values`() = runTest(testDispatcher) {
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
-    val heartRate = MutableStateFlow<Int?>(null)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
+    val heartRate = MutableStateFlow<Stamped<Int>?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
     val hr = mockHrManager(heartRate = heartRate)
     val ftmsFlow = MutableStateFlow<FtmsManager?>(ftms)
@@ -97,7 +98,7 @@ class WorkoutViewModelTest {
       dispatcher = testDispatcher
     )
 
-    ftmsData.value = IndoorBikeData(
+    ftmsData.value = stamp(IndoorBikeData(
       powerWatts = 200,
       cadenceRpm = 85.0,
       speedKph = null,
@@ -108,8 +109,8 @@ class WorkoutViewModelTest {
       heartRateBpm = null,
       elapsedTimeSec = null,
       remainingTimeSec = null
-    )
-    heartRate.value = 140
+    ))
+    heartRate.value = stamp(140)
 
     ftmsData.value = null
 
@@ -153,8 +154,8 @@ class WorkoutViewModelTest {
 
     // Pretend the user just got on the bike and the trainer reports
     // 230 W — but only AFTER the ViewModel was created.
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
-    val heartRate = MutableStateFlow<Int?>(null)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
+    val heartRate = MutableStateFlow<Stamped<Int>?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
     val hr = mockHrManager(heartRate = heartRate)
     ftmsFlow.value = ftms
@@ -163,7 +164,7 @@ class WorkoutViewModelTest {
     runCurrent()
 
     // Now emit some real data.
-    ftmsData.value = IndoorBikeData(
+    ftmsData.value = stamp(IndoorBikeData(
       powerWatts = 230,
       cadenceRpm = 88.0,
       speedKph = 32.0,
@@ -174,8 +175,8 @@ class WorkoutViewModelTest {
       heartRateBpm = null,
       elapsedTimeSec = null,
       remainingTimeSec = null
-    )
-    heartRate.value = 152
+    ))
+    heartRate.value = stamp(152)
 
     runCurrent()
 
@@ -191,8 +192,8 @@ class WorkoutViewModelTest {
    */
   @Test
   fun `hr updates immediately when strap notifies (fast path)`() = runTest(testDispatcher) {
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
-    val heartRate = MutableStateFlow<Int?>(null)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
+    val heartRate = MutableStateFlow<Stamped<Int>?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
     val hr = mockHrManager(heartRate = heartRate)
     val ftmsFlow = MutableStateFlow<FtmsManager?>(ftms)
@@ -211,11 +212,11 @@ class WorkoutViewModelTest {
     runCurrent()
     assertEquals(0, viewModel.uiState.value.currentHrBpm)
 
-    heartRate.value = 138
+    heartRate.value = stamp(138)
     runCurrent()
     assertEquals(138, viewModel.uiState.value.currentHrBpm)
 
-    heartRate.value = 142
+    heartRate.value = stamp(142)
     runCurrent()
     assertEquals(142, viewModel.uiState.value.currentHrBpm)
   }
@@ -233,7 +234,7 @@ class WorkoutViewModelTest {
 
   @Test
   fun `stop with samples emits finish event`() = runTest(testDispatcher) {
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
     val ftmsFlow = MutableStateFlow<FtmsManager?>(ftms)
 
@@ -243,7 +244,7 @@ class WorkoutViewModelTest {
       dispatcher = testDispatcher
     )
 
-    ftmsData.value = IndoorBikeData(
+    ftmsData.value = stamp(IndoorBikeData(
       powerWatts = 200,
       cadenceRpm = 85.0,
       speedKph = null,
@@ -254,7 +255,7 @@ class WorkoutViewModelTest {
       heartRateBpm = null,
       elapsedTimeSec = null,
       remainingTimeSec = null
-    )
+    ))
     runCurrent()
     // Fake a recorded sample so stop() has something to emit.
     viewModel.start()
@@ -288,7 +289,7 @@ class WorkoutViewModelTest {
   }
 
   private fun mockFtmsManager(
-    data: MutableStateFlow<IndoorBikeData?> = MutableStateFlow(null)
+    data: MutableStateFlow<Stamped<IndoorBikeData>?> = MutableStateFlow(null)
   ): FtmsManager {
     val device = mockk<BluetoothDevice>(relaxed = true)
     val manager = mockk<FtmsManager>(relaxed = true)
@@ -302,7 +303,7 @@ class WorkoutViewModelTest {
   }
 
   private fun mockHrManager(
-    heartRate: MutableStateFlow<Int?> = MutableStateFlow(null)
+    heartRate: MutableStateFlow<Stamped<Int>?> = MutableStateFlow(null)
   ): HrManager {
     val device = mockk<BluetoothDevice>(relaxed = true)
     val manager = mockk<HrManager>(relaxed = true)
@@ -341,14 +342,14 @@ class WorkoutViewModelTest {
 
   @Test
   fun `ramp test ends after 5s below half the step target`() = runTest(testDispatcher) {
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
     val viewModel = WorkoutViewModel(
       workout = com.trainerloop.domain.RampTest.generate(250),
       ftmsManagerFlow = MutableStateFlow<FtmsManager?>(ftms),
       dispatcher = testDispatcher
     )
-    ftmsData.value = lowPowerData(30) // first step targets 100W; 30 < 50
+    ftmsData.value = stamp(lowPowerData(30)) // first step targets 100W; 30 < 50
     runCurrent()
     viewModel.start()
     viewModel.seek(300) // skip warmup into the first WORK step
@@ -363,14 +364,14 @@ class WorkoutViewModelTest {
 
   @Test
   fun `ramp test warmup is exempt from failure detection`() = runTest(testDispatcher) {
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
     val viewModel = WorkoutViewModel(
       workout = com.trainerloop.domain.RampTest.generate(250),
       ftmsManagerFlow = MutableStateFlow<FtmsManager?>(ftms),
       dispatcher = testDispatcher
     )
-    ftmsData.value = lowPowerData(10)
+    ftmsData.value = stamp(lowPowerData(10))
     runCurrent()
     viewModel.start()
     runCurrent()
@@ -383,14 +384,14 @@ class WorkoutViewModelTest {
 
   @Test
   fun `non-ramp workouts never auto-stop on low power`() = runTest(testDispatcher) {
-    val ftmsData = MutableStateFlow<IndoorBikeData?>(null)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
     val viewModel = WorkoutViewModel(
       workout = sampleWorkout(), // WORK step at 200-220W
       ftmsManagerFlow = MutableStateFlow<FtmsManager?>(ftms),
       dispatcher = testDispatcher
     )
-    ftmsData.value = lowPowerData(10)
+    ftmsData.value = stamp(lowPowerData(10))
     runCurrent()
     viewModel.start()
     runCurrent()
@@ -413,6 +414,9 @@ class WorkoutViewModelTest {
     elapsedTimeSec = null,
     remainingTimeSec = null
   )
+
+  private fun <T> stamp(value: T): Stamped<T> =
+    Stamped(value, android.os.SystemClock.elapsedRealtime())
 
   private fun recoveryWorkout(): Workout = Workout(
     id = "rec-workout",

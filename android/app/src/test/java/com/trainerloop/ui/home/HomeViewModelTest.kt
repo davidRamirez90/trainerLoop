@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothDevice
 import com.trainerloop.app.ManagerProvider
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
+import com.trainerloop.ble.model.Stamped
 import com.trainerloop.data.model.SessionSummary
 import com.trainerloop.data.model.UserProfile
 import com.trainerloop.data.repository.ProfileRepository
@@ -258,7 +259,7 @@ private class FakeFtmsManager(
 private class FakeHrManager(
   val device: BluetoothDevice
 ) {
-  private val _heartRate = MutableStateFlow<Int?>(null)
+  private val _heartRate = MutableStateFlow<Stamped<Int>?>(null)
   private val _isConnected = MutableStateFlow(false)
 
   val mock: HrManager = mockk(relaxed = true)
@@ -270,7 +271,7 @@ private class FakeHrManager(
   }
 
   fun setHeartRate(bpm: Int?) {
-    _heartRate.value = bpm
+    _heartRate.value = bpm?.let { Stamped(it, android.os.SystemClock.elapsedRealtime()) }
   }
 
   fun setConnected(connected: Boolean) {
