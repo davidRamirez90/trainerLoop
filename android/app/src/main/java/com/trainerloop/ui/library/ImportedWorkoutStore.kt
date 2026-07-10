@@ -6,8 +6,14 @@ import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.io.File
 
 /** Prefs-backed set of favorite workout ids (built-in or imported). */
@@ -30,111 +36,137 @@ object ImportedWorkoutStore {
 
   private fun file(context: Context) = File(context.filesDir, "imported_workouts.json")
 
-  fun add(context: Context, workout: Workout) {
-    val existing = load(context).toMutableList()
-    existing.add(workout)
-    val json = JSONArray()
-    existing.forEach { json.put(workoutToJson(it)) }
-    file(context).writeText(json.toString())
+  fun add(context: Context, workout: Workout) = add(file(context), workout)
+
+  internal fun add(file: File, workout: Workout) {
+    val existing = load(file).filter { it.id != workout.id } + workout
+    writeAtomically(file, existing)
   }
 
-  fun remove(context: Context, id: String) {
-    val remaining = load(context).filter { it.id != id }
-    val json = JSONArray()
-    remaining.forEach { json.put(workoutToJson(it)) }
-    file(context).writeText(json.toString())
+  fun remove(context: Context, id: String) = remove(file(context), id)
+
+  internal fun remove(file: File, id: String) {
+    writeAtomically(file, load(file).filter { it.id != id })
   }
 
-  fun load(context: Context): List<Workout> {
-    val f = file(context)
-    if (!f.exists()) return emptyList()
+  fun load(context: Context): List<Workout> = load(file(context))
+
+  internal fun load(file: File): List<Workout> {
+    if (!file.exists()) return emptyList()
     return try {
-      val json = JSONArray(f.readText())
-      (0 until json.length()).map { i -> jsonToWorkout(json.getJSONObject(i)) }
+      val json = Json.parseToJsonElement(file.readText()).jsonArray
+      (0 until json.size).mapNotNull { i ->
+        try {
+          jsonToWorkout(json[i].jsonObject)
+        } catch (e: Exception) {
+          null
+        }
+      }
     } catch (e: Exception) {
       emptyList()
     }
   }
 
-  private fun workoutToJson(w: Workout): JSONObject {
-    return JSONObject().apply {
+  private fun writeAtomically(file: File, workouts: List<Workout>) {
+    val contents = buildJsonArray {
+      workouts.forEach { add(workoutToJson(it)) }
+    }.toString()
+    val tmp = File(file.parentFile, "${file.name}.tmp")
+    tmp.writeText(contents)
+    if (!tmp.renameTo(file)) {
+      file.writeText(contents)
+      tmp.delete()
+    }
+  }
+
+  private fun workoutToJson(w: Workout): JsonObject = buildJsonObject {
       put("id", w.id)
       put("name", w.name)
       put("description", w.description ?: "")
       put("source", w.source.name)
-      val segs = JSONArray()
-      w.segments.forEach { seg ->
-        val obj = JSONObject()
-        obj.put("id", seg.id)
-        obj.put("durationSec", seg.durationSec)
-        obj.put("label", seg.label ?: "")
-        obj.put("phase", seg.phase.name)
-        obj.put("isWork", seg.isWork)
-        when (seg) {
-          is WorkoutSegment.Step -> {
-            obj.put("type", "step")
-            obj.put("targetLow", seg.targetRange.low)
-            obj.put("targetHigh", seg.targetRange.high)
-            seg.targetCadence?.let { obj.put("cadenceLow", it.first); obj.put("cadenceHigh", it.last) }
-          }
-          is WorkoutSegment.Ramp -> {
-            obj.put("type", "ramp")
-            obj.put("startPower", seg.startPower)
-            obj.put("endPower", seg.endPower)
-          }
-          is WorkoutSegment.FreeRide -> {
-            obj.put("type", "freeride")
-          }
+      put("segments", buildJsonArray {
+        w.segments.forEach { seg ->
+          add(buildJsonObject {
+            put("id", seg.id)
+            put("durationSec", seg.durationSec)
+            put("label", seg.label ?: "")
+            put("phase", seg.phase.name)
+            put("isWork", seg.isWork)
+            when (seg) {
+              is WorkoutSegment.Step -> {
+                put("type", "step")
+                put("targetLow", seg.targetRange.low)
+                put("targetHigh", seg.targetRange.high)
+                seg.targetCadence?.let {
+                  put("cadenceLow", it.first)
+                  put("cadenceHigh", it.last)
+                }
+              }
+              is WorkoutSegment.Ramp -> {
+                put("type", "ramp")
+                put("startPower", seg.startPower)
+                put("endPower", seg.endPower)
+              }
+              is WorkoutSegment.FreeRide -> put("type", "freeride")
+            }
+          })
         }
-        segs.put(obj)
-      }
-      put("segments", segs)
-    }
+      })
   }
 
-  private fun jsonToWorkout(obj: JSONObject): Workout {
+  private fun jsonToWorkout(obj: JsonObject): Workout {
     val segs = mutableListOf<WorkoutSegment>()
-    val segArr = obj.getJSONArray("segments")
-    (0 until segArr.length()).forEach { i ->
-      val s = segArr.getJSONObject(i)
-      val type = s.getString("type")
+    val segArr = obj.required("segments").jsonArray
+    (0 until segArr.size).forEach { i ->
+      val s = segArr[i].jsonObject
+      val type = s.requiredString("type")
       val segment = when (type) {
         "step" -> WorkoutSegment.Step(
-          id = s.getString("id"),
-          durationSec = s.getInt("durationSec"),
-          label = s.optString("label", null)?.takeIf { it.isNotEmpty() },
-          phase = SegmentPhase.valueOf(s.getString("phase")),
-          isWork = s.getBoolean("isWork"),
-          targetRange = TargetRange(s.getInt("targetLow"), s.getInt("targetHigh")),
-          targetCadence = if (s.has("cadenceLow") && s.has("cadenceHigh")) {
-            IntRange(s.getInt("cadenceLow"), s.getInt("cadenceHigh"))
+          id = s.requiredString("id"),
+          durationSec = s.requiredInt("durationSec"),
+          label = s.optionalString("label"),
+          phase = SegmentPhase.valueOf(s.requiredString("phase")),
+          isWork = s.requiredBoolean("isWork"),
+          targetRange = TargetRange(s.requiredInt("targetLow"), s.requiredInt("targetHigh")),
+          targetCadence = if (s.containsKey("cadenceLow") && s.containsKey("cadenceHigh")) {
+            IntRange(s.requiredInt("cadenceLow"), s.requiredInt("cadenceHigh"))
           } else null
         )
         "ramp" -> WorkoutSegment.Ramp(
-          id = s.getString("id"),
-          durationSec = s.getInt("durationSec"),
-          label = s.optString("label", null)?.takeIf { it.isNotEmpty() },
-          phase = SegmentPhase.valueOf(s.getString("phase")),
-          isWork = s.getBoolean("isWork"),
-          startPower = s.getInt("startPower"),
-          endPower = s.getInt("endPower")
+          id = s.requiredString("id"),
+          durationSec = s.requiredInt("durationSec"),
+          label = s.optionalString("label"),
+          phase = SegmentPhase.valueOf(s.requiredString("phase")),
+          isWork = s.requiredBoolean("isWork"),
+          startPower = s.requiredInt("startPower"),
+          endPower = s.requiredInt("endPower")
         )
         else -> WorkoutSegment.FreeRide(
-          id = s.getString("id"),
-          durationSec = s.getInt("durationSec"),
-          label = s.optString("label", null)?.takeIf { it.isNotEmpty() },
-          phase = SegmentPhase.valueOf(s.getString("phase")),
-          isWork = s.getBoolean("isWork")
+          id = s.requiredString("id"),
+          durationSec = s.requiredInt("durationSec"),
+          label = s.optionalString("label"),
+          phase = SegmentPhase.valueOf(s.requiredString("phase")),
+          isWork = s.requiredBoolean("isWork")
         )
       }
       segs.add(segment)
     }
     return Workout(
-      id = obj.getString("id"),
-      name = obj.getString("name"),
-      description = obj.optString("description", null)?.takeIf { it.isNotEmpty() },
-      source = WorkoutSource.valueOf(obj.getString("source")),
+      id = obj.requiredString("id"),
+      name = obj.requiredString("name"),
+      description = obj.optionalString("description"),
+      source = WorkoutSource.valueOf(obj.requiredString("source")),
       segments = segs
     )
   }
+
+  private fun JsonObject.required(key: String) = get(key) ?: error("Missing $key")
+
+  private fun JsonObject.requiredString(key: String) = required(key).jsonPrimitive.content
+
+  private fun JsonObject.requiredInt(key: String) = required(key).jsonPrimitive.content.toInt()
+
+  private fun JsonObject.requiredBoolean(key: String) = required(key).jsonPrimitive.content.toBooleanStrict()
+
+  private fun JsonObject.optionalString(key: String) = get(key)?.jsonPrimitive?.content?.takeIf { it.isNotEmpty() }
 }

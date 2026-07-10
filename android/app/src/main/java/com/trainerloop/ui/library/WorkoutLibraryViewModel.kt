@@ -108,12 +108,12 @@ class WorkoutLibraryViewModel(
       name = "${workout.name} (copy)",
       source = WorkoutSource.MANUAL
     )
-    ImportedWorkoutStore.add(getApplication(), copy)
+    ImportedWorkoutStore.add(getApplication<Application>(), copy)
     loadWorkouts()
   }
 
   fun deleteWorkout(id: String) {
-    ImportedWorkoutStore.remove(getApplication(), id)
+    ImportedWorkoutStore.remove(getApplication<Application>(), id)
     loadWorkouts()
   }
 
@@ -175,7 +175,7 @@ class WorkoutLibraryViewModel(
         events.forEach { event ->
           val zwo = client.downloadZwo(athleteId, event.id)
           val name = event.name ?: "intervals_${event.id}"
-          val workout = WorkoutImporter.import("$name.zwo", zwo, ftp)
+          val workout = WorkoutImporter.import("$name.zwo", zwo, ftp).copy(id = "icu_${event.id}")
           saveImportedWorkout(ImportedWorkout(fileName = "$name.zwo", workout = workout))
         }
 
@@ -217,10 +217,10 @@ class WorkoutLibraryViewModel(
   }
 
   private fun saveImportedWorkout(imported: ImportedWorkout) {
-    ImportedWorkoutStore.add(getApplication(), imported.workout)
+    ImportedWorkoutStore.add(getApplication<Application>(), imported.workout)
   }
 
   private fun loadImportedWorkouts(): List<Workout> =
-    ImportedWorkoutStore.load(getApplication())
+    ImportedWorkoutStore.load(getApplication<Application>())
 
 }
