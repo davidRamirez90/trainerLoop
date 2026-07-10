@@ -10,7 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 
 // Full role coverage so nothing falls back to the purple Material baseline.
-private val LightColorScheme = lightColorScheme(
+internal val LightColorScheme = lightColorScheme(
   primary = Green40,
   onPrimary = Neutral99,
   primaryContainer = Green95,
@@ -44,7 +44,7 @@ private val LightColorScheme = lightColorScheme(
   onErrorContainer = Red20
 )
 
-private val DarkColorScheme = darkColorScheme(
+internal val DarkColorScheme = darkColorScheme(
   primary = Green60,
   onPrimary = Neutral10,
   primaryContainer = Green20,
@@ -61,10 +61,10 @@ private val DarkColorScheme = darkColorScheme(
   onBackground = Neutral95,
   surface = Neutral10,
   onSurface = Neutral95,
-  surfaceVariant = Neutral20,
+  surfaceVariant = Neutral15,
   onSurfaceVariant = Neutral90,
   surfaceContainerLowest = Neutral10,
-  surfaceContainerLow = Neutral12,
+  surfaceContainerLow = Neutral15,
   surfaceContainer = Neutral15,
   surfaceContainerHigh = Neutral20,
   surfaceContainerHighest = Neutral20,
