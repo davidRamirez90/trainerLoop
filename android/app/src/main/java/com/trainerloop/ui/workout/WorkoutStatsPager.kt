@@ -1,27 +1,38 @@
 package com.trainerloop.ui.workout
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.TelemetrySample
+import com.trainerloop.ui.theme.MotionSpec
+import com.trainerloop.ui.theme.Spacing
+import com.trainerloop.ui.theme.reducedMotionAware
 import kotlinx.coroutines.launch
 
 @Composable
@@ -30,24 +41,15 @@ fun WorkoutStatsPager(
   modifier: Modifier = Modifier,
   content: @Composable () -> Unit
 ) {
-  val pages = listOf("Main", "Power", "Trainer")
+  val pages = listOf("Chart", "Ride stats", "Trainer")
   val pagerState = rememberPagerState(pageCount = { pages.size })
   val scope = rememberCoroutineScope()
 
   Column(modifier = modifier.fillMaxWidth()) {
-    TabRow(selectedTabIndex = pagerState.currentPage) {
-      pages.forEachIndexed { index, title ->
-        Tab(
-          selected = pagerState.currentPage == index,
-          onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
-          text = { Text(title) }
-        )
-      }
-    }
-
     HorizontalPager(
       state = pagerState,
-      modifier = Modifier.fillMaxWidth()
+      modifier = Modifier.fillMaxWidth(),
+      beyondViewportPageCount = 1
     ) { page ->
       when (page) {
         0 -> {
@@ -57,6 +59,50 @@ fun WorkoutStatsPager(
         }
         1 -> PowerTab(powerSamples = powerSamples)
         2 -> TrainerTab()
+      }
+    }
+
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(vertical = Spacing.xs),
+      horizontalArrangement = Arrangement.Center,
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      pages.forEachIndexed { index, title ->
+        val selected = pagerState.currentPage == index
+        val dotWidth by animateDpAsState(
+          targetValue = if (selected) 24.dp else 8.dp,
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Dp>()),
+          label = "Pager dot width"
+        )
+        val dotColor by animateColorAsState(
+          targetValue = if (selected) {
+            MaterialTheme.colorScheme.primary
+          } else {
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+          },
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
+          label = "Pager dot color"
+        )
+
+        Box(
+          modifier = Modifier
+            .size(width = 48.dp, height = 32.dp)
+            .clickable(
+              onClickLabel = "Show $title page",
+              onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+              role = Role.Tab
+            ),
+          contentAlignment = Alignment.Center
+        ) {
+          Box(
+            modifier = Modifier
+              .size(width = dotWidth, height = 8.dp)
+              .clip(RoundedCornerShape(percent = 50))
+              .background(dotColor)
+          )
+        }
       }
     }
   }
