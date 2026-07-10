@@ -38,9 +38,12 @@ class BleScanner(context: Context) {
   @SuppressLint("MissingPermission")
   fun startScan(services: List<UUID>, durationMs: Long = 10_000): Flow<List<BleDevice>>? {
     val scannerRef = scanner ?: return null
-    if (!bluetoothAdapter!!.isEnabled) return null
+    if (bluetoothAdapter?.isEnabled != true) return null
 
     return callbackFlow {
+      activeCallback?.let { previous ->
+        try { scannerRef.stopScan(previous) } catch (_: Exception) {}
+      }
       val devices = mutableMapOf<String, BleDevice>()
 
       val callback = object : ScanCallback() {

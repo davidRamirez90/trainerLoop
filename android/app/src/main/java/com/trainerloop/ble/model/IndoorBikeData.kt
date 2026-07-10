@@ -38,10 +38,13 @@ object IndoorBikeDataParser {
     val hasElapsedTime = flags and (1 shl 11) != 0
     val hasRemainingTime = flags and (1 shl 12) != 0
 
-    // Instantaneous Speed (always present, uint16, 0.01 km/h)
-    if (offset + 2 > bytes.size) return null
-    val speedKph = bytes.readUint16Le(offset) / 100.0
-    offset += 2
+    // Instantaneous Speed is absent when the FTMS "More Data" bit is set.
+    val speedKph = if (flags and 1 == 0) {
+      if (offset + 2 > bytes.size) return null
+      val value = bytes.readUint16Le(offset) / 100.0
+      offset += 2
+      value
+    } else null
 
     val averageSpeed = if (hasAverageSpeed) {
       if (offset + 2 > bytes.size) return null
@@ -74,7 +77,7 @@ object IndoorBikeDataParser {
       val raw = bytes.readInt16Le(offset)
       offset += 2
       // 0.1 resolution, round to nearest integer
-      (raw + 5) / 10
+      kotlin.math.round(raw / 10.0).toInt()
     } else null
 
     val powerWatts = if (hasInstantPower) {
@@ -86,7 +89,7 @@ object IndoorBikeDataParser {
 
     val averagePower = if (hasAveragePower) {
       if (offset + 2 > bytes.size) return null
-      val value = bytes.readUint16Le(offset)
+      val value = bytes.readInt16Le(offset)
       offset += 2
       value
     } else null

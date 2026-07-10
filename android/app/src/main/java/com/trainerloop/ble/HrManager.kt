@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 
 class HrManager(
   private val context: Context,
@@ -86,5 +87,6 @@ class HrManager(
     connection = null
     _isConnected.value = false
     _heartRate.value = null
+    scope.cancel()
   }
 }

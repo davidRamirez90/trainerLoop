@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -127,6 +128,7 @@ class FtmsControlManager(
     _isConnected.value = false
     _status.value = FtmsControlStatus.IDLE
     _error.value = null
+    scope.cancel()
   }
 
   suspend fun setTargetPower(watts: Int): Boolean {
@@ -134,7 +136,6 @@ class FtmsControlManager(
     val now = System.currentTimeMillis()
     val nextTarget = watts.coerceIn(0, 2000)
     if (nextTarget == lastTargetWatts && now - lastSendTimeMs < MIN_SEND_INTERVAL_MS) return false
-    if (now - lastSendTimeMs < MIN_SEND_INTERVAL_MS) return false
 
     val char = getControlPointCharacteristic() ?: return false
     val result = connection.writeCharacteristic(char, FtmsCommands.setTargetPower(nextTarget))

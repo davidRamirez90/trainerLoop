@@ -11,6 +11,7 @@ import android.os.Build
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,6 +21,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.UUID
 
 enum class ConnectionStatus {
@@ -69,6 +71,8 @@ class BleConnection(
   suspend fun connect(): Result<Unit> {
     userInitiatedDisconnect = false
     _connectionStatus.value = ConnectionStatus.CONNECTING
+    gatt?.close()
+    gatt = null
     callback.resetConnectionDeferred()
     val gattInstance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
@@ -87,6 +91,8 @@ class BleConnection(
       autoReconnectEnabled = true
       Result.success(Unit)
     } else {
+      gattInstance.close()
+      gatt = null
       _connectionState.value = false
       _connectionStatus.value = ConnectionStatus.DISCONNECTED
       Result.failure(Exception("Failed to connect to ${device.address}"))
@@ -102,6 +108,7 @@ class BleConnection(
     gatt?.close()
     gatt = null
     _connectionState.value = false
+    scope.cancel()
   }
 
   internal fun handleUnexpectedDisconnect() {
@@ -120,6 +127,7 @@ class BleConnection(
       if (!isActiveForReconnect()) return
       _connectionStatus.value = ConnectionStatus.CONNECTING
       gatt?.close()
+      gatt = null
       callback.resetConnectionDeferred()
       val gattInstance = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
@@ -143,6 +151,8 @@ class BleConnection(
         handlers.forEach { runCatching { it.invoke() } }
         return
       }
+      gattInstance.close()
+      gatt = null
       attempt++
     }
   }
@@ -156,7 +166,12 @@ class BleConnection(
     return gattMutex.withLock {
       callback.resetServicesDeferred()
       if (gattInstance.discoverServices()) {
-        val success = callback.servicesResult.await()
+        val success = withTimeoutOrNull(GATT_OPERATION_TIMEOUT_MS) {
+          callback.servicesResult.await()
+        } ?: run {
+          callback.servicesResult.cancel()
+          false
+        }
         if (success) Result.success(Unit) else Result.failure(Exception("Service discovery failed"))
       } else {
         Result.failure(Exception("Could not start service discovery"))
@@ -220,11 +235,17 @@ class BleConnection(
           gattInstance.writeDescriptor(descriptor)
         }
         if (started) {
-          val ok = deferred.await()
+          val ok = withTimeoutOrNull(GATT_OPERATION_TIMEOUT_MS) {
+            deferred.await()
+          } ?: run {
+            deferred.cancel()
+            false
+          }
           if (!ok) {
             BleLog.w("Descriptor write for $uuid returned GATT failure (indicate=$useIndicate)")
           }
         } else {
+          deferred.cancel()
           BleLog.w("writeDescriptor returned false for $uuid (indicate=$useIndicate)")
         }
       } else {
@@ -250,10 +271,18 @@ class BleConnection(
 
     return gattMutex.withLock {
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val deferred = callback.resetWriteDeferred(characteristic.uuid)
         val status = gattInstance.writeCharacteristic(characteristic, bytes, writeType)
         if (status == BluetoothGatt.GATT_SUCCESS) {
-          Result.success(Unit)
+          val success = withTimeoutOrNull(GATT_OPERATION_TIMEOUT_MS) {
+            deferred.await()
+          } ?: run {
+            deferred.cancel()
+            false
+          }
+          if (success) Result.success(Unit) else Result.failure(Exception("Write failed"))
         } else {
+          deferred.cancel()
           Result.failure(Exception("Write failed with status $status"))
         }
       } else {
@@ -265,9 +294,15 @@ class BleConnection(
         @Suppress("DEPRECATION")
         val started = gattInstance.writeCharacteristic(characteristic)
         if (!started) {
+          deferred.cancel()
           Result.failure(Exception("Could not start write"))
         } else {
-          val success = deferred.await()
+          val success = withTimeoutOrNull(GATT_OPERATION_TIMEOUT_MS) {
+            deferred.await()
+          } ?: run {
+            deferred.cancel()
+            false
+          }
           if (success) Result.success(Unit) else Result.failure(Exception("Write failed"))
         }
       }
@@ -286,13 +321,21 @@ class BleConnection(
       val deferred = callback.resetReadDeferred(char.uuid)
       @Suppress("DEPRECATION")
       val started = gattInstance.readCharacteristic(char)
-      if (!started) return@withLock null
-      val bytes = try {
-        deferred.await()
-      } catch (_: Throwable) {
+      if (!started) {
+        deferred.cancel()
         return@withLock null
       }
-      parse(bytes)
+      val bytes = withTimeoutOrNull(GATT_OPERATION_TIMEOUT_MS) {
+        deferred.await()
+      } ?: run {
+        deferred.cancel()
+        return@withLock null
+      }
+      try {
+        parse(bytes)
+      } catch (_: Throwable) {
+        null
+      }
     }
   }
 
@@ -312,5 +355,6 @@ class BleConnection(
     private val CLIENT_CHARACTERISTIC_CONFIG_UUID =
       UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     private val BACKOFF_DELAYS = longArrayOf(1000, 2000, 4000, 8000, 15000, 30000)
+    private const val GATT_OPERATION_TIMEOUT_MS = 10_000L
   }
 }

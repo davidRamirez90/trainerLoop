@@ -17,8 +17,8 @@ class GattCallback(
   private val scope: CoroutineScope? = null
 ) : BluetoothGattCallback() {
 
-  private var connectionDeferred = CompletableDeferred<Boolean>()
-  private var servicesDeferred = CompletableDeferred<Boolean>()
+  @Volatile private var connectionDeferred = CompletableDeferred<Boolean>()
+  @Volatile private var servicesDeferred = CompletableDeferred<Boolean>()
 
   // Per-characteristic deferreds. A previous version used a single shared
   // deferred for all descriptor writes / reads / writes, which meant two

@@ -125,4 +125,19 @@ class IndoorBikeDataParserTest {
     assertNotNull(result)
     assertEquals(2, result!!.resistanceLevel)
   }
+
+  @Test
+  fun `more data flag omits speed before optional fields`() {
+    val flags = (1 shl 0) or (1 shl 5) or (1 shl 7)
+    val data = byteArrayOf(
+      flags.toByte(), 0x00,
+      0xF1.toByte(), 0xFF.toByte(), // resistance -15 -> -2
+      0xFB.toByte(), 0xFF.toByte()  // average power -5
+    )
+    val result = IndoorBikeDataParser.parse(data)
+    assertNotNull(result)
+    assertNull(result!!.speedKph)
+    assertEquals(-2, result.resistanceLevel)
+    assertEquals(-5, result.averagePower)
+  }
 }

@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 
 /**
  * Subscribes to FTMS Indoor Bike Data notifications on a **shared**
@@ -83,7 +84,7 @@ class FtmsManager(
     }
     scope.launch {
       _batteryLevel.value = conn.read(BleConstants.BATTERY_SERVICE, BleConstants.BATTERY_LEVEL) {
-        it[0].toInt() and 0xFF
+        if (it.isEmpty()) null else it[0].toInt() and 0xFF
       }
     }
   }
@@ -122,5 +123,6 @@ class FtmsManager(
     // owns it and will close it when both managers have been released.
     _isConnected.value = false
     _data.value = null
+    scope.cancel()
   }
 }
