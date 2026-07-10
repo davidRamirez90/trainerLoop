@@ -54,7 +54,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -257,27 +256,18 @@ fun WorkoutScreen(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
           }
         },
-        actions = {
-          SuggestionChip(
-            onClick = { viewModel.toggleErg() },
-            label = {
-              Text(
-                text = if (uiState.isErgEnabled) "ERG ON" else "ERG OFF",
-                color = if (uiState.isErgEnabled) Green40 else MaterialTheme.colorScheme.onSurfaceVariant
-              )
-            }
-          )
-          Spacer(modifier = Modifier.width(8.dp))
-        }
+        actions = {}
       )
     }
   ) { padding ->
-    Column(
-      modifier = Modifier
-        .fillMaxSize()
-        .padding(padding)
-        .padding(horizontal = Spacing.lg)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+      Column(
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(padding)
+          .padding(horizontal = Spacing.lg)
+          .padding(bottom = PlayerControlsSheetPeekHeight)
+      ) {
       // Reading hierarchy: interval context, dominant power, then secondary metrics.
       val currentSegment = uiState.segments.getOrNull(uiState.segmentIndex)
       IntervalContextLine(
@@ -404,128 +394,45 @@ fun WorkoutScreen(
         Spacer(modifier = Modifier.height(8.dp))
       }
 
-      // Extend recovery — only meaningful while a recovery interval is active.
-      if (uiState.segments.getOrNull(uiState.segmentIndex)?.phase ==
-        com.trainerloop.data.model.SegmentPhase.RECOVERY
-      ) {
-        FilledTonalButton(
-          onClick = { viewModel.extendCurrentRecovery() },
-          modifier = Modifier.fillMaxWidth()
-        ) {
-          Text("+30s recovery")
-        }
         Spacer(modifier = Modifier.height(8.dp))
       }
 
-      // Intensity controls
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-      ) {
-        FilledTonalButton(
-          onClick = { viewModel.adjustIntensityDown() },
-          modifier = Modifier.weight(1f)
-        ) {
-          Text("-5%", style = MaterialTheme.typography.labelSmall)
-        }
-        FilledTonalButton(
-          onClick = { viewModel.fineIntensityDown() },
-          modifier = Modifier.weight(1f)
-        ) {
-          Text("-1%", style = MaterialTheme.typography.labelSmall)
-        }
-        Text(
-          text = "${if (uiState.intensityOffsetPct >= 0) "+" else ""}${uiState.intensityOffsetPct}%",
-          style = NumericSmall.copy(fontWeight = FontWeight.Bold),
-          modifier = Modifier.align(Alignment.CenterVertically)
-        )
-        FilledTonalButton(
-          onClick = { viewModel.fineIntensityUp() },
-          modifier = Modifier.weight(1f)
-        ) {
-          Text("+1%", style = MaterialTheme.typography.labelSmall)
-        }
-        FilledTonalButton(
-          onClick = { viewModel.adjustIntensityUp() },
-          modifier = Modifier.weight(1f)
-        ) {
-          Text("+5%", style = MaterialTheme.typography.labelSmall)
-        }
-      }
-
-      Spacer(modifier = Modifier.height(12.dp))
-
-      // Main controls
-      val playPauseInteractionSource = remember { MutableInteractionSource() }
-      val skipInteractionSource = remember { MutableInteractionSource() }
-      val stopInteractionSource = remember { MutableInteractionSource() }
-
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-      ) {
-        when {
-          uiState.isRunning -> {
-            Button(
-              onClick = { viewModel.pause() },
-              modifier = Modifier
-                .pressable(playPauseInteractionSource)
-                .weight(1f),
-              interactionSource = playPauseInteractionSource
-            ) {
-              Icon(Icons.Default.Pause, contentDescription = null)
-              Spacer(modifier = Modifier.width(4.dp))
-              Text("Pause")
-            }
-          }
-          else -> {
+      PlayerControlsSheet(
+        modifier = Modifier.align(Alignment.BottomCenter),
+        isRunning = uiState.isRunning,
+        isComplete = uiState.isComplete,
+        elapsedSec = uiState.elapsedSec,
+        segmentEndSec = uiState.segmentEndSec,
+        totalDurationSec = WorkoutMath.totalDurationSec(uiState.segments),
+        intensityOffsetPct = uiState.intensityOffsetPct,
+        isErgEnabled = uiState.isErgEnabled,
+        showRecovery = uiState.segments.getOrNull(uiState.segmentIndex)?.phase ==
+          com.trainerloop.data.model.SegmentPhase.RECOVERY,
+        onPlayPause = {
+          if (uiState.isRunning) {
+            viewModel.pause()
+          } else {
             val resumable = uiState.elapsedSec > 0 && !uiState.isComplete
-            Button(
-              onClick = { if (resumable) viewModel.resume() else viewModel.start() },
-              modifier = Modifier
-                .pressable(playPauseInteractionSource)
-                .weight(1f),
-              interactionSource = playPauseInteractionSource
-            ) {
-              Icon(Icons.Default.PlayArrow, contentDescription = null)
-              Spacer(modifier = Modifier.width(4.dp))
-              Text(if (resumable) "Resume" else "Start")
+            if (resumable) viewModel.resume() else viewModel.start()
+          }
+        },
+        onSkip = { viewModel.skipSegment() },
+        onStop = { requestStop() },
+        onBiasDown = { viewModel.fineIntensityDown() },
+        onBiasUp = { viewModel.fineIntensityUp() },
+        onBiasReset = {
+          repeat(kotlin.math.abs(uiState.intensityOffsetPct)) {
+            if (uiState.intensityOffsetPct > 0) {
+              viewModel.fineIntensityDown()
+            } else {
+              viewModel.fineIntensityUp()
             }
           }
-        }
-
-        FilledTonalButton(
-          onClick = { viewModel.skipSegment() },
-          enabled = uiState.segmentEndSec < WorkoutMath.totalDurationSec(uiState.segments),
-          modifier = Modifier.pressable(skipInteractionSource),
-          interactionSource = skipInteractionSource
-        ) {
-          Icon(Icons.Default.SkipNext, contentDescription = null)
-          Spacer(modifier = Modifier.width(4.dp))
-          Text("Skip")
-        }
-
-        Button(
-          onClick = { requestStop() },
-          modifier = Modifier.pressable(stopInteractionSource),
-          interactionSource = stopInteractionSource,
-          colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-        ) {
-          Icon(Icons.Default.Stop, contentDescription = null)
-        }
-      }
-
-      if (uiState.isComplete) {
-        Spacer(modifier = Modifier.height(12.dp))
-        Button(
-          onClick = { viewModel.maybeEmitFinish() },
-          modifier = Modifier.fillMaxWidth()
-        ) {
-          Text("Finish Workout")
-        }
-      }
-
-      Spacer(modifier = Modifier.height(8.dp))
+        },
+        onToggleErg = { viewModel.toggleErg() },
+        onExtendRecovery = { viewModel.extendCurrentRecovery() },
+        onFinish = { viewModel.maybeEmitFinish() }
+      )
     }
   }
 
@@ -543,7 +450,14 @@ private fun StopConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
     onDismissRequest = onDismiss,
     title = { Text("End workout?") },
     text = { Text("Your ride will be saved.") },
-    confirmButton = { TextButton(onClick = onConfirm) { Text("End") } },
+    confirmButton = {
+      TextButton(
+        onClick = onConfirm,
+        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+      ) {
+        Text("End")
+      }
+    },
     dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
   )
 }
