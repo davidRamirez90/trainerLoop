@@ -62,7 +62,11 @@ internal object ErgMrcShared {
     } else ftpWatts
 
     val resolvedPowerUnit = powerUnit
-      ?: if (dataPoints.first().power <= 2) PowerUnit.PERCENT else PowerUnit.WATTS
+      ?: if (fileName.substringAfterLast('.', "").lowercase() == "mrc") {
+        PowerUnit.PERCENT
+      } else {
+        PowerUnit.WATTS
+      }
 
     val points = dataPoints
       .sortedBy { it.timeSec }

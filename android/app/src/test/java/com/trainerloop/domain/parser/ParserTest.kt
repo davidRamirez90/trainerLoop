@@ -31,6 +31,13 @@ class ParserTest {
   }
 
   @Test
+  fun `headerless MRC uses percent units even when first point is above two`() {
+    val workout = MrcParser.parse("headerless.mrc", "0 50\n5 50", ftpWatts = 250)
+    val first = workout.segments.first() as WorkoutSegment.Step
+    assertEquals(125, first.targetRange.low)
+  }
+
+  @Test
   fun `ZWO parser parses warmup steadyState and cooldown`() {
     val content = loadResource("sample.zwo")
     val workout = ZwoParser.parse("sample.zwo", content, ftpWatts = 250)

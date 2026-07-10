@@ -28,7 +28,9 @@ object GpxParser {
 
   fun parse(input: InputStream): Route {
     val doc = try {
-      DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(input)
+      DocumentBuilderFactory.newInstance().apply {
+        setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+      }.newDocumentBuilder().parse(input)
     } catch (e: Exception) {
       throw GpxParseException("Not a valid GPX file", e)
     }

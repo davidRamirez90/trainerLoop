@@ -10,15 +10,21 @@ import org.w3c.dom.Node
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.math.roundToInt
 
+class ZwoParseException(message: String, cause: Throwable? = null) : Exception(message, cause)
+
 object ZwoParser {
 
   private const val WORK_THRESHOLD = 0.85
 
   fun parse(name: String, content: String, ftpWatts: Int = 250): Workout {
-    val factory = DocumentBuilderFactory.newInstance()
-    val builder = factory.newDocumentBuilder()
-    val input = content.byteInputStream()
-    val document = builder.parse(input)
+    val document = try {
+      val factory = DocumentBuilderFactory.newInstance().apply {
+        setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+      }
+      factory.newDocumentBuilder().parse(content.byteInputStream())
+    } catch (e: Exception) {
+      throw ZwoParseException("Not a valid ZWO file", e)
+    }
 
     val workoutNode = document.getElementsByTagName("workout").item(0)
       ?: throw IllegalArgumentException("ZWO file missing <workout> definition.")
@@ -309,7 +315,7 @@ object ZwoParser {
   }
 
   private fun toWatts(value: Double, ftpWatts: Int): Int {
-    return if (value > 3) value.roundToInt() else (value * ftpWatts).roundToInt()
+    return if (value > 10) value.roundToInt() else (value * ftpWatts).roundToInt()
   }
 
   private fun MutableList<WorkoutSegment>.addStep(
