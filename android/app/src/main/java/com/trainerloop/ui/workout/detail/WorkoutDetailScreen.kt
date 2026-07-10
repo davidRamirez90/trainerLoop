@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -54,8 +55,10 @@ fun WorkoutDetailScreen(
   val context = LocalContext.current
   val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
   Scaffold(
+    contentWindowInsets = WindowInsets(0),
     topBar = {
       TopAppBar(
+        windowInsets = WindowInsets(0),
         title = { Text("Workout Preview") },
         navigationIcon = {
           IconButton(onClick = onBack) {

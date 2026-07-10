@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -234,8 +235,10 @@ fun WorkoutScreen(
   }
 
   Scaffold(
+    contentWindowInsets = WindowInsets(0),
     topBar = {
       TopAppBar(
+        windowInsets = WindowInsets(0),
         title = { Text(workout.name) },
         navigationIcon = {
           IconButton(onClick = { requestStop() }) {

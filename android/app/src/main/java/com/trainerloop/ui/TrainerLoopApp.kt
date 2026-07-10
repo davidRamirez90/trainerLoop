@@ -3,6 +3,10 @@ package com.trainerloop.ui
 import android.app.Application
 import android.content.Context
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -59,6 +63,10 @@ fun TrainerLoopApp(
   val currentRoute = currentBackStackEntry?.destination?.route
 
   Scaffold(
+    containerColor = MaterialTheme.colorScheme.background,
+    // The root owns the status-bar inset for screens without their own app bar,
+    // and the bottom bar owns the navigation-bar inset through NavigationBar.
+    contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Top),
     bottomBar = {
       if (currentRoute in Screen.bottomTabs.map { it.route }) {
         NavigationBar {
