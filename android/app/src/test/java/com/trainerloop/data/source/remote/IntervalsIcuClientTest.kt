@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import kotlinx.coroutines.runBlocking
+import com.trainerloop.domain.WorkoutNameCodec
 import java.net.ServerSocket
 import kotlin.concurrent.thread
 
@@ -27,6 +28,18 @@ class IntervalsIcuClientTest {
     assertEquals("Sweet Spot Intervals", events[0].name)
     assertEquals(456L, events[1].id)
     assertEquals(null, events[1].name)
+  }
+
+  @Test
+  fun `decodes ICU form name once and preserves a literal plus in a normal name`() {
+    assertEquals(
+      "Z2 Endurance   1x8m SS primer + 100%",
+      WorkoutNameCodec.decodeIcuName("Z2+Endurance+++1x8m+SS+primer+%2B+100%25")
+    )
+    assertEquals(
+      "Ride + 100% FTP",
+      WorkoutNameCodec.decodeIcuName("Ride + 100% FTP")
+    )
   }
 
   @Test

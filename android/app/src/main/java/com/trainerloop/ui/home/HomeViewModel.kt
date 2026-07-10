@@ -15,6 +15,7 @@ import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.data.repository.SessionRepository
 import com.trainerloop.data.source.local.AppDatabase
 import com.trainerloop.data.source.remote.IntervalsIcuClient
+import com.trainerloop.domain.WorkoutNameCodec
 import com.trainerloop.domain.WorkoutImporter
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
@@ -152,7 +153,10 @@ class HomeViewModel(
       result.onSuccess { events ->
         val event = events.firstOrNull()
         plannedEventId = event?.id
-        val name = event?.name?.takeIf { it.isNotBlank() } ?: event?.let { "Planned workout" }
+        val name = event?.name
+          ?.takeIf { it.isNotBlank() }
+          ?.let(WorkoutNameCodec::decodeIcuName)
+          ?: event?.let { "Planned workout" }
         cache.edit()
           .putString(KEY_PLANNED_NAME, name)
           .putString(KEY_PLANNED_DATE, cachedToday)
@@ -163,6 +167,7 @@ class HomeViewModel(
           runCatching {
             val zwo = client.downloadZwo(athleteId, eventId)
             WorkoutImporter.import("$eventId.zwo", zwo, profileRepository.getProfileSync().ftp)
+              .let { workout -> name?.let { workout.copy(name = it) } ?: workout }
           }.getOrNull()
         }
         _uiState.value = _uiState.value.copy(
@@ -199,6 +204,7 @@ class HomeViewModel(
       runCatching {
         val zwo = client.downloadZwo(athleteId, eventId)
         WorkoutImporter.import("$eventId.zwo", zwo, profile.ftp)
+          .let { workout -> _uiState.value.plannedName?.let { workout.copy(name = it) } ?: workout }
       }.onSuccess { workout ->
         _uiState.value = _uiState.value.copy(plannedLoading = false)
         _plannedWorkoutReady.value = workout

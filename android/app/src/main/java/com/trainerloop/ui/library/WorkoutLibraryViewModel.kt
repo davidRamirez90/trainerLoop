@@ -10,6 +10,7 @@ import com.trainerloop.data.model.WorkoutSource
 import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.data.source.remote.IntervalsIcuClient
 import com.trainerloop.domain.WorkoutImporter
+import com.trainerloop.domain.WorkoutNameCodec
 import com.trainerloop.domain.WorkoutSummaryMath
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -174,8 +175,11 @@ class WorkoutLibraryViewModel @JvmOverloads constructor(
         val ftp = profileRepository.getProfileSync().ftp
         events.forEach { event ->
           val zwo = client.downloadZwo(athleteId, event.id)
-          val name = event.name ?: "intervals_${event.id}"
-          val workout = WorkoutImporter.import("$name.zwo", zwo, ftp).copy(id = "icu_${event.id}")
+          val name = event.name
+            ?.let(WorkoutNameCodec::decodeIcuName)
+            ?: "intervals_${event.id}"
+          val workout = WorkoutImporter.import("$name.zwo", zwo, ftp)
+            .copy(id = "icu_${event.id}", name = name)
           saveImportedWorkout(ImportedWorkout(fileName = "$name.zwo", workout = workout))
         }
 

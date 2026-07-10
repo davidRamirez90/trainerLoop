@@ -12,6 +12,7 @@ import com.trainerloop.data.repository.SessionRepository
 import com.trainerloop.data.source.local.AppDatabase
 import com.trainerloop.data.source.remote.IntervalsIcuClient
 import com.trainerloop.domain.RampTest
+import com.trainerloop.domain.WorkoutNameCodec
 import com.trainerloop.domain.WorkoutSummaryMath
 import com.trainerloop.ui.components.FitShareHelper
 import kotlinx.serialization.builtins.ListSerializer
@@ -132,7 +133,7 @@ class WorkoutCompleteViewModel(
     if (samples.isEmpty()) {
       _uiState.value = WorkoutCompleteUiState(
         sessionId = sessionId,
-        workoutName = workoutName
+        workoutName = WorkoutNameCodec.normalizeStoredName(workoutName)
       )
       return
     }
@@ -153,7 +154,7 @@ class WorkoutCompleteViewModel(
 
     _uiState.value = _uiState.value.copy(
       sessionId = sessionId,
-      workoutName = workoutName,
+      workoutName = WorkoutNameCodec.normalizeStoredName(workoutName),
       durationSec = duration,
       avgPower = avgPower,
       maxPower = maxPower,
@@ -179,7 +180,7 @@ class WorkoutCompleteViewModel(
     val sessionData = SessionData(
       id = sessionId,
       workoutId = workoutId,
-      workoutName = workoutName,
+      workoutName = WorkoutNameCodec.normalizeStoredName(workoutName),
       startedAt = Instant.ofEpochMilli(startTimeMs).toString(),
       endedAt = Instant.now().toString(),
       durationSec = state.durationSec,

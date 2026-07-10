@@ -6,6 +6,7 @@ import com.trainerloop.data.source.local.AppDatabase
 import com.trainerloop.data.source.local.SessionDao
 import com.trainerloop.data.source.local.SessionEntity
 import com.trainerloop.data.source.local.SessionSummaryRow
+import com.trainerloop.domain.WorkoutNameCodec
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -32,7 +33,7 @@ open class SessionRepository(private val dao: SessionDao) {
     private fun toEntity(s: SessionData): SessionEntity = SessionEntity(
         id = s.id,
         workoutId = s.workoutId,
-        workoutName = s.workoutName,
+        workoutName = WorkoutNameCodec.normalizeStoredName(s.workoutName),
         startedAt = s.startedAt,
         endedAt = s.endedAt,
         durationSec = s.durationSec,
@@ -51,7 +52,7 @@ open class SessionRepository(private val dao: SessionDao) {
     private fun toSummary(e: SessionSummaryRow): SessionSummary = SessionSummary(
         id = e.id,
         workoutId = e.workoutId,
-        workoutName = e.workoutName,
+        workoutName = WorkoutNameCodec.normalizeStoredName(e.workoutName),
         startedAt = e.startedAt,
         endedAt = e.endedAt,
         durationSec = e.durationSec,
@@ -66,7 +67,7 @@ open class SessionRepository(private val dao: SessionDao) {
     private fun toData(e: SessionEntity): SessionData = SessionData(
         id = e.id,
         workoutId = e.workoutId,
-        workoutName = e.workoutName,
+        workoutName = WorkoutNameCodec.normalizeStoredName(e.workoutName),
         startedAt = e.startedAt,
         endedAt = e.endedAt,
         durationSec = e.durationSec,

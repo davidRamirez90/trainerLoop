@@ -55,6 +55,42 @@ class SessionRepositoryTest {
   }
 
   @Test
+  fun `history displays one-time decoded workout name without changing literal plus`() = runTest {
+    val dao = FakeSessionDao()
+    val repository = SessionRepository(dao)
+    repository.save(
+      sampleSession(
+        id = "encoded",
+        workoutName = "Z2+Endurance+++1x8m+SS+primer+%2B+100%25"
+      )
+    )
+    repository.save(sampleSession(id = "literal", workoutName = "Ride + 100% FTP"))
+
+    repository.summaries().test {
+      val names = awaitItem().associateBy { it.id }.mapValues { it.value.workoutName }
+      assertEquals("Z2 Endurance   1x8m SS primer + 100%", names["encoded"])
+      assertEquals("Ride + 100% FTP", names["literal"])
+      cancelAndIgnoreRemainingEvents()
+    }
+  }
+
+  @Test
+  fun `session detail displays the same normalized name as history`() = runTest {
+    val repository = SessionRepository(FakeSessionDao())
+    repository.save(
+      sampleSession(
+        id = "detail",
+        workoutName = "VO2max+%7C+Castle+Crag+%2B+primer"
+      )
+    )
+
+    assertEquals(
+      "VO2max | Castle Crag + primer",
+      repository.getById("detail")!!.workoutName
+    )
+  }
+
+  @Test
   fun `getById returns null when missing`() = runTest {
     val repository = SessionRepository(FakeSessionDao())
     assertNull(repository.getById("missing"))
