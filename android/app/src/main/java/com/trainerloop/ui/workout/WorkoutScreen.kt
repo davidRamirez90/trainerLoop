@@ -82,6 +82,8 @@ import com.trainerloop.ui.components.WorkoutChart
 import com.trainerloop.ui.components.AnimatedMetricValue
 import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.theme.Green40
+import com.trainerloop.ui.theme.NumericDisplay
+import com.trainerloop.ui.theme.NumericLarge
 import com.trainerloop.ui.theme.NumericMedium
 import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
@@ -276,102 +278,48 @@ fun WorkoutScreen(
         .padding(padding)
         .padding(horizontal = Spacing.lg)
     ) {
-      // Top bar: elapsed / target
+      // Reading hierarchy: interval context, dominant power, then secondary metrics.
+      val currentSegment = uiState.segments.getOrNull(uiState.segmentIndex)
+      IntervalContextLine(
+        label = currentSegment?.label ?: currentSegment?.phase?.name ?: "Interval",
+        position = "${uiState.segmentIndex + 1}/${uiState.segments.size}",
+        remaining = formatDuration(
+          (uiState.segmentEndSec - uiState.elapsedSec).coerceAtLeast(0)
+        )
+      )
+
+      Spacer(modifier = Modifier.height(Spacing.lg))
+
+      val sessionHasStarted = uiState.isRunning || uiState.elapsedSec > 0
+      PowerHero(
+        powerWatts = uiState.currentPowerWatts,
+        powerColor = currentPowerColor,
+        sessionHasStarted = sessionHasStarted,
+        targetRange = uiState.targetRange,
+        inZoneSec = uiState.inZoneSec,
+        segmentElapsedSec = uiState.elapsedInSegmentSec.coerceAtLeast(1),
+        progressColor = zoneColorSet(
+          targetWatts = (uiState.targetRange.low + uiState.targetRange.high) / 2,
+          ftp = ftp
+        ).fill
+      )
+
+      Spacer(modifier = Modifier.height(Spacing.lg))
+
       Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
       ) {
-        Column {
-          Text(
-            text = "DURATION",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-          Text(
-            text = formatDuration(uiState.elapsedSec),
-            style = NumericMedium
-          )
-        }
-        Column(horizontalAlignment = Alignment.End) {
-          Text(
-            text = "TARGET",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-          Text(
-            text = "${uiState.targetRange.low}-${uiState.targetRange.high} W",
-            style = NumericMedium
-          )
-        }
-      }
-
-      // Time-in-zone bar for the current interval (only when there's a target).
-      if (uiState.targetRange.low > 0) {
-        val segElapsed = uiState.elapsedInSegmentSec.coerceAtLeast(1)
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-          Text(
-            text = "IN ZONE",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-          Text(
-            text = "${uiState.inZoneSec}s / ${formatShortDuration(segElapsed)}",
-            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        InZoneProgressIndicator(
-          inZoneSec = uiState.inZoneSec,
-          segmentElapsedSec = segElapsed
-        )
-      }
-
-      Spacer(modifier = Modifier.height(Spacing.xl))
-
-      // Main metrics row
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-      ) {
-        val sessionHasStarted = uiState.isRunning || uiState.elapsedSec > 0
-        BigMetric(
-          label = "Power",
-          value = if (sessionHasStarted) uiState.currentPowerWatts.toString() else "—",
-          unit = "W",
-          modifier = Modifier.weight(1f),
-          highlight = sessionHasStarted,
-          animatedValue = uiState.currentPowerWatts,
-          animatedShowDashWhenZero = !sessionHasStarted,
-          valueColor = if (sessionHasStarted) {
-            currentPowerColor
-          } else null
-        )
-        BigMetric(
+        SecondaryMetricTile(
           label = "HR",
-          value = if (uiState.currentHrBpm > 0) uiState.currentHrBpm.toString() else "—",
           unit = "bpm",
-          animatedValue = uiState.currentHrBpm,
-          animatedShowDashWhenZero = true,
+          value = uiState.currentHrBpm,
           modifier = Modifier.weight(1f)
         )
-        BigMetric(
+        SecondaryMetricTile(
           label = "Cadence",
-          value = if (uiState.currentCadenceRpm > 0) uiState.currentCadenceRpm.toString() else "—",
           unit = "rpm",
-          animatedValue = uiState.currentCadenceRpm,
-          animatedShowDashWhenZero = true,
-          modifier = Modifier.weight(1f)
-        )
-        BigMetric(
-          label = "To Interval",
-          value = formatShortDuration((uiState.segmentEndSec - uiState.elapsedSec).coerceAtLeast(0)),
-          unit = "",
+          value = uiState.currentCadenceRpm,
           modifier = Modifier.weight(1f)
         )
       }
@@ -603,18 +551,156 @@ private fun StopConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
 @Composable
 private fun InZoneProgressIndicator(
   inZoneSec: Int,
-  segmentElapsedSec: Int
+  segmentElapsedSec: Int,
+  fillColor: Color
 ) {
   val progress by animateFloatAsState(
     targetValue = (inZoneSec.toFloat() / segmentElapsedSec).coerceIn(0f, 1f),
     animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
     label = "In-zone progress"
   )
+  val animatedFillColor by animateColorAsState(
+    targetValue = fillColor,
+    animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
+    label = "Interval zone color"
+  )
   androidx.compose.material3.LinearProgressIndicator(
     progress = { progress },
-    modifier = Modifier.fillMaxWidth(),
-    color = Green40
+    modifier = Modifier
+      .fillMaxWidth()
+      .height(4.dp)
+      .clip(RoundedCornerShape(2.dp)),
+    color = animatedFillColor,
+    trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
   )
+}
+
+@Composable
+private fun IntervalContextLine(
+  label: String,
+  position: String,
+  remaining: String
+) {
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    verticalAlignment = Alignment.CenterVertically
+  ) {
+    Text(
+      text = label,
+      style = MaterialTheme.typography.titleMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      maxLines = 1,
+      modifier = Modifier.weight(1f)
+    )
+    Text(
+      text = " · $position · ",
+      style = MaterialTheme.typography.titleMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      maxLines = 1
+    )
+    Text(
+      text = "$remaining left",
+      style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+      maxLines = 1
+    )
+  }
+}
+
+@Composable
+private fun PowerHero(
+  powerWatts: Int,
+  powerColor: Color,
+  sessionHasStarted: Boolean,
+  targetRange: com.trainerloop.data.model.TargetRange,
+  inZoneSec: Int,
+  segmentElapsedSec: Int,
+  progressColor: Color
+) {
+  val animatedPowerColor by animateColorAsState(
+    targetValue = powerColor,
+    animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
+    label = "Power zone color"
+  )
+
+  Column(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalAlignment = Alignment.CenterHorizontally
+  ) {
+    Row(verticalAlignment = Alignment.Bottom) {
+      AnimatedMetricValue(
+        value = powerWatts,
+        showDashWhenZero = !sessionHasStarted,
+        style = NumericDisplay,
+        color = animatedPowerColor
+      )
+      Spacer(modifier = Modifier.width(Spacing.xs))
+      Text(
+        text = "W",
+        style = NumericSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = Spacing.sm)
+      )
+    }
+
+    Text(
+      text = "target ${targetRange.low}–${targetRange.high} W",
+      style = NumericSmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+
+    Spacer(modifier = Modifier.height(Spacing.sm))
+
+    if (targetRange.low > 0) {
+      InZoneProgressIndicator(
+        inZoneSec = inZoneSec,
+        segmentElapsedSec = segmentElapsedSec,
+        fillColor = progressColor
+      )
+    }
+  }
+}
+
+@Composable
+private fun SecondaryMetricTile(
+  label: String,
+  unit: String,
+  value: Int,
+  modifier: Modifier = Modifier
+) {
+  Card(
+    modifier = modifier,
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.surfaceContainer
+    )
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(Spacing.md),
+      horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+      Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+      )
+      Row(verticalAlignment = Alignment.Bottom) {
+        AnimatedMetricValue(
+          value = value,
+          showDashWhenZero = true,
+          style = NumericMedium,
+          color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.width(Spacing.xs))
+        Text(
+          text = unit,
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+      }
+    }
+  }
 }
 
 /**
@@ -745,10 +831,7 @@ private fun RailMetric(
     )
     Row(verticalAlignment = Alignment.Bottom) {
       val valueStyle = if (big) {
-        MaterialTheme.typography.displayMedium.copy(
-          fontWeight = FontWeight.Bold,
-          fontFeatureSettings = "tnum"
-        )
+        NumericLarge
       } else {
         MaterialTheme.typography.headlineMedium.copy(
           fontWeight = FontWeight.Bold,
