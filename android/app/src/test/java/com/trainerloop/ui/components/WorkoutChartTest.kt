@@ -1,6 +1,7 @@
 package com.trainerloop.ui.components
 
 import androidx.compose.ui.graphics.Color
+import com.trainerloop.ui.theme.ZoneColors
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -8,45 +9,45 @@ class WorkoutChartTest {
 
   private val ftp = 200
 
-  private val gray = Color(0xFF9CA3AF)
-  private val blue = Color(0xFF60A5FA)
-  private val green = Color(0xFF4ADE80)
-  private val amber = Color(0xFFFBBF24)
-  private val orange = Color(0xFFFB923C)
-  private val red = Color(0xFFF87171)
+  private val slate = Color(0xFF64748B)
+  private val blue = Color(0xFF3B82F6)
+  private val green = Color(0xFF22C55E)
+  private val amber = Color(0xFFF59E0B)
+  private val orange = Color(0xFFF97316)
+  private val red = Color(0xFFEF4444)
 
   @Test
   fun `below 55 percent is gray`() {
-    assertEquals(gray.copy(alpha = 0.55f), zoneColor(targetWatts = 100, ftp = ftp))
+    assertEquals(slate, ZoneColors.forTarget(targetWatts = 100, ftp = ftp, dark = true).fill)
   }
 
   @Test
   fun `55 to 75 percent is blue`() {
-    assertEquals(blue.copy(alpha = 0.55f), zoneColor(targetWatts = 120, ftp = ftp))
+    assertEquals(blue, ZoneColors.forTarget(targetWatts = 120, ftp = ftp, dark = true).fill)
   }
 
   @Test
   fun `75 to 90 percent is green`() {
-    assertEquals(green.copy(alpha = 0.55f), zoneColor(targetWatts = 160, ftp = ftp))
+    assertEquals(green, ZoneColors.forTarget(targetWatts = 160, ftp = ftp, dark = true).fill)
   }
 
   @Test
   fun `90 to 105 percent is amber`() {
-    assertEquals(amber.copy(alpha = 0.55f), zoneColor(targetWatts = 190, ftp = ftp))
+    assertEquals(amber, ZoneColors.forTarget(targetWatts = 190, ftp = ftp, dark = true).fill)
   }
 
   @Test
   fun `105 to 120 percent is orange`() {
-    assertEquals(orange.copy(alpha = 0.55f), zoneColor(targetWatts = 220, ftp = ftp))
+    assertEquals(orange, ZoneColors.forTarget(targetWatts = 220, ftp = ftp, dark = true).fill)
   }
 
   @Test
   fun `above 120 percent is red`() {
-    assertEquals(red.copy(alpha = 0.55f), zoneColor(targetWatts = 260, ftp = ftp))
+    assertEquals(red, ZoneColors.forTarget(targetWatts = 260, ftp = ftp, dark = true).fill)
   }
 
   @Test
   fun `zero ftp falls back to gray without dividing by zero`() {
-    assertEquals(gray.copy(alpha = 0.55f), zoneColor(targetWatts = 200, ftp = 0))
+    assertEquals(slate, ZoneColors.forTarget(targetWatts = 200, ftp = 0, dark = true).fill)
   }
 }

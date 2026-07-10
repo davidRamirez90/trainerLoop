@@ -1,6 +1,7 @@
 package com.trainerloop.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
 import com.trainerloop.domain.WorkoutSummaryMath
+import com.trainerloop.ui.theme.ZoneColors
 
 @Composable
 fun WorkoutMiniChart(
@@ -30,6 +32,7 @@ fun WorkoutMiniChart(
   maxPowerAxis: Int = 400,
   lineColor: Color = MaterialTheme.colorScheme.primary
 ) {
+  val darkTheme = isSystemInDarkTheme()
   val totalDuration = remember(workout) {
     WorkoutMath.totalDurationSec(workout.segments)
   }
@@ -97,7 +100,7 @@ fun WorkoutMiniChart(
       }
 
       drawRect(
-        color = zoneColor(power, ftp),
+        color = ZoneColors.forTarget(power, ftp, darkTheme).fill,
         topLeft = Offset(x, y),
         size = Size(
           width = (xForTime((sec + step).coerceAtMost(totalDuration)) - x).coerceAtLeast(1f),

@@ -3,6 +3,7 @@ package com.trainerloop.ui.history
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,7 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.SessionSummary
-import com.trainerloop.ui.components.zoneColor
+import com.trainerloop.ui.theme.ZoneColors
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -173,6 +174,7 @@ private const val STRIPE_DAYS = 42
 private fun WeekStripes(sessions: List<SessionSummary>) {
   val context = LocalContext.current
   val resolvedFtp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
+  val darkTheme = isSystemInDarkTheme()
 
   // Aggregate sessions per local day.
   data class DayLoad(val durationSec: Int, val avgPower: Int)
@@ -206,7 +208,7 @@ private fun WeekStripes(sessions: List<SessionSummary>) {
       days.forEach { day ->
         val load = byDay[day]
         val frac = if (load != null) (load.durationSec.toFloat() / maxDuration).coerceIn(0.15f, 1f) else 0f
-        val barColor = if (load != null) zoneColor(load.avgPower, resolvedFtp).copy(alpha = 1f)
+        val barColor = if (load != null) ZoneColors.forTarget(load.avgPower, resolvedFtp, darkTheme).line
         else Color.Transparent
         Column(
           horizontalAlignment = Alignment.CenterHorizontally,

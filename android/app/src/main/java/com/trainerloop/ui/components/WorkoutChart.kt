@@ -1,6 +1,7 @@
 package com.trainerloop.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,7 +27,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -35,22 +35,8 @@ import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.domain.WorkoutMath
-
-/** Zone color for a target power, banded by percent of FTP. */
-fun zoneColor(targetWatts: Int, ftp: Int): Color {
-  if (ftp <= 0) return Color(0xFF9CA3AF).copy(alpha = 0.55f)
-  val pct = targetWatts * 100f / ftp
-  // Mid-bright hues: pastel over light surfaces, vivid over dark ones.
-  val base = when {
-    pct < 55 -> Color(0xFF9CA3AF)
-    pct < 75 -> Color(0xFF60A5FA)
-    pct < 90 -> Color(0xFF4ADE80)
-    pct < 105 -> Color(0xFFFBBF24)
-    pct < 120 -> Color(0xFFFB923C)
-    else -> Color(0xFFF87171)
-  }
-  return base.copy(alpha = 0.55f)
-}
+import com.trainerloop.ui.theme.ZoneColors
+import com.trainerloop.ui.theme.zoneColorSet
 
 private const val HR_AXIS_MIN = 40f
 private const val HR_AXIS_MAX = 200f
@@ -65,6 +51,7 @@ fun WorkoutChart(
   modifier: Modifier = Modifier,
   elevationProfile: DoubleArray? = null
 ) {
+  val darkTheme = isSystemInDarkTheme()
   val totalDuration = remember(segments) { WorkoutMath.totalDurationSec(segments) }
   // Segment bounds (startSec, endSec) for tap hit-testing.
   val bounds = remember(segments) {
@@ -184,7 +171,7 @@ fun WorkoutChart(
           val target = (range.low + range.high) / 2
           val yTop = yForPower(target)
           drawRect(
-            color = zoneColor(target, ftp),
+            color = ZoneColors.forTarget(target, ftp, darkTheme).fill,
             topLeft = Offset(xStart, yTop),
             size = Size(xEnd - xStart, chartBottom - yTop)
           )
@@ -279,6 +266,7 @@ private fun IntervalTooltip(
 ) {
   val range = WorkoutMath.targetRangeAt(listOf(segment), 0)
   val mid = (range.low + range.high) / 2
+  val colors = zoneColorSet(mid, ftp)
   val title = segment.label ?: segment.phase.name.lowercase().replaceFirstChar { it.uppercase() }
   Card(
     modifier = modifier,
@@ -290,7 +278,7 @@ private fun IntervalTooltip(
           modifier = Modifier
             .size(10.dp)
             .clip(CircleShape)
-            .background(zoneColor(mid, ftp).copy(alpha = 1f))
+            .background(colors.line)
         )
         Text(
           text = "  $title",

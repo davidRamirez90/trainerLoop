@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,8 +75,9 @@ import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
 import com.trainerloop.ui.components.WorkoutChart
-import com.trainerloop.ui.components.zoneColor
 import com.trainerloop.ui.theme.Green40
+import com.trainerloop.ui.theme.ZoneColors
+import com.trainerloop.ui.theme.zoneColorSet
 import com.trainerloop.ui.workout.WorkoutStatsPager
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,6 +93,8 @@ fun WorkoutScreen(
   val view = LocalView.current
   val context = LocalContext.current
   val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
+  val darkTheme = isSystemInDarkTheme()
+  val currentPowerColor = zoneColorSet(uiState.currentPowerWatts, ftp).line
   var showStopConfirm by remember { mutableStateOf(false) }
 
   fun requestStop() {
@@ -209,6 +213,8 @@ fun WorkoutScreen(
     LandscapeWorkout(
       uiState = uiState,
       ftp = ftp,
+      powerColor = currentPowerColor,
+      dark = darkTheme,
       onPlayPause = {
         when {
           uiState.isRunning -> viewModel.pause()
@@ -331,7 +337,7 @@ fun WorkoutScreen(
           modifier = Modifier.weight(1f),
           highlight = sessionHasStarted,
           valueColor = if (sessionHasStarted) {
-            zoneColor(uiState.currentPowerWatts, ftp).copy(alpha = 1f)
+            currentPowerColor
           } else null
         )
         BigMetric(
@@ -574,6 +580,8 @@ private fun StopConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
 private fun LandscapeWorkout(
   uiState: WorkoutUiState,
   ftp: Int,
+  powerColor: Color,
+  dark: Boolean,
   onPlayPause: () -> Unit,
   onStop: () -> Unit
 ) {
@@ -595,7 +603,7 @@ private fun LandscapeWorkout(
         label = "POWER",
         value = uiState.currentPowerWatts.toString(),
         unit = "W",
-        color = zoneColor(uiState.currentPowerWatts, ftp).copy(alpha = 1f),
+        color = powerColor,
         big = true
       )
       RailMetric(
@@ -637,6 +645,7 @@ private fun LandscapeWorkout(
     ImmersiveWorkoutChart(
       uiState = uiState,
       ftp = ftp,
+      dark = dark,
       modifier = Modifier
         .weight(1f)
         .fillMaxHeight()
@@ -684,6 +693,7 @@ private val ZOOM_LEVELS = listOf(1f, 2f, 4f, 8f)
 private fun ImmersiveWorkoutChart(
   uiState: WorkoutUiState,
   ftp: Int,
+  dark: Boolean,
   modifier: Modifier = Modifier
 ) {
   val segments = uiState.segments
@@ -772,7 +782,7 @@ private fun ImmersiveWorkoutChart(
           val xEnd = xForTime((sec + step).coerceAtMost(totalDuration))
           val yTop = yForPower(target)
           drawRect(
-            color = zoneColor(target, ftp),
+            color = ZoneColors.forTarget(target, ftp, dark).fill,
             topLeft = Offset(x, yTop),
             size = Size((xEnd - x).coerceAtLeast(1f), chartBottom - yTop)
           )
