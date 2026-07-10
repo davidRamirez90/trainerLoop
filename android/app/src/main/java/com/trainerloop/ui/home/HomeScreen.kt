@@ -55,6 +55,7 @@ import com.trainerloop.data.model.SessionSummary
 import com.trainerloop.ui.components.MetricBadge
 import com.trainerloop.ui.theme.Green20
 import com.trainerloop.ui.theme.Green40
+import com.trainerloop.ui.theme.Spacing
 
 @SuppressLint("MissingPermission")
 @Composable
@@ -80,8 +81,8 @@ fun HomeScreen(
   LazyColumn(
     modifier = Modifier
       .fillMaxSize()
-      .padding(16.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp)
+      .padding(Spacing.lg),
+    verticalArrangement = Arrangement.spacedBy(Spacing.lg)
   ) {
     item {
       RiderHeader(
@@ -189,7 +190,7 @@ private fun RiderHeader(
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight.Bold
       )
-      Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+      Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
         MetricBadge(label = "FTP", value = "$ftp W")
         MetricBadge(label = "Weight", value = "${"%.1f".format(weightKg)} kg")
       }
@@ -207,7 +208,7 @@ private fun StartRideHero(onStartFreeRide: () -> Unit) {
       modifier = Modifier
         .fillMaxWidth()
         .background(Brush.linearGradient(listOf(Green20, Green40)))
-        .padding(24.dp)
+        .padding(Spacing.xl)
     ) {
       Text(
         text = "Ready to ride?",
@@ -220,7 +221,7 @@ private fun StartRideHero(onStartFreeRide: () -> Unit) {
         style = MaterialTheme.typography.bodyMedium,
         color = Color.White.copy(alpha = 0.8f)
       )
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.lg))
       Button(
         onClick = onStartFreeRide,
         modifier = Modifier.fillMaxWidth(),
@@ -257,7 +258,7 @@ private fun PlannedWorkoutCard(
       containerColor = MaterialTheme.colorScheme.secondaryContainer
     )
   ) {
-    Column(modifier = Modifier.padding(20.dp)) {
+    Column(modifier = Modifier.padding(Spacing.lg)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
           modifier = Modifier
@@ -288,7 +289,7 @@ private fun PlannedWorkoutCard(
           com.trainerloop.domain.WorkoutMath.totalDurationSec(workout.segments)
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
           Text(
             text = formatDuration(totalSec),
             style = MaterialTheme.typography.bodyMedium,
@@ -301,7 +302,7 @@ private fun PlannedWorkoutCard(
             color = onColor.copy(alpha = 0.85f)
           )
         }
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(Spacing.lg))
         com.trainerloop.ui.components.WorkoutMiniChart(
           workout = workout,
           ftp = ftp,
@@ -311,7 +312,7 @@ private fun PlannedWorkoutCard(
       }
 
       if (name != null) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.lg))
         Button(
           onClick = onStart,
           enabled = !loading,
@@ -384,7 +385,7 @@ private fun DeviceChip(
     onClick = onClick
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+      modifier = Modifier.padding(Spacing.lg),
       verticalAlignment = Alignment.CenterVertically
     ) {
       Icon(
@@ -453,7 +454,7 @@ private fun ActionRow(
     modifier = Modifier
       .fillMaxWidth()
       .clickable(onClick = onClick)
-      .padding(horizontal = 16.dp, vertical = 12.dp),
+      .padding(Spacing.lg),
     verticalAlignment = Alignment.CenterVertically
   ) {
     Icon(
@@ -484,7 +485,7 @@ private fun RecentSessionCard(session: SessionSummary) {
       containerColor = MaterialTheme.colorScheme.surfaceVariant
     )
   ) {
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(modifier = Modifier.padding(Spacing.lg)) {
       Text(
         text = session.workoutName,
         style = MaterialTheme.typography.titleMedium,
@@ -493,7 +494,7 @@ private fun RecentSessionCard(session: SessionSummary) {
       Spacer(modifier = Modifier.height(4.dp))
       Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
       ) {
         Text(
           text = formatSessionDate(session.startedAt),

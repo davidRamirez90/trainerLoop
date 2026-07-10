@@ -29,6 +29,7 @@ import com.trainerloop.data.repository.RouteRepository
 import com.trainerloop.data.source.local.AppDatabase
 import com.trainerloop.ui.components.MetricBadge
 import com.trainerloop.ui.components.RouteProfileChart
+import com.trainerloop.ui.theme.Spacing
 
 @Composable
 fun RouteDetailScreen(
@@ -44,8 +45,8 @@ fun RouteDetailScreen(
 
   val r = route ?: return
   Column(
-    modifier = Modifier.fillMaxSize().padding(16.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp)
+    modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
+    verticalArrangement = Arrangement.spacedBy(Spacing.xl)
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       IconButton(onClick = onBack) {

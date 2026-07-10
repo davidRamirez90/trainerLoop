@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trainerloop.ui.theme.Spacing
 
 @Composable
 fun SettingsScreen(
@@ -84,8 +85,8 @@ fun SettingsScreen(
     modifier = Modifier
       .fillMaxSize()
       .verticalScroll(rememberScrollState())
-      .padding(16.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp)
+      .padding(horizontal = Spacing.lg),
+    verticalArrangement = Arrangement.spacedBy(Spacing.xl)
   ) {
     Text(
       text = "Profile",
@@ -260,7 +261,7 @@ fun SettingsScreen(
     }
 
     Card(modifier = Modifier.fillMaxWidth()) {
-      Column(modifier = Modifier.padding(16.dp)) {
+      Column(modifier = Modifier.padding(Spacing.lg)) {
         Text(
           text = "intervals.icu",
           style = MaterialTheme.typography.titleMedium,
@@ -339,7 +340,7 @@ private fun CoachPickerDialog(
                 else MaterialTheme.colorScheme.surface
               )
               .clickable { onSelect(profile.id) }
-              .padding(12.dp)
+              .padding(Spacing.lg)
           ) {
             Text(text = profile.name, fontWeight = FontWeight.SemiBold)
             Text(
@@ -502,7 +503,7 @@ private fun ProfileFieldCard(
   fields: List<ProfileField>
 ) {
   Card(modifier = Modifier.fillMaxWidth()) {
-    Column(modifier = Modifier.padding(16.dp)) {
+      Column(modifier = Modifier.padding(Spacing.lg)) {
       Text(
         text = title,
         style = MaterialTheme.typography.titleMedium,
@@ -560,7 +561,7 @@ private fun SettingsGroupCard(
   content: @Composable () -> Unit
 ) {
   Card(modifier = Modifier.fillMaxWidth()) {
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(modifier = Modifier.padding(Spacing.lg)) {
       Text(
         text = title,
         style = MaterialTheme.typography.titleMedium,

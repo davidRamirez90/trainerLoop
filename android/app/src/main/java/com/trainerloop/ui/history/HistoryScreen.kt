@@ -45,6 +45,7 @@ import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.SessionSummary
 import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.NumericSmall
+import com.trainerloop.ui.theme.Spacing
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -61,7 +62,7 @@ fun HistoryScreen(
     Box(
       modifier = Modifier
         .fillMaxSize()
-        .padding(16.dp),
+        .padding(horizontal = Spacing.lg),
       contentAlignment = Alignment.Center
     ) {
       Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -91,8 +92,8 @@ fun HistoryScreen(
   LazyColumn(
     modifier = Modifier
       .fillMaxSize()
-      .padding(16.dp),
-    verticalArrangement = Arrangement.spacedBy(12.dp)
+      .padding(horizontal = Spacing.lg),
+    verticalArrangement = Arrangement.spacedBy(Spacing.xl)
   ) {
     item {
       Text(
@@ -117,7 +118,7 @@ private fun SessionCard(session: SessionSummary, onClick: () -> Unit) {
       containerColor = MaterialTheme.colorScheme.surfaceVariant
     )
   ) {
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(modifier = Modifier.padding(Spacing.lg)) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -150,10 +151,10 @@ private fun SessionCard(session: SessionSummary, onClick: () -> Unit) {
           overflow = TextOverflow.Ellipsis
         )
       }
-      Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(Spacing.md))
       Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(24.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xl)
       ) {
         SessionStat(value = formatDuration(session.durationSec), label = "Time")
         if (session.avgPower > 0) {

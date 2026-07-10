@@ -41,6 +41,7 @@ import com.trainerloop.domain.WorkoutSummaryMath
 import com.trainerloop.ui.components.SampleChart
 import com.trainerloop.ui.theme.NumericMedium
 import com.trainerloop.ui.theme.NumericSmall
+import com.trainerloop.ui.theme.Spacing
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -104,7 +105,7 @@ fun SessionDetailScreen(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding)
-        .padding(horizontal = 16.dp)
+        .padding(horizontal = Spacing.lg)
         .verticalScroll(rememberScrollState())
     ) {
       Text(
@@ -113,7 +114,7 @@ fun SessionDetailScreen(
         color = MaterialTheme.colorScheme.onSurfaceVariant
       )
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.xl))
 
       Row(
         modifier = Modifier.fillMaxWidth(),
@@ -124,7 +125,7 @@ fun SessionDetailScreen(
         SummaryCard("NP", "$np W", Modifier.weight(1f))
       }
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.xl))
 
       Card(
         modifier = Modifier.fillMaxWidth(),
@@ -132,7 +133,7 @@ fun SessionDetailScreen(
           containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
       ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(Spacing.lg)) {
           StatRow("Duration", formatDuration(s.durationSec))
           StatRow("Avg Power", "${s.avgPower} W")
           StatRow("Max Power", "${s.maxPower} W")
@@ -146,7 +147,7 @@ fun SessionDetailScreen(
         }
       }
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.xl))
 
       if (s.completed && state.icuConfigured) {
         if (s.icuSyncedAt != null) {
@@ -175,14 +176,14 @@ fun SessionDetailScreen(
       }
 
       if (samples.isNotEmpty()) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.xl))
         Card(
           modifier = Modifier.fillMaxWidth(),
           colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
           )
         ) {
-          Column(modifier = Modifier.padding(16.dp)) {
+          Column(modifier = Modifier.padding(Spacing.lg)) {
             Text(
               text = "Ride Chart",
               style = MaterialTheme.typography.titleMedium,
@@ -194,7 +195,7 @@ fun SessionDetailScreen(
         }
       }
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.xl))
     }
   }
 }
@@ -210,7 +211,7 @@ private fun SummaryCard(label: String, value: String, modifier: Modifier = Modif
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(16.dp),
+        .padding(Spacing.lg),
       horizontalAlignment = Alignment.CenterHorizontally
     ) {
       Text(

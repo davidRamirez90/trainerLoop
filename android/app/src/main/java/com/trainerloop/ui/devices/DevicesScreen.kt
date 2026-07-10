@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.ui.theme.Green40
+import com.trainerloop.ui.theme.Spacing
 
 @Composable
 fun DevicesScreen(
@@ -48,7 +49,7 @@ fun DevicesScreen(
   Column(
     modifier = Modifier
       .fillMaxSize()
-      .padding(16.dp)
+      .padding(horizontal = Spacing.lg)
   ) {
     Row(
       modifier = Modifier.fillMaxWidth(),
@@ -71,7 +72,7 @@ fun DevicesScreen(
     StatusRow(label = "Location", ok = uiState.isLocationOn)
     StatusRow(label = "Permissions", ok = uiState.hasPermissions)
 
-    Spacer(modifier = Modifier.height(16.dp))
+    Spacer(modifier = Modifier.height(Spacing.xl))
 
     val pairedDevices = connectedDevices(uiState)
     val availableDevices = uiState.availableDevices.filter {
@@ -82,7 +83,7 @@ fun DevicesScreen(
 
     LazyColumn(
       modifier = Modifier.weight(1f),
-      verticalArrangement = Arrangement.spacedBy(12.dp)
+      verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
       // Paired Devices
       item {
@@ -189,7 +190,7 @@ fun DevicesScreen(
 
   uiState.error?.let { error ->
     Snackbar(
-      modifier = Modifier.padding(16.dp),
+      modifier = Modifier.padding(Spacing.lg),
       action = {
         TextButton(onClick = { viewModel.clearError() }) {
           Text("Dismiss")
@@ -242,7 +243,7 @@ private fun PairedDeviceCard(
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(12.dp),
+        .padding(Spacing.lg),
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically
     ) {
@@ -289,7 +290,7 @@ private fun AvailableDeviceCard(
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(12.dp),
+        .padding(Spacing.lg),
       horizontalArrangement = Arrangement.SpaceBetween,
       verticalAlignment = Alignment.CenterVertically
     ) {

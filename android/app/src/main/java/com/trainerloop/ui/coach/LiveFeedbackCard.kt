@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.domain.coach.FeedbackCategory
 import com.trainerloop.domain.coach.FeedbackItem
 
@@ -27,7 +28,7 @@ fun LiveFeedbackCard(item: FeedbackItem, modifier: Modifier = Modifier) {
     modifier = modifier.fillMaxWidth(),
     colors = CardDefaults.cardColors(containerColor = container)
   ) {
-    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+    Column(modifier = Modifier.padding(Spacing.lg)) {
       Text(
         text = categoryLabel(item.category),
         style = MaterialTheme.typography.labelSmall,

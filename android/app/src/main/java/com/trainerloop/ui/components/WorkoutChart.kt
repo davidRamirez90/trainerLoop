@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
 import androidx.compose.ui.unit.dp
+import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.domain.WorkoutMath
@@ -272,7 +273,7 @@ private fun IntervalTooltip(
     modifier = modifier,
     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
   ) {
-    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+    Column(modifier = Modifier.padding(Spacing.lg)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
           modifier = Modifier

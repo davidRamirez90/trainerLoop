@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.repository.RouteSummary
+import com.trainerloop.ui.theme.Spacing
 
 @Composable
 fun RoutesScreen(
@@ -47,8 +48,8 @@ fun RoutesScreen(
   ) { uri -> uri?.let { viewModel.importGpx(it) } }
 
   Column(
-    modifier = Modifier.fillMaxSize().padding(16.dp),
-    verticalArrangement = Arrangement.spacedBy(12.dp)
+    modifier = Modifier.fillMaxSize().padding(horizontal = Spacing.lg),
+    verticalArrangement = Arrangement.spacedBy(Spacing.xl)
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       IconButton(onClick = onBack) {
@@ -82,7 +83,7 @@ fun RoutesScreen(
       )
     }
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
       items(routes, key = { it.id }) { route ->
         RouteRow(
           route = route,
@@ -98,7 +99,7 @@ fun RoutesScreen(
 private fun RouteRow(route: RouteSummary, onClick: () -> Unit, onDelete: () -> Unit) {
   Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
     Row(
-      modifier = Modifier.fillMaxWidth().padding(16.dp),
+      modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
       verticalAlignment = Alignment.CenterVertically
     ) {
       Column(modifier = Modifier.weight(1f)) {

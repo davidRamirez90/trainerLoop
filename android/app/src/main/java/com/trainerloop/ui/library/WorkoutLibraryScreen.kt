@@ -51,6 +51,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.Workout
 import com.trainerloop.ui.components.WorkoutMiniChart
+import com.trainerloop.ui.theme.Spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,7 +78,7 @@ fun WorkoutLibraryScreen(
   Column(
     modifier = Modifier
       .fillMaxSize()
-      .padding(16.dp)
+      .padding(horizontal = Spacing.lg)
   ) {
     Row(
       modifier = Modifier.fillMaxWidth(),
@@ -130,7 +131,7 @@ fun WorkoutLibraryScreen(
       }
     }
 
-    Spacer(modifier = Modifier.height(16.dp))
+    Spacer(modifier = Modifier.height(Spacing.xl))
 
     if (uiState.isLoading) {
       CircularProgressIndicator()
@@ -138,7 +139,7 @@ fun WorkoutLibraryScreen(
 
     LazyColumn(
       modifier = Modifier.weight(1f),
-      verticalArrangement = Arrangement.spacedBy(12.dp)
+      verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
       item(key = "ftp-ramp-test-card") {
         RampTestCard(onClick = onStartRampTest)
@@ -160,7 +161,7 @@ fun WorkoutLibraryScreen(
 
   uiState.error?.let { error ->
     Snackbar(
-      modifier = Modifier.padding(16.dp),
+      modifier = Modifier.padding(Spacing.lg),
       action = {
         androidx.compose.material3.TextButton(onClick = { viewModel.clearError() }) {
           Text("Dismiss")
@@ -182,7 +183,7 @@ private fun RampTestCard(onClick: () -> Unit) {
       containerColor = MaterialTheme.colorScheme.primaryContainer
     )
   ) {
-    Column(modifier = Modifier.padding(12.dp)) {
+    Column(modifier = Modifier.padding(Spacing.lg)) {
       Text(
         text = "FTP Ramp Test",
         style = MaterialTheme.typography.titleMedium,
@@ -224,7 +225,7 @@ private fun WorkoutCard(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(12.dp)
+        .padding(Spacing.lg)
     ) {
       WorkoutMiniChart(
         workout = workout,
@@ -277,7 +278,7 @@ private fun WorkoutCard(
       }
       Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
       ) {
         Text(
           text = "${formatDuration(stats.durationSec)}",

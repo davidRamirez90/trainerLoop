@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.trainerloop.ui.theme.Spacing
 import androidx.compose.ui.unit.sp
 
 @Composable
@@ -35,7 +36,7 @@ fun MetricCard(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(8.dp),
+        .padding(Spacing.sm),
       horizontalAlignment = Alignment.CenterHorizontally
     ) {
       Text(

@@ -79,6 +79,7 @@ import com.trainerloop.ui.components.WorkoutChart
 import com.trainerloop.ui.theme.Green40
 import com.trainerloop.ui.theme.NumericMedium
 import com.trainerloop.ui.theme.NumericSmall
+import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.zoneColorSet
 import com.trainerloop.ui.workout.WorkoutStatsPager
@@ -266,7 +267,7 @@ fun WorkoutScreen(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding)
-        .padding(horizontal = 16.dp)
+        .padding(horizontal = Spacing.lg)
     ) {
       // Top bar: elapsed / target
       Row(
@@ -325,7 +326,7 @@ fun WorkoutScreen(
         )
       }
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.xl))
 
       // Main metrics row
       Row(
@@ -390,7 +391,7 @@ fun WorkoutScreen(
         }
       }
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.xl))
 
       // Chart section with tabs
       WorkoutStatsPager(
