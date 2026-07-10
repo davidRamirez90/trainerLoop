@@ -1,5 +1,6 @@
 package com.trainerloop.ui.theme
 
+import android.provider.Settings
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -7,7 +8,10 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 
 // Full role coverage so nothing falls back to the purple Material baseline.
 internal val LightColorScheme = lightColorScheme(
@@ -90,11 +94,21 @@ fun TrainerLoopTheme(
   content: @Composable () -> Unit
 ) {
   val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+  val context = LocalContext.current
+  val reducedMotion = remember(context) {
+    Settings.Global.getFloat(
+      context.contentResolver,
+      Settings.Global.ANIMATOR_DURATION_SCALE,
+      1f
+    ) == 0f
+  }
 
-  MaterialTheme(
-    colorScheme = colorScheme,
-    typography = Typography,
-    shapes = TrainerLoopShapes,
-    content = content
-  )
+  CompositionLocalProvider(LocalReducedMotion provides reducedMotion) {
+    MaterialTheme(
+      colorScheme = colorScheme,
+      typography = Typography,
+      shapes = TrainerLoopShapes,
+      content = content
+    )
+  }
 }
