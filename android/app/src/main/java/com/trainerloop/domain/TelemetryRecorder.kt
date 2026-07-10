@@ -21,7 +21,8 @@ class TelemetryRecorder(
   private val dataProvider: DataProvider,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
   private val stamper: com.trainerloop.domain.sim.SampleStamper? = null,
-  private val now: () -> Long = android.os.SystemClock::elapsedRealtime
+  private val now: () -> Long = android.os.SystemClock::elapsedRealtime,
+  initialSamples: List<TelemetrySample> = emptyList()
 ) {
   data class DataProvider(
     val data: StateFlow<Stamped<IndoorBikeData>?>,
@@ -34,7 +35,8 @@ class TelemetryRecorder(
     hr: HrManager? = null,
     dispatcher: CoroutineDispatcher = Dispatchers.Default,
     stamper: com.trainerloop.domain.sim.SampleStamper? = null,
-    now: () -> Long = android.os.SystemClock::elapsedRealtime
+    now: () -> Long = android.os.SystemClock::elapsedRealtime,
+    initialSamples: List<TelemetrySample> = emptyList()
   ) : this(
     clock,
     DataProvider(
@@ -44,7 +46,8 @@ class TelemetryRecorder(
     ),
     dispatcher,
     stamper,
-    now
+    now,
+    initialSamples
   )
 
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -54,7 +57,7 @@ class TelemetryRecorder(
   )
   val latest: StateFlow<TelemetrySample> = _latest.asStateFlow()
 
-  private val _samples = MutableStateFlow<List<TelemetrySample>>(emptyList())
+  private val _samples = MutableStateFlow(initialSamples)
   val samples: StateFlow<List<TelemetrySample>> = _samples.asStateFlow()
 
   private var lastDataReceivedAtSec: Int? = null

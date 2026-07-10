@@ -2,6 +2,7 @@ package com.trainerloop.domain
 
 import com.trainerloop.ble.model.IndoorBikeData
 import com.trainerloop.ble.model.Stamped
+import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.model.SegmentPhase
 import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.WorkoutSegment
@@ -23,6 +24,34 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TelemetryRecorderTest {
+
+  @Test
+  fun `recorder seeded with prior samples appends instead of restarting`() = runTest {
+    val testDispatcher = StandardTestDispatcher(testScheduler)
+    val clock = WorkoutClock(shortWorkout(durationSec = 5), testDispatcher)
+    val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(
+      Stamped(bikeData(powerWatts = 200, cadenceRpm = 85.0), atMs = 0L)
+    )
+    val hrData = MutableStateFlow<Stamped<Int>?>(Stamped(150, atMs = 0L))
+    val prior = listOf(
+      TelemetrySample(timeSec = 1, powerWatts = 100, cadenceRpm = 80, hrBpm = 0)
+    )
+    val recorder = TelemetryRecorder(
+      clock,
+      TelemetryRecorder.DataProvider(ftmsData, hrData),
+      dispatcher = testDispatcher,
+      now = { 0L },
+      initialSamples = prior
+    )
+
+    recorder.startCollecting()
+    clock.start()
+    runCurrent()
+    advanceTimeBy(2000)
+    runCurrent()
+
+    assertEquals(listOf(1, 2), recorder.samples.value.map { it.timeSec })
+  }
 
   @Test
   fun `sample is flagged dropout when ftms data is stale`() = runTest {

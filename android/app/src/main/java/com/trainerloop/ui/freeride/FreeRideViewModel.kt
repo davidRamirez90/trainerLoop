@@ -108,8 +108,11 @@ class FreeRideViewModel(
         .distinctUntilChanged()
         .collect { (ftms, hr) ->
           val previous = recorder.value
+          val carried = previous?.samples?.value ?: emptyList()
           recorder.value = if (ftms != null) {
-            TelemetryRecorder(clock, ftms, hr, dispatcher, tracker)
+            TelemetryRecorder(
+              clock, ftms, hr, dispatcher, tracker, initialSamples = carried
+            )
               .also { it.startCollecting() }
           } else null
           previous?.stop()

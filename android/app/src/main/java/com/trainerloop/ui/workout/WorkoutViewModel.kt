@@ -171,8 +171,11 @@ class WorkoutViewModel(
         .distinctUntilChanged()
         .collect { (ftms, hr) ->
           val previous = recorder.value
+          val carried = previous?.samples?.value ?: emptyList()
           val next = if (ftms != null) {
-            TelemetryRecorder(clock, ftms, hr, dispatcher, virtualRide)
+            TelemetryRecorder(
+              clock, ftms, hr, dispatcher, virtualRide, initialSamples = carried
+            )
               .also { it.startCollecting() }
           } else null
           recorder.value = next
