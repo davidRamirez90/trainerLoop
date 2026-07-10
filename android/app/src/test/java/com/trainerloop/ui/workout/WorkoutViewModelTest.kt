@@ -7,6 +7,7 @@ import com.trainerloop.ble.HrManager
 import com.trainerloop.ble.model.IndoorBikeData
 import com.trainerloop.ble.model.Stamped
 import com.trainerloop.data.model.SegmentPhase
+import com.trainerloop.data.model.CoachAction
 import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
@@ -233,6 +234,36 @@ class WorkoutViewModelTest {
   }
 
   @Test
+  fun `adjust intensity up action raises the offset`() = runTest(testDispatcher) {
+    val viewModel = WorkoutViewModel(workout = sampleWorkout(), dispatcher = testDispatcher)
+
+    viewModel.applyCoachAction(CoachAction.AdjustIntensityUp(percent = 5))
+
+    assertEquals(5, viewModel.uiState.value.intensityOffsetPct)
+  }
+
+  @Test
+  fun `adjust intensity down clamps at -20`() = runTest(testDispatcher) {
+    val viewModel = WorkoutViewModel(workout = sampleWorkout(), dispatcher = testDispatcher)
+
+    repeat(6) { viewModel.applyCoachAction(CoachAction.AdjustIntensityDown(percent = 5)) }
+
+    assertEquals(-20, viewModel.uiState.value.intensityOffsetPct)
+  }
+
+  @Test
+  fun `skip remaining seeks to the first cooldown segment`() = runTest(testDispatcher) {
+    val viewModel = WorkoutViewModel(workout = intervalWorkout(), dispatcher = testDispatcher)
+
+    viewModel.start()
+    advanceTimeBy(10_000)
+    viewModel.applyCoachAction(CoachAction.SkipRemainingOnIntervals)
+    advanceTimeBy(1_000)
+
+    assertEquals(2, viewModel.uiState.value.segmentIndex)
+  }
+
+  @Test
   fun `stop with samples emits finish event`() = runTest(testDispatcher) {
     val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
@@ -439,6 +470,39 @@ class WorkoutViewModelTest {
         phase = SegmentPhase.WORK,
         isWork = true,
         targetRange = TargetRange(low = 200, high = 220)
+      )
+    )
+  )
+
+  private fun intervalWorkout(): Workout = Workout(
+    id = "interval-workout",
+    name = "Interval Test",
+    description = null,
+    source = WorkoutSource.MANUAL,
+    segments = listOf(
+      WorkoutSegment.Step(
+        id = "w1",
+        durationSec = 300,
+        label = "Work 1",
+        phase = SegmentPhase.WORK,
+        isWork = true,
+        targetRange = TargetRange(low = 200, high = 220)
+      ),
+      WorkoutSegment.Step(
+        id = "w2",
+        durationSec = 300,
+        label = "Work 2",
+        phase = SegmentPhase.WORK,
+        isWork = true,
+        targetRange = TargetRange(low = 200, high = 220)
+      ),
+      WorkoutSegment.Step(
+        id = "c1",
+        durationSec = 120,
+        label = "Cooldown",
+        phase = SegmentPhase.COOLDOWN,
+        isWork = false,
+        targetRange = TargetRange(low = 100, high = 110)
       )
     )
   )

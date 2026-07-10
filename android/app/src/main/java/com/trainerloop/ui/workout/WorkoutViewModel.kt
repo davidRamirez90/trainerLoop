@@ -364,36 +364,55 @@ class WorkoutViewModel(
   }
 
   fun adjustIntensityUp() {
-    val current = _uiState.value.intensityOffsetPct
-    val newOffset = (current + 5).coerceAtMost(20)
-    _uiState.value = _uiState.value.copy(intensityOffsetPct = newOffset)
+    setIntensityOffset(_uiState.value.intensityOffsetPct + 5)
   }
 
   fun adjustIntensityDown() {
-    val current = _uiState.value.intensityOffsetPct
-    val newOffset = (current - 5).coerceAtLeast(-20)
-    _uiState.value = _uiState.value.copy(intensityOffsetPct = newOffset)
+    setIntensityOffset(_uiState.value.intensityOffsetPct - 5)
   }
 
   fun fineIntensityUp() {
-    val current = _uiState.value.intensityOffsetPct
-    val newOffset = (current + 1).coerceAtMost(20)
-    _uiState.value = _uiState.value.copy(intensityOffsetPct = newOffset)
+    setIntensityOffset(_uiState.value.intensityOffsetPct + 1)
   }
 
   fun fineIntensityDown() {
-    val current = _uiState.value.intensityOffsetPct
-    val newOffset = (current - 1).coerceAtLeast(-20)
-    _uiState.value = _uiState.value.copy(intensityOffsetPct = newOffset)
+    setIntensityOffset(_uiState.value.intensityOffsetPct - 1)
   }
 
   // Coach suggestion handlers
   fun acceptSuggestion(suggestionId: String) {
     viewModelScope.launch {
-      val accepted = coachEngine.accept(suggestionId)
-      (accepted?.action as? CoachAction.ExtendRecovery)?.let {
-        extendCurrentRecovery(it.seconds)
-      }
+      coachEngine.accept(suggestionId)?.action?.let { applyCoachAction(it) }
+    }
+  }
+
+  internal fun applyCoachAction(action: CoachAction) {
+    when (action) {
+      is CoachAction.AdjustIntensityUp -> setIntensityOffset(
+        _uiState.value.intensityOffsetPct + action.percent
+      )
+      is CoachAction.AdjustIntensityDown -> setIntensityOffset(
+        _uiState.value.intensityOffsetPct - action.percent
+      )
+      is CoachAction.ExtendRecovery -> extendCurrentRecovery(action.seconds)
+      CoachAction.SkipRemainingOnIntervals -> skipToCooldown()
+    }
+  }
+
+  private fun setIntensityOffset(pct: Int) {
+    _uiState.value = _uiState.value.copy(intensityOffsetPct = pct.coerceIn(-20, 20))
+    updateFromClock()
+  }
+
+  /** Jump to the first COOLDOWN at/after the current segment, or end the workout. */
+  private fun skipToCooldown() {
+    val currentIdx = _uiState.value.segmentIndex
+    val cooldownIdx = segments.withIndex()
+      .firstOrNull { (i, seg) -> i >= currentIdx && seg.phase == SegmentPhase.COOLDOWN }?.index
+    if (cooldownIdx != null) {
+      seek(segments.take(cooldownIdx).sumOf { it.durationSec })
+    } else {
+      seek(WorkoutMath.totalDurationSec(segments))
     }
   }
 
