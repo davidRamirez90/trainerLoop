@@ -46,13 +46,19 @@ object WorkoutSummaryMath {
     val np = normalizedPower(workout)
     val ifactor = intensityFactor(np, ftp)
     val activeSec = WorkoutMath.totalDurationSec(workout.segments)
+    val hasMeaningfulPowerTargets = !isFreeRideOnly(workout)
     return WorkoutStats(
       durationSec = activeSec,
       normalizedPower = np,
       intensityFactor = ifactor,
-      tss = tss(np, ftp, activeSec)
+      tss = tss(np, ftp, activeSec),
+      hasMeaningfulPowerTargets = hasMeaningfulPowerTargets
     )
   }
+
+  /** True when the workout leaves all power decisions to the rider. */
+  fun isFreeRideOnly(workout: Workout): Boolean =
+    workout.segments.isNotEmpty() && workout.segments.all { it is WorkoutSegment.FreeRide }
 
   fun segmentAveragePower(segment: WorkoutSegment): Double = when (segment) {
     is WorkoutSegment.Step -> (segment.targetRange.low + segment.targetRange.high) / 2.0
@@ -119,5 +125,12 @@ data class WorkoutStats(
   val durationSec: Int,
   val normalizedPower: Int,
   val intensityFactor: Double,
-  val tss: Int
-)
+  val tss: Int,
+  val hasMeaningfulPowerTargets: Boolean = true
+) {
+  val plannedIntensityFactor: Double?
+    get() = intensityFactor.takeIf { hasMeaningfulPowerTargets }
+
+  val plannedTss: Int?
+    get() = tss.takeIf { hasMeaningfulPowerTargets }
+}

@@ -8,15 +8,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
+import com.trainerloop.domain.WorkoutSummaryMath
 
 @Composable
 fun WorkoutMiniChart(
@@ -30,12 +33,34 @@ fun WorkoutMiniChart(
   val totalDuration = remember(workout) {
     WorkoutMath.totalDurationSec(workout.segments)
   }
+  val isFreeRideOnly = remember(workout) {
+    WorkoutSummaryMath.isFreeRideOnly(workout)
+  }
+  val placeholderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
 
   Canvas(
     modifier = modifier
       .fillMaxWidth()
       .height(chartHeight)
   ) {
+    if (isFreeRideOnly) {
+      val bandHeight = size.height * 0.4f
+      val bandWidth = size.width - 4.dp.toPx()
+      val bandTop = (size.height - bandHeight) / 2f
+      val dash = PathEffect.dashPathEffect(
+        floatArrayOf(8.dp.toPx(), 6.dp.toPx()),
+        0f
+      )
+      drawRoundRect(
+        color = placeholderColor,
+        topLeft = Offset(2.dp.toPx(), bandTop),
+        size = Size(bandWidth, bandHeight),
+        cornerRadius = CornerRadius(8.dp.toPx()),
+        style = Stroke(width = 2.dp.toPx(), pathEffect = dash)
+      )
+      return@Canvas
+    }
+
     if (totalDuration == 0) return@Canvas
 
     val width = size.width

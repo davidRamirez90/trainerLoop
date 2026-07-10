@@ -280,16 +280,20 @@ private fun WorkoutCard(
           style = MaterialTheme.typography.labelSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(
-          text = "IF ${String.format(Locale.ROOT, "%.2f", stats.intensityFactor)}",
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-          text = "TSS ${stats.tss}",
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        stats.plannedIntensityFactor?.let { intensityFactor ->
+          Text(
+            text = "IF ${String.format(Locale.ROOT, "%.2f", intensityFactor)}",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
+        stats.plannedTss?.let { tss ->
+          Text(
+            text = "TSS $tss",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
       }
     }
   }
