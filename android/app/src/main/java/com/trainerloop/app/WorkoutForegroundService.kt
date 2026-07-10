@@ -28,8 +28,9 @@ class WorkoutForegroundService : Service() {
     when (intent?.action) {
       ACTION_STOP -> {
         (application as? TrainerLoopApplication)?.stopRequests?.tryEmit(Unit)
-        // The ride screen tears the session down and calls stop(context),
-        // which stops the service through the normal path.
+        releaseWakeLock()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
         return START_NOT_STICKY
       }
       ACTION_UPDATE -> {

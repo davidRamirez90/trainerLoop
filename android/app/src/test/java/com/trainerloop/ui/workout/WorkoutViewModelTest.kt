@@ -188,6 +188,59 @@ class WorkoutViewModelTest {
     assertEquals("hr should reach UI after late attach", 152, state.currentHrBpm)
   }
 
+  @Test
+  fun `manager swap carries buffered samples into the replacement recorder`() =
+    runTest(testDispatcher) {
+      val firstData = MutableStateFlow<Stamped<IndoorBikeData>?>(
+        stamp(IndoorBikeData(
+          powerWatts = 200,
+          cadenceRpm = 85.0,
+          speedKph = null,
+          resistanceLevel = null,
+          averagePower = null,
+          averageSpeed = null,
+          totalDistanceMeters = null,
+          heartRateBpm = null,
+          elapsedTimeSec = null,
+          remainingTimeSec = null
+        ))
+      )
+      val secondData = MutableStateFlow<Stamped<IndoorBikeData>?>(
+        stamp(IndoorBikeData(
+          powerWatts = 210,
+          cadenceRpm = 86.0,
+          speedKph = null,
+          resistanceLevel = null,
+          averagePower = null,
+          averageSpeed = null,
+          totalDistanceMeters = null,
+          heartRateBpm = null,
+          elapsedTimeSec = null,
+          remainingTimeSec = null
+        ))
+      )
+      val firstManager = mockFtmsManager(data = firstData)
+      val secondManager = mockFtmsManager(data = secondData)
+      val ftmsFlow = MutableStateFlow<FtmsManager?>(firstManager)
+      val viewModel = WorkoutViewModel(
+        workout = sampleWorkout(),
+        ftmsManagerFlow = ftmsFlow,
+        dispatcher = testDispatcher
+      )
+
+      runCurrent()
+      viewModel.start()
+      advanceTimeBy(3_000)
+      runCurrent()
+
+      assertEquals(0, viewModel.uiState.value.samples.size)
+
+      ftmsFlow.value = secondManager
+      runCurrent()
+
+      assertEquals(3, viewModel.uiState.value.samples.size)
+    }
+
   /**
    * Fast-path HR: the displayed HR should follow HR-strap notifications
    * even when the 1 Hz clock has not advanced.

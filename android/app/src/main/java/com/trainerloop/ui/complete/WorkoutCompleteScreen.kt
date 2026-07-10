@@ -214,6 +214,7 @@ fun WorkoutCompleteScreen(
 
       OutlinedButton(
         onClick = onDone,
+        enabled = uiState.isSaved || uiState.isDiscarded || viewModel.samples.isEmpty(),
         modifier = Modifier.fillMaxWidth()
       ) {
         Text("Done")
