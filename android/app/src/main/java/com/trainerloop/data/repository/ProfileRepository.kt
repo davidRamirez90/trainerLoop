@@ -6,6 +6,8 @@ import com.trainerloop.data.model.UserProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 open class ProfileRepository(context: Context) {
 
@@ -13,15 +15,18 @@ open class ProfileRepository(context: Context) {
     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
   private val _profile = MutableStateFlow(load())
+  private val updateMutex = Mutex()
   open val profile: Flow<UserProfile> = _profile.asStateFlow()
 
   fun getProfileSync(): UserProfile = _profile.value
 
   suspend fun updateProfile(update: (UserProfile) -> UserProfile) {
-    val current = _profile.value
-    val updated = update(current)
-    save(updated)
-    _profile.value = updated
+    updateMutex.withLock {
+      val current = _profile.value
+      val updated = update(current)
+      save(updated)
+      _profile.value = updated
+    }
   }
 
   suspend fun updateFtp(ftp: Int) {

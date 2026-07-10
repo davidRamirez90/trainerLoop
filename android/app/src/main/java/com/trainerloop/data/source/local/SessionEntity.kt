@@ -1,9 +1,10 @@
 package com.trainerloop.data.source.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "sessions")
+@Entity(tableName = "sessions", indices = [Index(value = ["startedAt"])])
 data class SessionEntity(
     @PrimaryKey val id: String,
     val workoutId: String,

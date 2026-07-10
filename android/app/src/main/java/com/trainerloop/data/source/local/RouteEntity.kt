@@ -1,9 +1,10 @@
 package com.trainerloop.data.source.local
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "routes")
+@Entity(tableName = "routes", indices = [Index(value = ["importedAt"])])
 data class RouteEntity(
     @PrimaryKey val id: String,
     val name: String,
