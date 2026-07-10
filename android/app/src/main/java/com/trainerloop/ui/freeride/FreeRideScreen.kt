@@ -30,7 +30,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trainerloop.app.trainerLoopApp
+import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.ui.components.RouteProfileChart
 import com.trainerloop.ui.workout.WorkoutFinishData
 
@@ -51,8 +52,8 @@ fun FreeRideScreen(
   onSessionFinished: (WorkoutFinishData) -> Unit,
   onExit: () -> Unit
 ) {
-  val uiState by viewModel.uiState.collectAsState()
-  val finishEvent by viewModel.finishEvent.collectAsState()
+  val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val finishEvent by viewModel.finishEvent.collectAsStateWithLifecycle()
   val context = LocalContext.current
   val view = LocalView.current
   var showStopConfirm by remember { mutableStateOf(false) }
@@ -74,6 +75,29 @@ fun FreeRideScreen(
   DisposableEffect(uiState.isRunning) {
     view.keepScreenOn = uiState.isRunning
     onDispose { view.keepScreenOn = false }
+  }
+
+  LaunchedEffect(uiState.isRunning) {
+    if (uiState.isRunning) {
+      WorkoutForegroundService.start(
+        context,
+        uiState.currentPowerWatts,
+        formatTime(uiState.elapsedSec)
+      )
+    } else {
+      WorkoutForegroundService.stop(context)
+    }
+  }
+
+  LaunchedEffect(uiState.currentPowerWatts, uiState.elapsedSec / 3) {
+    if (uiState.isRunning) {
+      WorkoutForegroundService.update(
+        context,
+        uiState.currentPowerWatts,
+        formatTime(uiState.elapsedSec),
+        true
+      )
+    }
   }
 
   if (showStopConfirm) {

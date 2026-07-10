@@ -1,5 +1,7 @@
 package com.trainerloop.app
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -10,6 +12,10 @@ import com.trainerloop.ui.TrainerLoopApp
 import com.trainerloop.ui.theme.TrainerLoopTheme
 
 class MainActivity : ComponentActivity() {
+
+  private val notificationPermissionLauncher = registerForActivityResult(
+    ActivityResultContracts.RequestPermission()
+  ) { }
 
   private val permissionLauncher = registerForActivityResult(
     ActivityResultContracts.RequestMultiplePermissions()
@@ -39,6 +45,11 @@ class MainActivity : ComponentActivity() {
 
     if (!BlePermissions.hasPermissions(this)) {
       permissionLauncher.launch(BlePermissions.REQUIRED)
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+      checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+    ) {
+      notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     setContent {

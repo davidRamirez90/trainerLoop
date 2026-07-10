@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import com.trainerloop.ble.BlePermissions
 
 class WorkoutForegroundService : Service() {
 
@@ -45,7 +46,7 @@ class WorkoutForegroundService : Service() {
         startForeground(NOTIFICATION_ID, buildNotification(power, time, isRunning))
       }
     }
-    return START_STICKY
+    return START_NOT_STICKY
   }
 
   override fun onBind(intent: Intent?): IBinder? = null
@@ -121,6 +122,7 @@ class WorkoutForegroundService : Service() {
     const val EXTRA_IS_RUNNING = "is_running"
 
     fun start(context: Context, power: Int, time: String) {
+      if (!BlePermissions.hasPermissions(context)) return
       val intent = Intent(context, WorkoutForegroundService::class.java).apply {
         putExtra(EXTRA_POWER, power)
         putExtra(EXTRA_TIME, time)
@@ -134,6 +136,7 @@ class WorkoutForegroundService : Service() {
     }
 
     fun update(context: Context, power: Int, time: String, isRunning: Boolean) {
+      if (!BlePermissions.hasPermissions(context)) return
       val intent = Intent(context, WorkoutForegroundService::class.java).apply {
         action = ACTION_UPDATE
         putExtra(EXTRA_POWER, power)
