@@ -8,6 +8,7 @@ import com.trainerloop.ble.FtmsControlManager
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
 import com.trainerloop.ble.BleLog
+import com.trainerloop.ble.ZwiftClickManager
 import com.trainerloop.data.model.Workout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,9 @@ class TrainerLoopApplication : Application(), ManagerProvider {
 
   private val _ftmsControlManager = MutableStateFlow<FtmsControlManager?>(null)
   val ftmsControlManager: StateFlow<FtmsControlManager?> = _ftmsControlManager.asStateFlow()
+
+  private val _clickManager = MutableStateFlow<ZwiftClickManager?>(null)
+  val clickManager: StateFlow<ZwiftClickManager?> = _clickManager.asStateFlow()
 
   /**
    * The single BLE GATT connection for the trainer, shared between
@@ -138,19 +142,38 @@ class TrainerLoopApplication : Application(), ManagerProvider {
     }
   }
 
+  fun attachClick(device: BluetoothDevice) {
+    val previousClick = _clickManager.value
+    _clickManager.value = ZwiftClickManager(this, device)
+    appScope.launch {
+      previousClick?.disconnect()
+    }
+  }
+
+  fun clearClick() {
+    val previousClick = _clickManager.value
+    _clickManager.value = null
+    appScope.launch {
+      previousClick?.disconnect()
+    }
+  }
+
   fun clearDevices() {
     val previousFtms = _ftmsManager.value
     val previousControl = _ftmsControlManager.value
     val previousHr = _hrManager.value
+    val previousClick = _clickManager.value
     val previousConn = trainerConnection
     _ftmsManager.value = null
     _ftmsControlManager.value = null
     _hrManager.value = null
+    _clickManager.value = null
     trainerConnection = null
     appScope.launch {
       previousFtms?.disconnect()
       previousControl?.disconnect()
       previousHr?.disconnect()
+      previousClick?.disconnect()
       previousConn?.disconnect()
     }
   }
