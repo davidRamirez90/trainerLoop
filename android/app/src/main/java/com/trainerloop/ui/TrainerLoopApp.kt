@@ -160,7 +160,8 @@ fun TrainerLoopApp(
           viewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = freeRideFactory),
           onSessionFinished = { data ->
             navController.storeFinishPayload(
-              context, data.startTimeMs, data.samples, data.coachJson, "FREE_RIDE", routeId
+              context, data.startTimeMs, data.samples, data.coachJson,
+              data.completedNaturally, "FREE_RIDE", routeId
             )
             navController.navigate(
               Screen.WorkoutComplete.createRoute(
@@ -278,7 +279,9 @@ fun TrainerLoopApp(
           workout = workout,
           viewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = workoutFactory),
           onSessionFinished = { data ->
-            navController.storeFinishPayload(context, data.startTimeMs, data.samples, data.coachJson)
+            navController.storeFinishPayload(
+              context, data.startTimeMs, data.samples, data.coachJson, data.completedNaturally
+            )
             navController.navigate(
               Screen.WorkoutComplete.createRoute(
                 sessionId = data.startTimeMs.toString(),
@@ -311,7 +314,8 @@ fun TrainerLoopApp(
         val coachJson = payload?.get<String>(FINISH_COACH_KEY)?.let(::readAndDeleteFile) ?: ""
         val sessionType = payload?.get<String>(FINISH_TYPE_KEY) ?: "WORKOUT"
         val freeRideRouteId = payload?.get<String>(FINISH_ROUTE_KEY)
-        val completeFactory = remember(sessionId) {
+        val completed = payload?.get<Boolean>(FINISH_COMPLETED_KEY) ?: false
+        val completeFactory = remember(sessionId, completed) {
           WorkoutCompleteViewModelFactory(
             application = context.applicationContext as Application,
             sessionId = sessionId,
@@ -321,7 +325,8 @@ fun TrainerLoopApp(
             startTimeMs = startTimeMs,
             coachJson = coachJson,
             sessionType = sessionType,
-            routeId = freeRideRouteId
+            routeId = freeRideRouteId,
+            completed = completed
           )
         }
 
@@ -345,12 +350,14 @@ private const val FINISH_SAMPLES_KEY = "finish_samples"
 private const val FINISH_COACH_KEY = "finish_coach"
 private const val FINISH_TYPE_KEY = "finish_type"
 private const val FINISH_ROUTE_KEY = "finish_route"
+private const val FINISH_COMPLETED_KEY = "finish_completed"
 
 private fun NavHostController.storeFinishPayload(
   context: Context,
   startTimeMs: Long,
   samples: List<TelemetrySample>,
   coachJson: String,
+  completed: Boolean = false,
   sessionType: String = "WORKOUT",
   routeId: String? = null
 ) {
@@ -365,6 +372,7 @@ private fun NavHostController.storeFinishPayload(
   currentBackStackEntry?.savedStateHandle?.set(FINISH_COACH_KEY, coachFile.absolutePath)
   currentBackStackEntry?.savedStateHandle?.set(FINISH_TYPE_KEY, sessionType)
   currentBackStackEntry?.savedStateHandle?.set(FINISH_ROUTE_KEY, routeId)
+  currentBackStackEntry?.savedStateHandle?.set(FINISH_COMPLETED_KEY, completed)
 }
 
 private fun readSamplesFile(path: String): List<TelemetrySample> =

@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -42,6 +43,10 @@ fun WorkoutCompleteScreen(
   onDone: () -> Unit
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+  LaunchedEffect(uiState.isDiscarded) {
+    if (uiState.isDiscarded) onDiscard()
+  }
 
   Scaffold(
     topBar = {
@@ -168,10 +173,8 @@ fun WorkoutCompleteScreen(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
       ) {
         OutlinedButton(
-          onClick = {
-            viewModel.onDiscard()
-            onDiscard()
-          },
+          onClick = { viewModel.onDiscard() },
+          enabled = !uiState.isSaving,
           modifier = Modifier.weight(1f),
           colors = ButtonDefaults.outlinedButtonColors(
             contentColor = MaterialTheme.colorScheme.error
@@ -181,7 +184,7 @@ fun WorkoutCompleteScreen(
         }
         Button(
           onClick = { viewModel.onSave() },
-          enabled = !uiState.isSaved,
+          enabled = !uiState.isSaved && !uiState.isSaving,
           modifier = Modifier.weight(1f)
         ) {
           Text(if (uiState.isSaved) "Saved" else "Save")

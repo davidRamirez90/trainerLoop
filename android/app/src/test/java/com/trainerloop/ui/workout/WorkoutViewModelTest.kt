@@ -264,6 +264,7 @@ class WorkoutViewModelTest {
     viewModel.stop()
 
     assertTrue("finishEvent should carry samples", viewModel.finishEvent.value?.samples?.isNotEmpty() == true)
+    assertFalse(viewModel.finishEvent.value?.completedNaturally == true)
   }
 
   @Test

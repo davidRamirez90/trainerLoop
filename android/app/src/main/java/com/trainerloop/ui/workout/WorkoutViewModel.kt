@@ -82,7 +82,8 @@ data class WorkoutFinishData(
   val workoutName: String,
   val startTimeMs: Long,
   val samples: List<TelemetrySample>,
-  val coachJson: String = ""
+  val coachJson: String = "",
+  val completedNaturally: Boolean = false
 )
 
 private data class WorkoutControlTick(
@@ -480,7 +481,8 @@ class WorkoutViewModel(
       workoutName = workout.name,
       startTimeMs = sessionStartMs ?: (now() - state.elapsedSec * 1000L),
       samples = state.samples,
-      coachJson = if (isRampTest) "" else liveCoach.sessionData().toJson()
+      coachJson = if (isRampTest) "" else liveCoach.sessionData().toJson(),
+      completedNaturally = state.isComplete
     )
   }
 

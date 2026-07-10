@@ -13,14 +13,14 @@ open class SessionRepository(private val dao: SessionDao) {
     open fun summaries(): Flow<List<SessionSummary>> =
         dao.getAll().map { rows -> rows.map(::toSummary) }
 
-    suspend fun save(session: SessionData) {
+    open suspend fun save(session: SessionData) {
         dao.insert(toEntity(session))
     }
 
     suspend fun getById(id: String): SessionData? =
         dao.getById(id)?.let(::toData)
 
-    suspend fun deleteById(id: String) {
+    open suspend fun deleteById(id: String) {
         dao.deleteById(id)
     }
 

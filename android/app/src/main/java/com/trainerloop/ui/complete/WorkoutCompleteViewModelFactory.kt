@@ -14,7 +14,8 @@ class WorkoutCompleteViewModelFactory(
   private val startTimeMs: Long,
   private val coachJson: String = "",
   private val sessionType: String = "WORKOUT",
-  private val routeId: String? = null
+  private val routeId: String? = null,
+  private val completed: Boolean = false
 ) : ViewModelProvider.Factory {
 
   @Suppress("UNCHECKED_CAST")
@@ -29,7 +30,8 @@ class WorkoutCompleteViewModelFactory(
         startTimeMs = startTimeMs,
         coachJson = coachJson,
         sessionType = sessionType,
-        routeId = routeId
+        routeId = routeId,
+        completed = completed
       ) as T
     }
     throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

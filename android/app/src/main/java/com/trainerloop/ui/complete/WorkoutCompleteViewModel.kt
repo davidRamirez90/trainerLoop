@@ -38,6 +38,7 @@ data class WorkoutCompleteUiState(
   val distanceKm: Double = 0.0,
   val ascentM: Int = 0,
   val fitFile: File? = null,
+  val isSaving: Boolean = false,
   val isSaved: Boolean = false,
   val isDiscarded: Boolean = false,
   val error: String? = null,
@@ -64,6 +65,7 @@ class WorkoutCompleteViewModel(
   private val coachJson: String = "",
   private val sessionType: String = "WORKOUT",
   private val routeId: String? = null,
+  private val completed: Boolean = false,
   private val profileRepository: ProfileRepository = ProfileRepository(application),
   private val sessionRepository: SessionRepository = SessionRepository.create(AppDatabase.getInstance(application))
 ) : AndroidViewModel(application) {
@@ -77,7 +79,6 @@ class WorkoutCompleteViewModel(
       coachData = com.trainerloop.domain.coach.CoachSessionData.fromJson(coachJson)
     )
     createFitFile()
-    saveSession()
     if (RampTest.isRampTest(workoutId)) {
       _uiState.value = _uiState.value.copy(
         isRampTest = true,
@@ -166,9 +167,11 @@ class WorkoutCompleteViewModel(
     )
   }
 
-  private fun saveSession() {
+  fun onSave() {
     val state = _uiState.value
-    if (samples.isEmpty()) return
+    if (state.isSaved || state.isSaving || state.isDiscarded || samples.isEmpty()) return
+
+    _uiState.value = state.copy(isSaving = true)
 
     val samplesJson = Json.encodeToString(ListSerializer(TelemetrySample.serializer()), samples)
     val sessionData = SessionData(
@@ -180,7 +183,7 @@ class WorkoutCompleteViewModel(
       durationSec = state.durationSec,
       samplesJson = samplesJson,
       coachEventsJson = coachJson,
-      completed = true,
+      completed = completed,
       avgPower = state.avgPower,
       maxPower = state.maxPower,
       avgCadence = state.avgCadence,
@@ -192,9 +195,12 @@ class WorkoutCompleteViewModel(
     viewModelScope.launch {
       try {
         sessionRepository.save(sessionData)
-        _uiState.value = _uiState.value.copy(isSaved = true)
+        _uiState.value = _uiState.value.copy(isSaved = true, isSaving = false)
       } catch (e: Exception) {
-        _uiState.value = _uiState.value.copy(error = "Failed to save session: ${e.message}")
+        _uiState.value = _uiState.value.copy(
+          isSaving = false,
+          error = "Failed to save session: ${e.message}"
+        )
         return@launch
       }
       uploadToIntervalsIcu(sessionData)
@@ -235,11 +241,6 @@ class WorkoutCompleteViewModel(
     )
   }
 
-  fun onSave() {
-    if (_uiState.value.isSaved) return
-    saveSession()
-  }
-
   fun onShare() {
     val file = _uiState.value.fitFile ?: return
     FitShareHelper.shareFitFile(getApplication(), file)
@@ -248,7 +249,7 @@ class WorkoutCompleteViewModel(
   fun onDiscard() {
     viewModelScope.launch {
       try {
-        sessionRepository.deleteById(sessionId)
+        if (_uiState.value.isSaved) sessionRepository.deleteById(sessionId)
         _uiState.value.fitFile?.delete()
         _uiState.value = _uiState.value.copy(isDiscarded = true, isSaved = false, fitFile = null)
       } catch (e: Exception) {

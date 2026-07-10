@@ -194,7 +194,8 @@ class FreeRideViewModel(
         workoutName = route.name ?: "GPX Ride",
         startTimeMs = sessionStartMs ?:
           (now() - _uiState.value.elapsedSec * 1000L),
-        samples = samples
+        samples = samples,
+        completedNaturally = _uiState.value.routeComplete
       )
     }
     sessionStartMs = null
