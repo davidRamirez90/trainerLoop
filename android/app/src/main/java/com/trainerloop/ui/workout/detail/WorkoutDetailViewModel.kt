@@ -7,6 +7,7 @@ import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.domain.WorkoutMath
 import com.trainerloop.domain.WorkoutStats
 import com.trainerloop.domain.WorkoutSummaryMath
+import com.trainerloop.ui.theme.ZoneColors
 
 enum class WorkoutCategory(val label: String) {
   ENDURANCE("Endurance"),
@@ -47,18 +48,28 @@ class WorkoutDetailViewModel(
 
   val intervals: List<IntervalRow> = workout.segments.map { segment ->
     IntervalRow(
-      color = phaseColor(segment.phase),
+      color = phaseColor(segment),
       name = segment.label ?: "${segment.phase.name.lowercase().replaceFirstChar { it.uppercase() }}",
       durationSec = segment.durationSec,
       targetFtpPct = targetFtpPct(segment, ftp)
     )
   }
 
-  private fun phaseColor(phase: SegmentPhase): androidx.compose.ui.graphics.Color = when (phase) {
+  private fun phaseColor(segment: WorkoutSegment): androidx.compose.ui.graphics.Color = when (segment.phase) {
     SegmentPhase.WARMUP -> com.trainerloop.ui.theme.Amber80
-    SegmentPhase.WORK -> com.trainerloop.ui.theme.Green60
+    SegmentPhase.WORK -> ZoneColors.forTarget(
+      targetWatts = segmentTargetPower(segment),
+      ftp = ftp,
+      dark = true
+    ).line
     SegmentPhase.RECOVERY -> com.trainerloop.ui.theme.Blue80
     SegmentPhase.COOLDOWN -> com.trainerloop.ui.theme.Amber80
+  }
+
+  private fun segmentTargetPower(segment: WorkoutSegment): Int = when (segment) {
+    is WorkoutSegment.Step -> (segment.targetRange.low + segment.targetRange.high) / 2
+    is WorkoutSegment.Ramp -> (segment.startPower + segment.endPower) / 2
+    is WorkoutSegment.FreeRide -> 0
   }
 
   private fun targetFtpPct(segment: WorkoutSegment, ftp: Int): String {

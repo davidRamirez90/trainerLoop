@@ -1,43 +1,52 @@
 package com.trainerloop.ui.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.TelemetrySample
+import kotlinx.coroutines.launch
 
-/** Post-ride telemetry chart with Power / HR / Cadence tabs. */
+/** Post-ride telemetry chart with Power / HR / Cadence pager pages. */
 @Composable
 fun SampleChart(samples: List<TelemetrySample>) {
-  var selectedTab by rememberSaveable { mutableIntStateOf(0) }
   val tabs = listOf("Power", "Heart Rate", "Cadence")
+  val pagerState = rememberPagerState(pageCount = { tabs.size })
+  val scope = rememberCoroutineScope()
 
-  TabRow(selectedTabIndex = selectedTab) {
-    tabs.forEachIndexed { index, title ->
-      Tab(
-        selected = selectedTab == index,
-        onClick = { selectedTab = index },
-        text = { Text(title) }
-      )
-    }
+  HorizontalPager(
+    state = pagerState,
+    modifier = Modifier.fillMaxWidth(),
+    beyondViewportPageCount = 1
+  ) { page ->
+    ChartPage(
+      samples = samples,
+      selectedTab = page
+    )
   }
 
-  Spacer(modifier = Modifier.height(8.dp))
+  PagerDots(
+    pageTitles = tabs,
+    currentPage = pagerState.currentPage,
+    onPageSelected = { page -> scope.launch { pagerState.animateScrollToPage(page) } }
+  )
+}
 
+@Composable
+private fun ChartPage(
+  samples: List<TelemetrySample>,
+  selectedTab: Int
+) {
   val (values, color, unit) = when (selectedTab) {
     0 -> Triple(samples.map { it.powerWatts }, MaterialTheme.colorScheme.secondary, "W")
     1 -> Triple(samples.map { it.hrBpm }, MaterialTheme.colorScheme.error, "bpm")

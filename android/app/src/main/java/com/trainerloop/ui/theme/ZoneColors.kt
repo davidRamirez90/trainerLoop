@@ -3,6 +3,7 @@ package com.trainerloop.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.trainerloop.domain.PowerZoneMath
 
 data class ZoneColorSet(
   val fill: Color,
@@ -14,16 +15,7 @@ object ZoneColors {
 
   /** 1..6 from %FTP using the existing bands: <55, <75, <90, <105, <120, else. Returns 1 when ftp <= 0. */
   fun zoneIndex(targetWatts: Int, ftp: Int): Int {
-    if (ftp <= 0) return 1
-    val percentFtp = targetWatts.toFloat() * 100f / ftp
-    return when {
-      percentFtp < 55f -> 1
-      percentFtp < 75f -> 2
-      percentFtp < 90f -> 3
-      percentFtp < 105f -> 4
-      percentFtp < 120f -> 5
-      else -> 6
-    }
+    return PowerZoneMath.zoneIndex(targetWatts, ftp)
   }
 
   fun forZone(zone: Int, dark: Boolean): ZoneColorSet {

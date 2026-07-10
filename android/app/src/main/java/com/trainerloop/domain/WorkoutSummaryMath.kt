@@ -87,6 +87,23 @@ object WorkoutSummaryMath {
     return samples.map { it.hrBpm }.average().toInt()
   }
 
+  /** Returns elapsed seconds spent in each power zone, indexed 0..5 for Z1..Z6. */
+  fun zoneTimeSec(samples: List<TelemetrySample>, ftp: Int): IntArray {
+    val secondsByZone = IntArray(6)
+    var previousTimeSec: Int? = null
+
+    samples.forEach { sample ->
+      val sampleSeconds = previousTimeSec
+        ?.let { (sample.timeSec - it).coerceAtLeast(1) }
+        ?: sample.timeSec.coerceAtLeast(1)
+      val zone = PowerZoneMath.zoneIndex(sample.powerWatts, ftp)
+      secondsByZone[zone - 1] += sampleSeconds
+      previousTimeSec = sample.timeSec
+    }
+
+    return secondsByZone
+  }
+
   fun normalizedPower(samples: List<TelemetrySample>): Int {
     if (samples.isEmpty()) return 0
     val windowSize = 30

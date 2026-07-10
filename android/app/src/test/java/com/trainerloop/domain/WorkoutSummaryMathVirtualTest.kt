@@ -30,4 +30,21 @@ class WorkoutSummaryMathVirtualTest {
     assertEquals(0.0, WorkoutSummaryMath.totalDistanceKm(samples), 1e-9)
     assertEquals(0, WorkoutSummaryMath.totalAscentM(samples))
   }
+
+  @Test
+  fun `zone time uses exact FTP boundaries`() {
+    val ftp = 100
+    val samples = listOf(55, 75, 90, 105, 120).mapIndexed { index, percent ->
+      sample(index + 1, null, null).copy(powerWatts = percent)
+    }
+
+    assertEquals(intArrayOf(0, 1, 1, 1, 1, 1).toList(), WorkoutSummaryMath.zoneTimeSec(samples, ftp).toList())
+  }
+
+  @Test
+  fun `zone time assigns all samples to Z1 when FTP is zero`() {
+    val samples = listOf(sample(1, null, null), sample(2, null, null), sample(3, null, null))
+
+    assertEquals(intArrayOf(3, 0, 0, 0, 0, 0).toList(), WorkoutSummaryMath.zoneTimeSec(samples, 0).toList())
+  }
 }
