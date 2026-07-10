@@ -1,6 +1,5 @@
 package com.trainerloop.domain.coach
 
-import java.util.UUID
 
 /**
  * Arbitration (§8.3–8.4): rate limits, per-rule cooldowns, dedupe, session
@@ -58,7 +57,7 @@ class FeedbackDecisionEngine(
     if (candidate.category == FeedbackCategory.MOTIVATION) motivationCount++
 
     return FeedbackItem(
-      id = UUID.randomUUID().toString(),
+      id = "${candidate.ruleId}-$activeSec",
       timestampSec = activeSec,
       category = candidate.category,
       severity = candidate.severity,

@@ -142,6 +142,12 @@ class AthleteStateModel(private val profile: UserProfile) {
   /** Flush rolling windows across pauses > 30 s or seeks. */
   fun invalidateWindows() {
     power3.clear(); power30.clear(); hr10.clear(); hr60.clear(); cadence10.clear()
+    hrValid.clear(); cadenceValid.clear(); powerValid.clear()
+    segPowerSum = 0.0; segPowerSqSum = 0.0; segPowerN = 0
+    segHrSum = 0.0; segHrN = 0; segStartHr = null
+    segEndHrWindow = RollingWindow(15)
+    segCadenceSum = 0.0; segCadenceN = 0; segInBand = 0
+    recoveryStartHr = null; recoveryElapsed = 0; hrr60 = null
   }
 
   private fun handleSegmentChange(ctx: IntervalContext?, targetMid: Double) {
@@ -299,6 +305,8 @@ class AthleteStateModel(private val profile: UserProfile) {
     }
 
     fun fraction(): Double = if (count == 0) 1.0 else trueCount.toDouble() / count
+
+    fun clear() { head = 0; count = 0; trueCount = 0 }
   }
 
   companion object {

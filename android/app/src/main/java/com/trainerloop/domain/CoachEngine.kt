@@ -366,9 +366,10 @@ class CoachEngine(
       val adherencePct = if (targetMid > 0) (avgPower / targetMid) * 100 else 0.0
       val cadenceVariance = if (cadenceValues.isNotEmpty()) stddev(cadenceValues) else 0.0
       val hrDriftPct = if (hrValues.size > 1) {
-        val min = hrValues.minOrNull() ?: 0
-        val max = hrValues.maxOrNull() ?: 0
-        if (min > 0) ((max - min) / min.toDouble()) * 100 else 0.0
+        val third = (hrValues.size / 3).coerceAtLeast(1)
+        val start = hrValues.take(third).average()
+        val end = hrValues.takeLast(third).average()
+        if (start > 0) ((end - start) / start) * 100 else 0.0
       } else 0.0
       return WindowMetrics(avgPower, adherencePct, cadenceVariance, hrDriftPct)
     }

@@ -40,6 +40,7 @@ class AnalyticsEngine(private val profile: UserProfile, coach: CoachProfile? = n
       final60Fired = false
       startSlotFired = false
       sustain.keys.filter { it.startsWith("interval:") }.forEach { sustain.remove(it) }
+      sustain.keys.filter { it.startsWith("pacing-") }.forEach { sustain.remove(it) }
     }
 
     val hr = state.hr10s
