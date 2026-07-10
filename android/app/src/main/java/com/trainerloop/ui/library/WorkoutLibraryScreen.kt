@@ -1,28 +1,35 @@
 package com.trainerloop.ui.library
 
-import java.util.Locale
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,9 +41,13 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -45,15 +56,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.Workout
 import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.components.WorkoutMiniChart
+import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
+import com.trainerloop.ui.theme.reducedMotionAware
+import java.util.Locale
+
+/** Momentum-class flourish for the favorite toggle; reduced motion resolves this to a snap. */
+private val StarBounceSpec = spring<Float>(dampingRatio = 0.7f, stiffness = 300f)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +83,21 @@ fun WorkoutLibraryScreen(
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val context = LocalContext.current
+  val snackbarHostState = remember { SnackbarHostState() }
+
+  LaunchedEffect(uiState.error) {
+    uiState.error?.let { message ->
+      snackbarHostState.showSnackbar(message)
+      viewModel.clearError()
+    }
+  }
+
+  LaunchedEffect(uiState.snackbarMessage) {
+    uiState.snackbarMessage?.let { message ->
+      snackbarHostState.showSnackbar(message)
+      viewModel.clearSnackbarMessage()
+    }
+  }
 
   // Pick up workouts saved by the builder while this ViewModel was alive
   androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refresh() }
@@ -77,16 +111,21 @@ fun WorkoutLibraryScreen(
     }
   }
 
-  Column(
-    modifier = Modifier
-      .fillMaxSize()
-      .padding(horizontal = Spacing.lg)
-  ) {
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically
+  Scaffold(
+    contentWindowInsets = WindowInsets(0),
+    snackbarHost = { SnackbarHost(snackbarHostState) }
+  ) { padding ->
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .padding(padding)
+        .padding(horizontal = Spacing.lg)
     ) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+      ) {
       Text(
         text = "Workouts",
         style = MaterialTheme.typography.headlineLarge
@@ -94,83 +133,84 @@ fun WorkoutLibraryScreen(
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (uiState.canSync) {
           Button(onClick = { viewModel.sync() }, enabled = !uiState.isSyncing) {
+            if (uiState.isSyncing) {
+              CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                color = MaterialTheme.colorScheme.onPrimary,
+                strokeWidth = 2.dp
+              )
+            } else {
+              Icon(Icons.Outlined.Sync, contentDescription = null)
+            }
+            Spacer(modifier = Modifier.width(Spacing.sm))
             Text(if (uiState.isSyncing) "Syncing…" else "Sync")
           }
         }
-        Button(onClick = {
+        IconButton(onClick = {
           importLauncher.launch(arrayOf("*/*"))
         }) {
-          Text("Import")
+          Icon(
+            imageVector = Icons.Outlined.UploadFile,
+            contentDescription = "Import workout file"
+          )
         }
       }
     }
 
-    Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(12.dp))
 
-    OutlinedTextField(
-      value = uiState.searchQuery,
-      onValueChange = viewModel::onSearchQueryChange,
-      modifier = Modifier.fillMaxWidth(),
-      placeholder = { Text("Search workouts") },
-      leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-      singleLine = true
-    )
+      OutlinedTextField(
+        value = uiState.searchQuery,
+        onValueChange = viewModel::onSearchQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = { Text("Search workouts") },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        singleLine = true
+      )
 
-    Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(12.dp))
 
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .horizontalScroll(rememberScrollState()),
-      horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-      uiState.categories.forEach { category ->
-        FilterChip(
-          selected = uiState.selectedCategory == category,
-          onClick = { viewModel.onCategorySelected(category) },
-          label = { Text(category.label, maxLines = 1, softWrap = false) }
-        )
-      }
-    }
-
-    Spacer(modifier = Modifier.height(Spacing.xl))
-
-    if (uiState.isLoading) {
-      CircularProgressIndicator()
-    }
-
-    LazyColumn(
-      modifier = Modifier.weight(1f),
-      verticalArrangement = Arrangement.spacedBy(Spacing.md)
-    ) {
-      item(key = "ftp-ramp-test-card") {
-        RampTestCard(onClick = onStartRampTest)
-      }
-      items(uiState.filteredWorkouts, key = { it.workout.id }) { item ->
-        WorkoutCard(
-          item = item,
-          ftp = ftp,
-          isFavorite = item.workout.id in uiState.favoriteIds,
-          canDelete = item.workout.id in uiState.deletableIds,
-          onClick = { onWorkoutSelected(item.workout) },
-          onToggleFavorite = { viewModel.toggleFavorite(item.workout.id) },
-          onDuplicate = { viewModel.duplicateWorkout(item.workout) },
-          onDelete = { viewModel.deleteWorkout(item.workout.id) }
-        )
-      }
-    }
-  }
-
-  uiState.error?.let { error ->
-    Snackbar(
-      modifier = Modifier.padding(Spacing.lg),
-      action = {
-        androidx.compose.material3.TextButton(onClick = { viewModel.clearError() }) {
-          Text("Dismiss")
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        uiState.categories.forEach { category ->
+          FilterChip(
+            selected = uiState.selectedCategory == category,
+            onClick = { viewModel.onCategorySelected(category) },
+            label = { Text(category.label, maxLines = 1, softWrap = false) }
+          )
         }
       }
-    ) {
-      Text(error)
+
+      Spacer(modifier = Modifier.height(Spacing.xl))
+
+      if (uiState.isLoading) {
+        CircularProgressIndicator()
+      }
+
+      LazyColumn(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+      ) {
+        item(key = "ftp-ramp-test-card") {
+          RampTestCard(onClick = onStartRampTest)
+        }
+        items(uiState.filteredWorkouts, key = { it.workout.id }) { item ->
+          WorkoutCard(
+            item = item,
+            ftp = ftp,
+            isFavorite = item.workout.id in uiState.favoriteIds,
+            canDelete = item.workout.id in uiState.deletableIds,
+            onClick = { onWorkoutSelected(item.workout) },
+            onToggleFavorite = { viewModel.toggleFavorite(item.workout.id) },
+            onDuplicate = { viewModel.duplicateWorkout(item.workout) },
+            onDelete = { viewModel.deleteWorkout(item.workout.id) }
+          )
+        }
+      }
     }
   }
 }
@@ -179,27 +219,44 @@ fun WorkoutLibraryScreen(
 private fun RampTestCard(onClick: () -> Unit) {
   val interactionSource = remember { MutableInteractionSource() }
 
-  Card(
+  OutlinedCard(
     onClick = onClick,
     modifier = Modifier
       .fillMaxWidth()
       .pressable(interactionSource),
     interactionSource = interactionSource,
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.primaryContainer
-    )
   ) {
-    Column(modifier = Modifier.padding(Spacing.lg)) {
-      Text(
-        text = "FTP Ramp Test",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onPrimaryContainer
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(Spacing.lg),
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      Icon(
+        imageVector = Icons.Outlined.MonitorHeart,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.size(28.dp)
       )
-      Text(
-        text = "Ramp to exhaustion — new FTP is 75% of your best 1-minute power",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onPrimaryContainer
+      Spacer(modifier = Modifier.width(Spacing.md))
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = "FTP Ramp Test",
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold
+        )
+        Text(
+          text = "Ramp to exhaustion to estimate your FTP",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+      }
+      Icon(
+        imageVector = Icons.Default.ChevronRight,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant
       )
     }
   }
@@ -220,6 +277,11 @@ private fun WorkoutCard(
   val stats = item.stats
   var menuOpen by remember { mutableStateOf(false) }
   val interactionSource = remember { MutableInteractionSource() }
+  val starScale by animateFloatAsState(
+    targetValue = if (isFavorite) 1.08f else 1f,
+    animationSpec = reducedMotionAware(StarBounceSpec),
+    label = "favorite-star-bounce"
+  )
 
   Card(
     onClick = onClick,
@@ -252,7 +314,13 @@ private fun WorkoutCard(
           fontWeight = FontWeight.SemiBold,
           modifier = Modifier.weight(1f)
         )
-        IconButton(onClick = onToggleFavorite) {
+        IconButton(
+          onClick = onToggleFavorite,
+          modifier = Modifier.graphicsLayer {
+            scaleX = starScale
+            scaleY = starScale
+          }
+        ) {
           Icon(
             imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
             contentDescription = if (isFavorite) "Unfavorite" else "Favorite",
@@ -285,30 +353,20 @@ private fun WorkoutCard(
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
       }
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
-      ) {
-        Text(
-          text = "${formatDuration(stats.durationSec)}",
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+      val meta = buildList {
+        add(formatDuration(stats.durationSec))
         stats.plannedIntensityFactor?.let { intensityFactor ->
-          Text(
-            text = "IF ${String.format(Locale.ROOT, "%.2f", intensityFactor)}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
+          add("IF ${String.format(Locale.ROOT, "%.2f", intensityFactor)}")
         }
-        stats.plannedTss?.let { tss ->
-          Text(
-            text = "TSS $tss",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
-      }
+        stats.plannedTss?.let { tss -> add("TSS $tss") }
+      }.joinToString(" · ")
+      Text(
+        text = meta,
+        style = NumericSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis
+      )
     }
   }
 }

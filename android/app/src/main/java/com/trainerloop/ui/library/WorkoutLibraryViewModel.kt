@@ -40,6 +40,7 @@ data class LibraryUiState(
   val categories: List<WorkoutCategory> = WorkoutCategory.entries,
   val isLoading: Boolean = false,
   val error: String? = null,
+  val snackbarMessage: String? = null,
   val canSync: Boolean = false,
   val isSyncing: Boolean = false,
   /** Ids the user has starred; these sort to the top. */
@@ -161,7 +162,11 @@ class WorkoutLibraryViewModel @JvmOverloads constructor(
     val apiKey = profile.intervalsIcuApiKey
     if (athleteId.isBlank() || apiKey.isBlank()) return
 
-    _uiState.value = _uiState.value.copy(isSyncing = true, error = null)
+    _uiState.value = _uiState.value.copy(
+      isSyncing = true,
+      error = null,
+      snackbarMessage = null
+    )
     viewModelScope.launch {
       try {
         val client = IntervalsIcuClient(apiKey)
@@ -184,7 +189,10 @@ class WorkoutLibraryViewModel @JvmOverloads constructor(
         }
 
         loadWorkouts()
-        _uiState.value = _uiState.value.copy(isSyncing = false)
+        _uiState.value = _uiState.value.copy(
+          isSyncing = false,
+          snackbarMessage = "Workouts synced"
+        )
       } catch (e: Exception) {
         _uiState.value = _uiState.value.copy(isSyncing = false, error = "Sync failed: ${e.message}")
       }
@@ -193,6 +201,10 @@ class WorkoutLibraryViewModel @JvmOverloads constructor(
 
   fun clearError() {
     _uiState.value = _uiState.value.copy(error = null)
+  }
+
+  fun clearSnackbarMessage() {
+    _uiState.value = _uiState.value.copy(snackbarMessage = null)
   }
 
   private fun Workout.toListItem(ftp: Int): WorkoutListItem {
