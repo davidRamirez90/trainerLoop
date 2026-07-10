@@ -137,7 +137,11 @@ class WorkoutViewModel(
   private var segments: List<WorkoutSegment> = workout.segments
 
   private val _uiState = MutableStateFlow(
-    WorkoutUiState(segments = workout.segments, elevationProfile = route?.expectedAltitudeM)
+    WorkoutUiState(
+      segments = workout.segments,
+      elevationProfile = route?.expectedAltitudeM,
+      intensityOffsetPct = userProfile.ergBiasPct.coerceIn(-20, 20)
+    )
   )
   val uiState: StateFlow<WorkoutUiState> = _uiState.asStateFlow()
 
@@ -336,7 +340,7 @@ class WorkoutViewModel(
     sessionStartMs = null
     recorder.value?.reset(clock.sessionId.value)
     _uiState.value = _uiState.value.copy(
-      intensityOffsetPct = 0,
+      intensityOffsetPct = userProfile.ergBiasPct.coerceIn(-20, 20),
       samples = emptyList()
     )
   }

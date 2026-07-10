@@ -9,6 +9,7 @@ import com.trainerloop.ble.model.Stamped
 import com.trainerloop.data.model.SegmentPhase
 import com.trainerloop.data.model.CoachAction
 import com.trainerloop.data.model.TargetRange
+import com.trainerloop.data.model.UserProfile
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
@@ -231,6 +232,31 @@ class WorkoutViewModelTest {
     val state = viewModel.uiState.value
     assertEquals(5, state.intensityOffsetPct)
     assertTrue(state.targetRange.low > 0)
+  }
+
+  @Test
+  fun `initial intensity offset honors saved erg bias`() = runTest(testDispatcher) {
+    val viewModel = WorkoutViewModel(
+      workout = sampleWorkout(),
+      dispatcher = testDispatcher,
+      userProfile = UserProfile(ergBiasPct = 5)
+    )
+
+    assertEquals(5, viewModel.uiState.value.intensityOffsetPct)
+  }
+
+  @Test
+  fun `stop resets intensity offset to saved erg bias`() = runTest(testDispatcher) {
+    val viewModel = WorkoutViewModel(
+      workout = sampleWorkout(),
+      dispatcher = testDispatcher,
+      userProfile = UserProfile(ergBiasPct = 5)
+    )
+
+    viewModel.adjustIntensityUp()
+    viewModel.stop()
+
+    assertEquals(5, viewModel.uiState.value.intensityOffsetPct)
   }
 
   @Test

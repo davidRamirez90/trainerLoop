@@ -74,9 +74,10 @@ class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(appli
   fun refresh() = loadWorkouts()
 
   private fun loadWorkouts() {
-    val builtIn = BuiltInWorkouts.all().map { it.toListItem() }
+    val ftp = profileRepository.getProfileSync().ftp
+    val builtIn = BuiltInWorkouts.all().map { it.toListItem(ftp) }
     val stored = loadImportedWorkouts()
-    val imported = stored.map { it.toListItem() }
+    val imported = stored.map { it.toListItem(ftp) }
     val all = builtIn + imported
     _uiState.value = _uiState.value.copy(
       workouts = all,
@@ -127,7 +128,11 @@ class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(appli
     _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
     viewModelScope.launch {
-      val result = WorkoutImportHelper.importWorkout(context, uri)
+      val result = WorkoutImportHelper.importWorkout(
+        context,
+        uri,
+        profileRepository.getProfileSync().ftp
+      )
       if (result != null) {
         saveImportedWorkout(result)
         loadWorkouts()
@@ -178,21 +183,21 @@ class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(appli
     _uiState.value = _uiState.value.copy(error = null)
   }
 
-  private fun Workout.toListItem(): WorkoutListItem {
+  private fun Workout.toListItem(ftp: Int): WorkoutListItem {
     return WorkoutListItem(
       workout = this,
-      category = categorize(this),
-      stats = WorkoutSummaryMath.workoutStats(this)
+      category = categorize(this, ftp),
+      stats = WorkoutSummaryMath.workoutStats(this, ftp)
     )
   }
 
-  private fun categorize(workout: Workout): WorkoutCategory {
+  private fun categorize(workout: Workout, ftp: Int): WorkoutCategory {
     return when (workout.id) {
       "endurance" -> WorkoutCategory.ENDURANCE
       "sweet_spot" -> WorkoutCategory.SWEET_SPOT
       "pyramid" -> WorkoutCategory.THRESHOLD
       else -> {
-        val ifactor = WorkoutSummaryMath.workoutStats(workout).intensityFactor
+        val ifactor = WorkoutSummaryMath.workoutStats(workout, ftp).intensityFactor
         when {
           ifactor < 0.75 -> WorkoutCategory.ENDURANCE
           ifactor < 0.90 -> WorkoutCategory.SWEET_SPOT

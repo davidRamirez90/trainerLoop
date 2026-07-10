@@ -42,7 +42,7 @@ object WorkoutSummaryMath {
     return ((activeSec * np * ifactor) / (ftp * 3600.0) * 100.0).toInt()
   }
 
-  fun workoutStats(workout: Workout, ftp: Int = 250): WorkoutStats {
+  fun workoutStats(workout: Workout, ftp: Int): WorkoutStats {
     val np = normalizedPower(workout)
     val ifactor = intensityFactor(np, ftp)
     val activeSec = WorkoutMath.totalDurationSec(workout.segments)

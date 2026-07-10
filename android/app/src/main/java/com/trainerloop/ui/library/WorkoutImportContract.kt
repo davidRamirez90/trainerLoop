@@ -20,7 +20,7 @@ object WorkoutImportHelper {
     "*/*"
   )
 
-  suspend fun importWorkout(context: Context, uri: Uri, ftp: Int = 250): ImportedWorkout? {
+  suspend fun importWorkout(context: Context, uri: Uri, ftp: Int): ImportedWorkout? {
     return try {
       val inputStream = context.contentResolver.openInputStream(uri) ?: return null
       val content = inputStream.bufferedReader().use { it.readText() }
