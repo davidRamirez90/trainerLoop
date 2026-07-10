@@ -17,4 +17,11 @@ object BleConstants {
   val DEVICE_INFO_SERVICE = UUID.fromString("0000180A-0000-1000-8000-00805f9b34fb")
   val MANUFACTURER_NAME = UUID.fromString("00002A29-0000-1000-8000-00805f9b34fb")
   val MODEL_NUMBER = UUID.fromString("00002A24-0000-1000-8000-00805f9b34fb")
+
+  // Zwift Click — proprietary controller service (community reverse-engineered,
+  // see docs/plans/2026-07-10-zwift-click-shifter-plan.md "Protocol Reference").
+  val ZWIFT_CLICK_SERVICE = UUID.fromString("00000001-19CA-4651-86E5-FA29DCDD09D1")
+  val ZWIFT_CLICK_ASYNC = UUID.fromString("00000002-19CA-4651-86E5-FA29DCDD09D1")
+  val ZWIFT_CLICK_SYNC_RX = UUID.fromString("00000003-19CA-4651-86E5-FA29DCDD09D1")
+  val ZWIFT_CLICK_SYNC_TX = UUID.fromString("00000004-19CA-4651-86E5-FA29DCDD09D1")
 }
