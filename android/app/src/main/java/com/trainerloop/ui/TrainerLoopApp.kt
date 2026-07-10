@@ -8,8 +8,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.DirectionsRun
-import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -445,10 +444,10 @@ private fun readAndDeleteFile(path: String): String? = runCatching {
 private val Screen.icon: ImageVector
   get() = when (this) {
     Screen.Home -> Icons.Default.Home
-    Screen.Workouts -> Icons.Default.FitnessCenter
+    Screen.Workouts -> Icons.AutoMirrored.Filled.DirectionsBike
     Screen.History -> Icons.Default.History
     Screen.Profile -> Icons.Default.Person
-    else -> Icons.AutoMirrored.Filled.DirectionsRun
+    else -> Icons.AutoMirrored.Filled.DirectionsBike
   }
 
 private val Screen.label: String

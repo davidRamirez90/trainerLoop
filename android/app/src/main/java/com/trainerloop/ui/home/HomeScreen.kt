@@ -22,7 +22,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -231,7 +230,7 @@ private fun StartRideHero(onStartFreeRide: () -> Unit) {
         )
       ) {
         Icon(
-          imageVector = Icons.Default.FitnessCenter,
+          imageVector = Icons.AutoMirrored.Filled.DirectionsBike,
           contentDescription = null,
           modifier = Modifier.padding(end = 8.dp)
         )
@@ -424,7 +423,7 @@ private fun ActionRows(
   Card(modifier = Modifier.fillMaxWidth()) {
     Column {
       ActionRow(
-        icon = Icons.Default.FitnessCenter,
+        icon = Icons.AutoMirrored.Filled.DirectionsBike,
         label = "Workout Library",
         onClick = onWorkoutLibrary
       )
