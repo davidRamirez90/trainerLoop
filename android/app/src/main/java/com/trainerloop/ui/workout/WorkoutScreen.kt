@@ -56,7 +56,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -85,8 +85,8 @@ fun WorkoutScreen(
   onSessionFinished: (WorkoutFinishData) -> Unit,
   onExit: () -> Unit
 ) {
-  val uiState by viewModel.uiState.collectAsState()
-  val finishData by viewModel.finishEvent.collectAsState()
+  val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val finishData by viewModel.finishEvent.collectAsStateWithLifecycle()
   val view = LocalView.current
   val context = LocalContext.current
   val ftp = remember { com.trainerloop.data.repository.ProfileRepository(context).getProfileSync().ftp }

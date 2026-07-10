@@ -28,7 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -52,7 +52,7 @@ fun HistoryScreen(
   onSessionClick: (String) -> Unit,
   viewModel: HistoryViewModel = viewModel()
 ) {
-  val sessions by viewModel.sessions.collectAsState()
+  val sessions by viewModel.sessions.collectAsStateWithLifecycle()
 
   if (sessions.isEmpty()) {
     Box(

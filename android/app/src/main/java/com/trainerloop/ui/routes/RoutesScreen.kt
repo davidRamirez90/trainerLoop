@@ -24,7 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,8 +39,8 @@ fun RoutesScreen(
   onBack: () -> Unit,
   viewModel: RoutesViewModel = viewModel()
 ) {
-  val routes by viewModel.routes.collectAsState()
-  val importError by viewModel.importError.collectAsState()
+  val routes by viewModel.routes.collectAsStateWithLifecycle()
+  val importError by viewModel.importError.collectAsStateWithLifecycle()
 
   val picker = rememberLauncherForActivityResult(
     ActivityResultContracts.OpenDocument()

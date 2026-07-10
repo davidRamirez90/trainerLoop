@@ -39,7 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import android.annotation.SuppressLint
@@ -68,8 +68,8 @@ fun HomeScreen(
   onGpxRoutes: () -> Unit,
   viewModel: HomeViewModel = viewModel()
 ) {
-  val uiState by viewModel.uiState.collectAsState()
-  val plannedReady by viewModel.plannedWorkoutReady.collectAsState()
+  val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val plannedReady by viewModel.plannedWorkoutReady.collectAsStateWithLifecycle()
 
   LaunchedEffect(plannedReady) {
     plannedReady?.let {
