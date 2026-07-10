@@ -87,7 +87,7 @@ fun DevicesScreen(
         )
       }
 
-      if (uiState.connectedTrainer == null && uiState.connectedHr == null) {
+      if (uiState.connectedTrainer == null && uiState.connectedHr == null && uiState.connectedClick == null) {
         item {
           Text(
             text = "No devices paired yet. Connect a trainer or HR sensor below.",
@@ -122,6 +122,17 @@ fun DevicesScreen(
         }
       }
 
+      uiState.connectedClick?.let { device ->
+        item {
+          PairedDeviceCard(
+            name = device.name ?: "Zwift Click",
+            connected = true,
+            detail = uiState.clickBattery?.let { "Battery $it%" } ?: "Connected",
+            onDisconnect = { viewModel.disconnectClick() }
+          )
+        }
+      }
+
       item { Spacer(modifier = Modifier.height(8.dp)) }
 
       // Available Devices
@@ -135,10 +146,12 @@ fun DevicesScreen(
 
       val pairedAddresses = setOfNotNull(
         uiState.connectedTrainer?.address,
-        uiState.connectedHr?.address
+        uiState.connectedHr?.address,
+        uiState.connectedClick?.address
       )
       val availableTrainers = uiState.trainerDevices.filter { it.address !in pairedAddresses }
       val availableHr = uiState.hrDevices.filter { it.address !in pairedAddresses }
+      val availableControllers = uiState.clickDevices.filter { it.address !in pairedAddresses }
 
       if (availableTrainers.isNotEmpty()) {
         item {
@@ -174,7 +187,24 @@ fun DevicesScreen(
         }
       }
 
-      if (availableTrainers.isEmpty() && availableHr.isEmpty() && !uiState.isScanning) {
+      if (availableControllers.isNotEmpty()) {
+        item {
+          Text(
+            text = "Controllers",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
+        items(availableControllers) { device ->
+          AvailableDeviceCard(
+            device = device,
+            isConnecting = uiState.isConnectingClick && uiState.pendingClickAddress == device.address,
+            onConnect = { viewModel.connectClick(device) }
+          )
+        }
+      }
+
+      if (availableTrainers.isEmpty() && availableHr.isEmpty() && availableControllers.isEmpty() && !uiState.isScanning) {
         item {
           Text(
             text = "No devices found. Tap Scan to search.",
