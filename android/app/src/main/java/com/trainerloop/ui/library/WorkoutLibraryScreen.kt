@@ -46,8 +46,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.Workout
-import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.ui.components.WorkoutMiniChart
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -62,7 +62,7 @@ fun WorkoutLibraryScreen(
 
   // Pick up workouts saved by the builder while this ViewModel was alive
   androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refresh() }
-  val ftp = remember { ProfileRepository(context).getProfileSync().ftp }
+  val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
 
   val importLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.OpenDocument()

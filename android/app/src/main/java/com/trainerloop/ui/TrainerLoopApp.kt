@@ -152,7 +152,7 @@ fun TrainerLoopApp(
             .getById(routeId)
         }
         val loaded = route ?: return@composable
-        val profile = remember { com.trainerloop.data.repository.ProfileRepository(context).getProfileSync() }
+        val profile = remember { app.profileRepository.getProfileSync() }
         val freeRideFactory = remember(
           loaded, routeId, app.ftmsManager, app.hrManager, app.ftmsControlManager,
           app.clickManager, profile
@@ -202,12 +202,13 @@ fun TrainerLoopApp(
 
       composable(Screen.Workouts.route) {
         val context = LocalContext.current
+        val app = context.trainerLoopApp
         WorkoutLibraryScreen(
           onWorkoutSelected = { workout ->
             navController.navigate(Screen.WorkoutDetail.createRoute(workout.id))
           },
           onStartRampTest = {
-            val ftp = com.trainerloop.data.repository.ProfileRepository(context).getProfileSync().ftp
+            val ftp = app.profileRepository.getProfileSync().ftp
             navController.navigate(
               Screen.WorkoutPlayer.createRoute(
                 sessionId = System.currentTimeMillis(),
@@ -246,8 +247,9 @@ fun TrainerLoopApp(
         arguments = listOf(navArgument("workoutId") { type = NavType.StringType })
       ) { backStackEntry ->
         val context = LocalContext.current
+        val app = context.trainerLoopApp
         val workoutId = backStackEntry.arguments?.getString("workoutId") ?: return@composable
-        val ftp = remember { com.trainerloop.data.repository.ProfileRepository(context).getProfileSync().ftp }
+        val ftp = remember { app.profileRepository.getProfileSync().ftp }
         val workout = remember(workoutId) {
           WorkoutResolver.resolve(
             workoutId,
@@ -282,7 +284,7 @@ fun TrainerLoopApp(
       ) { backStackEntry ->
         val context = LocalContext.current
         val app = context.trainerLoopApp
-        val profile = remember { com.trainerloop.data.repository.ProfileRepository(context).getProfileSync() }
+        val profile = remember { app.profileRepository.getProfileSync() }
         val workoutId = backStackEntry.arguments?.getString("workoutId") ?: return@composable
         val workout = remember(workoutId, profile.ftp) {
           WorkoutResolver.resolve(

@@ -39,8 +39,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.SessionSummary
-import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.ui.components.zoneColor
 import java.time.Instant
 import java.time.LocalDate
@@ -166,7 +166,7 @@ private const val STRIPE_DAYS = 42
 @Composable
 private fun WeekStripes(sessions: List<SessionSummary>) {
   val context = LocalContext.current
-  val resolvedFtp = remember { ProfileRepository(context).getProfileSync().ftp }
+  val resolvedFtp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
 
   // Aggregate sessions per local day.
   data class DayLoad(val durationSec: Int, val avgPower: Int)

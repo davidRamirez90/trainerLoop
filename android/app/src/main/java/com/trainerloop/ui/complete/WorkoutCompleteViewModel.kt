@@ -3,6 +3,7 @@ package com.trainerloop.ui.complete
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.trainerloop.app.TrainerLoopApplication
 import com.trainerloop.data.model.SessionData
 import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.repository.IcuActivityUploader
@@ -66,7 +67,8 @@ class WorkoutCompleteViewModel(
   private val sessionType: String = "WORKOUT",
   private val routeId: String? = null,
   private val completed: Boolean = false,
-  private val profileRepository: ProfileRepository = ProfileRepository(application),
+  private val profileRepository: ProfileRepository =
+    (application as? TrainerLoopApplication)?.profileRepository ?: ProfileRepository(application),
   private val sessionRepository: SessionRepository = SessionRepository.create(AppDatabase.getInstance(application))
 ) : AndroidViewModel(application) {
 

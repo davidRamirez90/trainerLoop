@@ -90,7 +90,7 @@ fun WorkoutScreen(
   val finishData by viewModel.finishEvent.collectAsStateWithLifecycle()
   val view = LocalView.current
   val context = LocalContext.current
-  val ftp = remember { com.trainerloop.data.repository.ProfileRepository(context).getProfileSync().ftp }
+  val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
   var showStopConfirm by remember { mutableStateOf(false) }
 
   fun requestStop() {

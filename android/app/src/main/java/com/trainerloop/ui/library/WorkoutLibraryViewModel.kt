@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.trainerloop.app.TrainerLoopApplication
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSource
 import com.trainerloop.data.repository.ProfileRepository
@@ -46,19 +47,26 @@ data class LibraryUiState(
   val deletableIds: Set<String> = emptySet()
 )
 
-class WorkoutLibraryViewModel(application: Application) : AndroidViewModel(application) {
-
-  private val profileRepository = ProfileRepository(application)
+class WorkoutLibraryViewModel(
+  application: Application,
+  private val profileRepository: ProfileRepository =
+    (application as? TrainerLoopApplication)?.profileRepository ?: ProfileRepository(application)
+) : AndroidViewModel(application) {
 
   private val _uiState = MutableStateFlow(LibraryUiState())
   val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
 
   init {
     loadWorkouts()
-    val profile = profileRepository.getProfileSync()
-    _uiState.value = _uiState.value.copy(
-      canSync = profile.intervalsIcuAthleteId.isNotBlank() && profile.intervalsIcuApiKey.isNotBlank()
-    )
+    viewModelScope.launch {
+      profileRepository.profile.collect { profile ->
+        _uiState.value = _uiState.value.copy(
+          canSync = profile.intervalsIcuAthleteId.isNotBlank() &&
+            profile.intervalsIcuApiKey.isNotBlank()
+        )
+        loadWorkouts()
+      }
+    }
   }
 
   fun onSearchQueryChange(query: String) {

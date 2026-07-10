@@ -34,8 +34,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.TelemetrySample
-import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.domain.WorkoutSummaryMath
 import com.trainerloop.ui.components.SampleChart
 import kotlinx.serialization.builtins.ListSerializer
@@ -91,7 +91,7 @@ fun SessionDetailScreen(
       emptyList()
     }
     val np = WorkoutSummaryMath.normalizedPower(samples)
-    val ftp = ProfileRepository(context).getProfileSync().ftp
+    val ftp = context.trainerLoopApp.profileRepository.getProfileSync().ftp
     val ifactor = WorkoutSummaryMath.intensityFactor(np, ftp)
     val tss = WorkoutSummaryMath.tss(np, ftp, s.durationSec)
 

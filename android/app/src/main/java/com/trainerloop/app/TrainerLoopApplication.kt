@@ -9,6 +9,7 @@ import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
 import com.trainerloop.ble.BleLog
 import com.trainerloop.ble.ZwiftClickManager
+import com.trainerloop.data.repository.ProfileRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,6 +22,8 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.launch
 
 class TrainerLoopApplication : Application(), ManagerProvider {
+
+  val profileRepository: ProfileRepository by lazy { ProfileRepository(this) }
 
   private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 

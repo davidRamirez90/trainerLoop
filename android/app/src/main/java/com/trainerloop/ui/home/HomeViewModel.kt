@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.trainerloop.app.ManagerProvider
+import com.trainerloop.app.TrainerLoopApplication
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
@@ -45,18 +46,18 @@ data class HomeUiState(
 
 class HomeViewModel(
   application: Application,
-  private val profileRepository: ProfileRepository,
+  private val profileRepository: ProfileRepository =
+    (application as? TrainerLoopApplication)?.profileRepository ?: ProfileRepository(application),
   private val sessionRepository: SessionRepository,
   private val managerProvider: ManagerProvider,
   private val coroutineScope: CoroutineScope? = null
 ) : AndroidViewModel(application) {
 
   constructor(application: Application) : this(
-    application,
-    ProfileRepository(application),
-    SessionRepository.create(AppDatabase.getInstance(application)),
-    application.trainerLoopApp,
-    null
+    application = application,
+    sessionRepository = SessionRepository.create(AppDatabase.getInstance(application)),
+    managerProvider = application.trainerLoopApp,
+    coroutineScope = null
   )
 
   private val scope: CoroutineScope

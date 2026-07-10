@@ -37,8 +37,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.Workout
-import com.trainerloop.data.repository.ProfileRepository
 import com.trainerloop.ui.components.WorkoutMiniChart
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,7 +52,7 @@ fun WorkoutDetailScreen(
   )
 ) {
   val context = LocalContext.current
-  val ftp = remember { ProfileRepository(context).getProfileSync().ftp }
+  val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
   Scaffold(
     topBar = {
       TopAppBar(

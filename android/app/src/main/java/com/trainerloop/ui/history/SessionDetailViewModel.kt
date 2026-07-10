@@ -3,6 +3,7 @@ package com.trainerloop.ui.history
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.trainerloop.app.TrainerLoopApplication
 import com.trainerloop.data.model.SessionData
 import com.trainerloop.data.repository.IcuActivityUploader
 import com.trainerloop.data.repository.ProfileRepository
@@ -26,7 +27,8 @@ class SessionDetailViewModel(
   private val sessionId: String,
   private val sessionRepository: SessionRepository =
     SessionRepository.create(AppDatabase.getInstance(application)),
-  private val profileRepository: ProfileRepository = ProfileRepository(application)
+  private val profileRepository: ProfileRepository =
+    (application as? TrainerLoopApplication)?.profileRepository ?: ProfileRepository(application)
 ) : AndroidViewModel(application) {
 
   private val _uiState = MutableStateFlow(SessionDetailUiState())

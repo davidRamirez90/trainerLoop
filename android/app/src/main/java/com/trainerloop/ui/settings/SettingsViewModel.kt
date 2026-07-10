@@ -3,6 +3,7 @@ package com.trainerloop.ui.settings
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.trainerloop.app.TrainerLoopApplication
 import com.trainerloop.data.repository.ProfileRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,8 +31,11 @@ data class SettingsUiState(
   val isSaved: Boolean = false
 )
 
-class SettingsViewModel(application: Application) : AndroidViewModel(application) {
-  private val repository = ProfileRepository(application)
+class SettingsViewModel(
+  application: Application,
+  private val repository: ProfileRepository =
+    (application as? TrainerLoopApplication)?.profileRepository ?: ProfileRepository(application)
+) : AndroidViewModel(application) {
 
   private val _uiState = MutableStateFlow(SettingsUiState())
   val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
