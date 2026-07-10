@@ -5,13 +5,14 @@ import com.trainerloop.data.model.SessionSummary
 import com.trainerloop.data.source.local.AppDatabase
 import com.trainerloop.data.source.local.SessionDao
 import com.trainerloop.data.source.local.SessionEntity
+import com.trainerloop.data.source.local.SessionSummaryRow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 open class SessionRepository(private val dao: SessionDao) {
 
     open fun summaries(): Flow<List<SessionSummary>> =
-        dao.getAll().map { rows -> rows.map(::toSummary) }
+        dao.getSummaries().map { rows -> rows.map(::toSummary) }
 
     open suspend fun save(session: SessionData) {
         dao.insert(toEntity(session))
@@ -47,7 +48,7 @@ open class SessionRepository(private val dao: SessionDao) {
         routeId = s.routeId
     )
 
-    private fun toSummary(e: SessionEntity): SessionSummary = SessionSummary(
+    private fun toSummary(e: SessionSummaryRow): SessionSummary = SessionSummary(
         id = e.id,
         workoutId = e.workoutId,
         workoutName = e.workoutName,

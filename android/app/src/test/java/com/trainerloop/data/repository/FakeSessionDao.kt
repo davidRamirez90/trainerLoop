@@ -2,14 +2,33 @@ package com.trainerloop.data.repository
 
 import com.trainerloop.data.source.local.SessionDao
 import com.trainerloop.data.source.local.SessionEntity
+import com.trainerloop.data.source.local.SessionSummaryRow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
 /** In-memory [SessionDao] fake shared by the repository/uploader JVM tests. */
 class FakeSessionDao : SessionDao {
   private val rows = MutableStateFlow<List<SessionEntity>>(emptyList())
 
-  override fun getAll(): Flow<List<SessionEntity>> = rows
+  override fun getSummaries(): Flow<List<SessionSummaryRow>> = rows.map { entities ->
+    entities.map { entity ->
+      SessionSummaryRow(
+        id = entity.id,
+        workoutId = entity.workoutId,
+        workoutName = entity.workoutName,
+        startedAt = entity.startedAt,
+        endedAt = entity.endedAt,
+        durationSec = entity.durationSec,
+        completed = entity.completed,
+        avgPower = entity.avgPower,
+        maxPower = entity.maxPower,
+        avgCadence = entity.avgCadence,
+        avgHr = entity.avgHr,
+        icuSyncedAt = entity.icuSyncedAt
+      )
+    }
+  }
 
   override suspend fun insert(entity: SessionEntity) {
     rows.value = rows.value

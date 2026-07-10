@@ -12,8 +12,11 @@ interface SessionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: SessionEntity)
 
-    @Query("SELECT * FROM sessions ORDER BY startedAt DESC")
-    fun getAll(): Flow<List<SessionEntity>>
+    @Query(
+        "SELECT id, workoutId, workoutName, startedAt, endedAt, durationSec, completed, " +
+            "avgPower, maxPower, avgCadence, avgHr, icuSyncedAt FROM sessions ORDER BY startedAt DESC"
+    )
+    fun getSummaries(): Flow<List<SessionSummaryRow>>
 
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun getById(id: String): SessionEntity?
@@ -27,3 +30,18 @@ interface SessionDao {
     @Query("UPDATE sessions SET icuSyncedAt = :syncedAt WHERE id = :id")
     suspend fun markIcuSynced(id: String, syncedAt: String)
 }
+
+data class SessionSummaryRow(
+    val id: String,
+    val workoutId: String,
+    val workoutName: String,
+    val startedAt: String,
+    val endedAt: String?,
+    val durationSec: Int,
+    val completed: Boolean,
+    val avgPower: Int,
+    val maxPower: Int,
+    val avgCadence: Int,
+    val avgHr: Int,
+    val icuSyncedAt: String?
+)
