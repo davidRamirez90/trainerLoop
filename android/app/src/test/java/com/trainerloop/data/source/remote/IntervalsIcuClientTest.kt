@@ -4,6 +4,9 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
+import java.net.ServerSocket
+import kotlin.concurrent.thread
 
 class IntervalsIcuClientTest {
 
@@ -47,5 +50,34 @@ class IntervalsIcuClientTest {
     org.junit.Assert.assertFalse(IntervalsIcuClient.isUploadAccepted(422, """{"error":"Invalid file"}"""))
     org.junit.Assert.assertFalse(IntervalsIcuClient.isUploadAccepted(401, "unauthorized"))
     org.junit.Assert.assertFalse(IntervalsIcuClient.isUploadAccepted(500, "boom"))
+  }
+
+  @Test
+  fun `GET failures throw typed HTTP exception`() = runBlocking {
+    val server = ServerSocket(0)
+    val serverThread = thread {
+      server.accept().use { socket ->
+        val input = socket.getInputStream().bufferedReader()
+        while (input.readLine().orEmpty().isNotEmpty()) { }
+        val body = "unauthorized"
+        socket.getOutputStream().bufferedWriter().use { output ->
+          output.write("HTTP/1.1 401 Unauthorized\r\nContent-Length: ${body.length}\r\n\r\n$body")
+          output.flush()
+        }
+      }
+    }
+    try {
+      val client = IntervalsIcuClient("key", "http://127.0.0.1:${server.localPort}")
+      try {
+        client.getAthlete("a")
+        org.junit.Assert.fail("Expected HTTP failure")
+      } catch (e: IntervalsIcuHttpException) {
+        assertEquals(401, e.statusCode)
+        assertEquals("unauthorized", e.responseBody)
+      }
+    } finally {
+      server.close()
+      serverThread.join(1000)
+    }
   }
 }

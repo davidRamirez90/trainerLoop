@@ -8,6 +8,12 @@ import kotlinx.serialization.json.Json
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Base64
+import java.net.URLEncoder
+
+class IntervalsIcuHttpException(
+  val statusCode: Int,
+  val responseBody: String
+) : Exception("intervals.icu returned HTTP $statusCode")
 
 @Serializable
 data class IntervalsIcuAthlete(
@@ -23,12 +29,15 @@ data class IntervalsIcuEvent(
 )
 
 /** Thin client for the intervals.icu REST API — HttpURLConnection, no new HTTP dependency. */
-class IntervalsIcuClient(private val apiKey: String) {
+class IntervalsIcuClient(
+  private val apiKey: String,
+  private val baseUrl: String = "https://intervals.icu"
+) {
 
   private val json = Json { ignoreUnknownKeys = true }
 
   suspend fun getAthlete(athleteId: String): IntervalsIcuAthlete = withContext(Dispatchers.IO) {
-    val body = request("GET", "/api/v1/athlete/$athleteId")
+    val body = request("GET", "/api/v1/athlete/${pathSegment(athleteId)}")
     json.decodeFromString(IntervalsIcuAthlete.serializer(), body)
   }
 
@@ -36,25 +45,26 @@ class IntervalsIcuClient(private val apiKey: String) {
     withContext(Dispatchers.IO) {
       val body = request(
         "GET",
-        "/api/v1/athlete/$athleteId/events?oldest=$date&newest=$date&category=WORKOUT"
+        "/api/v1/athlete/${pathSegment(athleteId)}/events?oldest=${queryParam(date)}&newest=${queryParam(date)}&category=WORKOUT"
       )
       json.decodeFromString(ListSerializer(IntervalsIcuEvent.serializer()), body)
     }
 
   suspend fun downloadZwo(athleteId: String, eventId: Long): String = withContext(Dispatchers.IO) {
-    request("GET", "/api/v1/athlete/$athleteId/events/$eventId/download.zwo")
+    request("GET", "/api/v1/athlete/${pathSegment(athleteId)}/events/$eventId/download.zwo")
   }
 
   suspend fun uploadActivity(athleteId: String, fitBytes: ByteArray, name: String): Boolean =
     withContext(Dispatchers.IO) {
       val boundary = "TrainerLoopBoundary${System.currentTimeMillis()}"
-      val conn = openConnection("POST", "/api/v1/athlete/$athleteId/activities")
+      val conn = openConnection("POST", "/api/v1/athlete/${pathSegment(athleteId)}/activities")
       conn.doOutput = true
       conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
 
       conn.outputStream.use { out ->
         out.write("--$boundary\r\n".toByteArray())
-        out.write("Content-Disposition: form-data; name=\"file\"; filename=\"$name.fit\"\r\n".toByteArray())
+        val safeName = name.replace(Regex("[^A-Za-z0-9._ -]"), "_")
+        out.write("Content-Disposition: form-data; name=\"file\"; filename=\"$safeName.fit\"\r\n".toByteArray())
         out.write("Content-Type: application/octet-stream\r\n\r\n".toByteArray())
         out.write(fitBytes)
         out.write("\r\n--$boundary--\r\n".toByteArray())
@@ -66,7 +76,7 @@ class IntervalsIcuClient(private val apiKey: String) {
     }
 
   suspend fun updateFtp(athleteId: String, ftp: Int): Boolean = withContext(Dispatchers.IO) {
-    val conn = openConnection("PUT", "/api/v1/athlete/$athleteId")
+    val conn = openConnection("PUT", "/api/v1/athlete/${pathSegment(athleteId)}")
     conn.doOutput = true
     conn.setRequestProperty("Content-Type", "application/json")
     conn.outputStream.use { it.write("""{"ftp":$ftp}""".toByteArray()) }
@@ -77,11 +87,19 @@ class IntervalsIcuClient(private val apiKey: String) {
 
   private fun request(method: String, path: String): String {
     val conn = openConnection(method, path)
-    return conn.readBody()
+    val code = conn.responseCode
+    val body = conn.readBody()
+    if (code !in 200..299) throw IntervalsIcuHttpException(code, body)
+    return body
   }
 
+  private fun pathSegment(value: String): String =
+    URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
+
+  private fun queryParam(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
+
   private fun openConnection(method: String, path: String): HttpURLConnection {
-    val conn = URL("https://intervals.icu$path").openConnection() as HttpURLConnection
+    val conn = URL("$baseUrl$path").openConnection() as HttpURLConnection
     conn.requestMethod = method
     val credentials = Base64.getEncoder().encodeToString("API_KEY:$apiKey".toByteArray())
     conn.setRequestProperty("Authorization", "Basic $credentials")
