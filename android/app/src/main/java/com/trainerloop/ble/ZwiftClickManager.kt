@@ -102,8 +102,21 @@ class ZwiftClickManager(
 
     // Arm both notification sources BEFORE writing RideOn so the ack (an
     // indication on sync TX) cannot be missed.
-    collectFrames(conn.enableNotifications(asyncChar), handshakeAck)
-    collectFrames(conn.enableNotifications(syncTxChar), handshakeAck)
+    val asyncFlow = try {
+      conn.enableNotifications(asyncChar)
+    } catch (t: Throwable) {
+      BleLog.e("Zwift Click async notification setup failed", t)
+      return Result.failure(Exception("Zwift Click async notification subscription failed", t))
+    }
+    collectFrames(asyncFlow, handshakeAck)
+
+    val syncTxFlow = try {
+      conn.enableNotifications(syncTxChar)
+    } catch (t: Throwable) {
+      BleLog.e("Zwift Click sync notification setup failed", t)
+      return Result.failure(Exception("Zwift Click sync notification subscription failed", t))
+    }
+    collectFrames(syncTxFlow, handshakeAck)
 
     // The Click's sync RX is write-without-response; fall back to a
     // response write if a future firmware drops the no-response property.

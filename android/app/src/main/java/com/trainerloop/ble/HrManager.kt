@@ -40,7 +40,10 @@ class HrManager(
       return Result.failure(it)
     }
 
-    subscribeToNotifications(conn)
+    val subscribed = subscribeToNotifications(conn)
+    if (!subscribed) {
+      return Result.failure(Exception("Heart Rate Measurement subscription failed"))
+    }
 
     // Auto-resubscribe on reconnect. Service discovery is re-run once by
     // BleConnection before handlers fire.
@@ -53,19 +56,26 @@ class HrManager(
     return Result.success(Unit)
   }
 
-  private fun subscribeToNotifications(conn: BleConnection) {
-    val dataChar = conn.getCharacteristic(BleConstants.HEART_RATE_SERVICE, BleConstants.HEART_RATE_MEASUREMENT)
-    if (dataChar == null) {
+  private suspend fun subscribeToNotifications(conn: BleConnection): Boolean {
+    val dataChar = conn.getCharacteristic(
+      BleConstants.HEART_RATE_SERVICE,
+      BleConstants.HEART_RATE_MEASUREMENT
+    ) ?: run {
       BleLog.e(
         "HR Measurement characteristic NOT FOUND " +
           "service=${BleConstants.HEART_RATE_SERVICE} char=${BleConstants.HEART_RATE_MEASUREMENT}"
       )
-      return
+      return false
     }
     BleLog.d("HR characteristic found, enabling notifications")
+    val notificationFlow = try {
+      conn.enableNotifications(dataChar)
+    } catch (t: Throwable) {
+      BleLog.e("HR enableNotifications failed", t)
+      return false
+    }
     scope.launch {
       try {
-        val notificationFlow = conn.enableNotifications(dataChar)
         BleLog.d("HR notifications enabled, starting collect")
         notificationFlow.collect { bytes ->
           val hr = HeartRateMeasurementParser.parse(bytes)
@@ -80,6 +90,7 @@ class HrManager(
         BleLog.e("HR notification collector crashed", t)
       }
     }
+    return true
   }
 
   suspend fun disconnect() {

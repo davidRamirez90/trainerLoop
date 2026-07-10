@@ -81,7 +81,13 @@ class BleConnection(
     }
     gatt = gattInstance
     val success: Boolean = try {
-      callback.connectionResult.await()
+      withTimeoutOrNull(CONNECT_TIMEOUT_MS) {
+        try {
+          callback.connectionResult.await()
+        } catch (e: Exception) {
+          false
+        }
+      } ?: false
     } catch (e: Exception) {
       false
     }
@@ -136,7 +142,13 @@ class BleConnection(
       }
       gatt = gattInstance
       val connected = try {
-        callback.connectionResult.await()
+        withTimeoutOrNull(CONNECT_TIMEOUT_MS) {
+          try {
+            callback.connectionResult.await()
+          } catch (e: Exception) {
+            false
+          }
+        } ?: false
       } catch (e: Exception) {
         false
       }
@@ -243,10 +255,11 @@ class BleConnection(
           }
           if (!ok) {
             BleLog.w("Descriptor write for $uuid returned GATT failure (indicate=$useIndicate)")
+            throw IllegalStateException("CCCD write failed for $uuid")
           }
         } else {
           deferred.cancel()
-          BleLog.w("writeDescriptor returned false for $uuid (indicate=$useIndicate)")
+          throw IllegalStateException("writeDescriptor could not start for $uuid")
         }
       } else {
         BleLog.w("CCCD not found for $uuid — notifications may not arrive")
@@ -355,6 +368,7 @@ class BleConnection(
     private val CLIENT_CHARACTERISTIC_CONFIG_UUID =
       UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
     private val BACKOFF_DELAYS = longArrayOf(1000, 2000, 4000, 8000, 15000, 30000)
+    private const val CONNECT_TIMEOUT_MS = 20_000L
     private const val GATT_OPERATION_TIMEOUT_MS = 10_000L
   }
 }

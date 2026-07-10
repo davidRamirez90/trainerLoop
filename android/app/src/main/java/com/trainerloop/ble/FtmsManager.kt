@@ -57,7 +57,10 @@ class FtmsManager(
   suspend fun connect(): Result<Unit> {
     BleLog.d("FtmsManager.connect device=${device.address}")
     readDeviceInfo(connection)
-    subscribeToNotifications(connection)
+    val subscribed = subscribeToNotifications(connection)
+    if (!subscribed) {
+      return Result.failure(Exception("FTMS Indoor Bike Data subscription failed"))
+    }
 
     // Auto-resubscribe on reconnect (the GATT link is shared, but
     // characteristic subscriptions need to be re-armed after a drop).
@@ -90,19 +93,24 @@ class FtmsManager(
     }
   }
 
-  private fun subscribeToNotifications(conn: BleConnection) {
+  private suspend fun subscribeToNotifications(conn: BleConnection): Boolean {
     val dataChar = conn.getCharacteristic(BleConstants.FTMS_SERVICE, BleConstants.INDOOR_BIKE_DATA)
-    if (dataChar == null) {
-      BleLog.e(
-        "FTMS IndoorBikeData characteristic NOT FOUND " +
-          "service=${BleConstants.FTMS_SERVICE} char=${BleConstants.INDOOR_BIKE_DATA}"
-      )
-      return
-    }
+      ?: run {
+        BleLog.e(
+          "FTMS IndoorBikeData characteristic NOT FOUND " +
+            "service=${BleConstants.FTMS_SERVICE} char=${BleConstants.INDOOR_BIKE_DATA}"
+        )
+        return false
+      }
     BleLog.d("FTMS IndoorBikeData characteristic found, enabling notifications")
+    val notificationFlow = try {
+      conn.enableNotifications(dataChar)
+    } catch (t: Throwable) {
+      BleLog.e("FTMS enableNotifications failed", t)
+      return false
+    }
     scope.launch {
       try {
-        val notificationFlow = conn.enableNotifications(dataChar)
         BleLog.d("FTMS notifications enabled, starting collect")
         notificationFlow.collect { bytes ->
           val parsed = IndoorBikeDataParser.parse(bytes)
@@ -116,6 +124,7 @@ class FtmsManager(
         BleLog.e("FTMS notification collector crashed", t)
       }
     }
+    return true
   }
 
   suspend fun disconnect() {

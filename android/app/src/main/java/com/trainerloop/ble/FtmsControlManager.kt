@@ -65,7 +65,10 @@ class FtmsControlManager(
   // here again raced with the data manager's subscription on the shared
   // GATT link.
   suspend fun connect(): Result<Unit> {
-    setupControlPoint(connection)
+    val subscribed = setupControlPoint(connection)
+    if (!subscribed) {
+      return Result.failure(Exception("FTMS Control Point subscription failed"))
+    }
 
     // Auto-resubscribe and re-request control on reconnect. The GATT
     // link is shared with FtmsManager; we only need to re-arm the
@@ -79,19 +82,28 @@ class FtmsControlManager(
     return Result.success(Unit)
   }
 
-  private suspend fun setupControlPoint(conn: BleConnection) {
+  private suspend fun setupControlPoint(conn: BleConnection): Boolean {
     val cpChar = conn.getCharacteristic(
       BleConstants.FTMS_SERVICE,
       BleConstants.FITNESS_MACHINE_CONTROL_POINT
     ) ?: run {
       com.trainerloop.ble.BleLog.e("FTMS control point characteristic NOT FOUND")
-      return
+      return false
     }
     com.trainerloop.ble.BleLog.d("FTMS control point found, enabling notifications")
 
-    val responseFlow = conn.enableNotifications(cpChar)
+    val responseFlow = try {
+      conn.enableNotifications(cpChar)
+    } catch (t: Throwable) {
+      com.trainerloop.ble.BleLog.e("FTMS control point enableNotifications failed", t)
+      return false
+    }
     scope.launch {
-      responseFlow.collect { bytes -> handleResponse(bytes) }
+      try {
+        responseFlow.collect { bytes -> handleResponse(bytes) }
+      } catch (t: Throwable) {
+        com.trainerloop.ble.BleLog.e("FTMS control point notification collector crashed", t)
+      }
     }
 
     _status.value = FtmsControlStatus.REQUESTING
@@ -119,6 +131,7 @@ class FtmsControlManager(
         _status.value = FtmsControlStatus.READY
       }
     }
+    return true
   }
 
   suspend fun disconnect() {
