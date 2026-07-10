@@ -5,6 +5,7 @@ import com.trainerloop.domain.WorkoutImporter
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -49,6 +50,40 @@ class ParserTest {
   }
 
   @Test
+  fun `ZWO parser caps repeats and segment durations`() {
+    val content = """
+      <?xml version="1.0" encoding="UTF-8"?>
+      <workout_file>
+        <name>Large intervals</name>
+        <workout>
+          <IntervalsT Repeat="100000" OnDuration="10000000" OffDuration="0" OnPower="1" OffPower="0.5" />
+        </workout>
+      </workout_file>
+    """.trimIndent()
+
+    val workout = ZwoParser.parse("large.zwo", content)
+
+    assertEquals(400, workout.segments.size)
+    assertEquals(86_400, workout.segments.first().durationSec)
+    assertEquals(1, workout.segments[1].durationSec)
+  }
+
+  @Test
+  fun `ZWO parser rejects more than 2000 segments`() {
+    val content = buildString {
+      append("<workout_file><workout>")
+      repeat(2_001) {
+        append("<SteadyState Duration=\"60\" Power=\"1\" />")
+      }
+      append("</workout></workout_file>")
+    }
+
+    assertThrows(IllegalArgumentException::class.java) {
+      ZwoParser.parse("too-many.zwo", content)
+    }
+  }
+
+  @Test
   fun `JSON parser parses workout with segments`() {
     val content = loadResource("sample.json")
     val workout = JsonWorkoutParser.parse("sample.json", content)
@@ -56,6 +91,40 @@ class ParserTest {
     assertEquals(2, workout.segments.size)
     assertEquals(SegmentPhase.WARMUP, workout.segments[0].phase)
     assertEquals(SegmentPhase.WORK, workout.segments[1].phase)
+  }
+
+  @Test
+  fun `JSON parser caps segment durations`() {
+    val content = """
+      {
+        "name": "Clamped workout",
+        "segments": [
+          {"durationSec": 10000000, "targetRange": {"low": 100, "high": 100}, "phase": "work"},
+          {"durationSec": -10, "targetRange": {"low": 80, "high": 80}, "phase": "recovery"}
+        ]
+      }
+    """.trimIndent()
+
+    val workout = JsonWorkoutParser.parse("clamped.json", content)
+
+    assertEquals(86_400, workout.segments.first().durationSec)
+    assertEquals(1, workout.segments[1].durationSec)
+  }
+
+  @Test
+  fun `JSON parser rejects more than 2000 segments`() {
+    val content = buildString {
+      append("{\"segments\":[")
+      repeat(2_001) { index ->
+        if (index > 0) append(',')
+        append("{\"durationSec\":60,\"targetRange\":{\"low\":100,\"high\":100},\"phase\":\"work\"}")
+      }
+      append("]}")
+    }
+
+    assertThrows(IllegalArgumentException::class.java) {
+      JsonWorkoutParser.parse("too-many.json", content)
+    }
   }
 
   @Test

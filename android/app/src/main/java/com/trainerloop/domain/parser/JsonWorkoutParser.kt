@@ -11,6 +11,8 @@ import kotlinx.serialization.json.Json
 object JsonWorkoutParser {
 
   private val json = Json { ignoreUnknownKeys = true }
+  private const val MAX_SEGMENT_SEC = 86_400
+  private const val MAX_SEGMENTS = 2_000
 
   fun parse(name: String, content: String, @Suppress("UNUSED_PARAMETER") ftpWatts: Int = 250): Workout {
     val dto = json.decodeFromString(WorkoutJson.serializer(), content)
@@ -22,43 +24,48 @@ object JsonWorkoutParser {
     val fallbackName = name.substringBeforeLast('.').trim()
     val fallbackSubtitle = "Imported workout"
 
+    val segments = dto.segments.mapIndexed { index, segment ->
+      val phase = segment.phase?.let { parsePhase(it) }
+        ?: throw IllegalArgumentException("segments[$index].phase must be warmup, work, recovery, or cooldown.")
+      val targetRange = segment.targetRange
+        ?: throw IllegalArgumentException("segments[$index].targetRange must be an object.")
+
+      val rampToRange = segment.rampToRange
+      val cadenceRange = segment.cadenceRange?.let { IntRange(it.low, it.high) }
+
+      if (rampToRange != null) {
+        WorkoutSegment.Ramp(
+          id = segment.id?.takeIf { it.isNotBlank() } ?: "segment-${index + 1}",
+          durationSec = segment.durationSec.coerceIn(1, MAX_SEGMENT_SEC),
+          label = segment.label?.takeIf { it.isNotBlank() } ?: "Segment ${index + 1}",
+          phase = phase,
+          isWork = segment.isWork ?: (phase == SegmentPhase.WORK),
+          startPower = targetRange.low,
+          endPower = rampToRange.high,
+          targetCadence = cadenceRange
+        )
+      } else {
+        WorkoutSegment.Step(
+          id = segment.id?.takeIf { it.isNotBlank() } ?: "segment-${index + 1}",
+          durationSec = segment.durationSec.coerceIn(1, MAX_SEGMENT_SEC),
+          label = segment.label?.takeIf { it.isNotBlank() } ?: "Segment ${index + 1}",
+          phase = phase,
+          isWork = segment.isWork ?: (phase == SegmentPhase.WORK),
+          targetRange = TargetRange(targetRange.low, targetRange.high),
+          targetCadence = cadenceRange
+        )
+      }
+    }
+    if (segments.size > MAX_SEGMENTS) {
+      throw IllegalArgumentException("Workout cannot contain more than $MAX_SEGMENTS segments.")
+    }
+
     return Workout(
       id = dto.id?.takeIf { it.isNotBlank() } ?: "import-${System.currentTimeMillis()}",
       name = dto.name?.takeIf { it.isNotBlank() } ?: fallbackName,
       description = dto.subtitle?.takeIf { it.isNotBlank() } ?: fallbackSubtitle,
       source = WorkoutSource.IMPORTED,
-      segments = dto.segments.mapIndexed { index, segment ->
-        val phase = segment.phase?.let { parsePhase(it) }
-          ?: throw IllegalArgumentException("segments[$index].phase must be warmup, work, recovery, or cooldown.")
-        val targetRange = segment.targetRange
-          ?: throw IllegalArgumentException("segments[$index].targetRange must be an object.")
-
-        val rampToRange = segment.rampToRange
-        val cadenceRange = segment.cadenceRange?.let { IntRange(it.low, it.high) }
-
-        if (rampToRange != null) {
-          WorkoutSegment.Ramp(
-            id = segment.id?.takeIf { it.isNotBlank() } ?: "segment-${index + 1}",
-            durationSec = segment.durationSec,
-            label = segment.label?.takeIf { it.isNotBlank() } ?: "Segment ${index + 1}",
-            phase = phase,
-            isWork = segment.isWork ?: (phase == SegmentPhase.WORK),
-            startPower = targetRange.low,
-            endPower = rampToRange.high,
-            targetCadence = cadenceRange
-          )
-        } else {
-          WorkoutSegment.Step(
-            id = segment.id?.takeIf { it.isNotBlank() } ?: "segment-${index + 1}",
-            durationSec = segment.durationSec,
-            label = segment.label?.takeIf { it.isNotBlank() } ?: "Segment ${index + 1}",
-            phase = phase,
-            isWork = segment.isWork ?: (phase == SegmentPhase.WORK),
-            targetRange = TargetRange(targetRange.low, targetRange.high),
-            targetCadence = cadenceRange
-          )
-        }
-      }
+      segments = segments
     )
   }
 

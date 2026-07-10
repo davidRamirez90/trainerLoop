@@ -78,4 +78,19 @@ class GpxParserTest {
       GpxParser.parse("not xml at all".byteInputStream())
     }
   }
+
+  @Test
+  fun `caps parsed points for large gpx`() {
+    val gpx = buildString {
+      append("<?xml version=\"1.0\"?><gpx><trk><trkseg>")
+      repeat(60_000) { index ->
+        append("<trkpt lat=\"${47.0 + index * 0.0001}\" lon=\"8.0\"><ele>${500.0 + index * 0.01}</ele></trkpt>")
+      }
+      append("</trkseg></trk></gpx>")
+    }
+
+    val route = GpxParser.parse(gpx.byteInputStream())
+
+    assertTrue(route.points.size <= 50_000)
+  }
 }

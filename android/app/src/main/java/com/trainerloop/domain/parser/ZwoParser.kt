@@ -15,6 +15,9 @@ class ZwoParseException(message: String, cause: Throwable? = null) : Exception(m
 object ZwoParser {
 
   private const val WORK_THRESHOLD = 0.85
+  private const val MAX_SEGMENT_SEC = 86_400
+  private const val MAX_REPEATS = 200
+  private const val MAX_SEGMENTS = 2_000
 
   fun parse(name: String, content: String, ftpWatts: Int = 250): Workout {
     val document = try {
@@ -52,7 +55,7 @@ object ZwoParser {
         "warmup" -> {
           val (low, high) = resolveWarmupCooldownPower(element, ftpWatts)
           val cadenceRange = getCadenceRange(element)
-          val duration = element.getAttrNumber("Duration").roundToInt()
+          val duration = element.getDurationSec()
           if (low != high) {
             segments.addRamp(
               id = segmentIndex,
@@ -81,7 +84,7 @@ object ZwoParser {
         "cooldown" -> {
           val (low, high) = resolveWarmupCooldownPower(element, ftpWatts)
           val cadenceRange = getCadenceRange(element)
-          val duration = element.getAttrNumber("Duration").roundToInt()
+          val duration = element.getDurationSec()
           if (low != high) {
             segments.addRamp(
               id = segmentIndex,
@@ -108,7 +111,7 @@ object ZwoParser {
         }
 
         "ramp" -> {
-          val duration = element.getAttrNumber("Duration").roundToInt()
+          val duration = element.getDurationSec()
           val low = toWatts(element.getAttrNumber("PowerLow"), ftpWatts)
           val high = toWatts(element.getAttrNumber("PowerHigh"), ftpWatts)
           val isWork = high >= ftpWatts * WORK_THRESHOLD
@@ -128,7 +131,7 @@ object ZwoParser {
         }
 
         "steadystate" -> {
-          val duration = element.getAttrNumber("Duration").roundToInt()
+          val duration = element.getDurationSec()
           val (resolvedLow, resolvedHigh) = resolveSteadyStatePower(element)
           val lowWatts = toWatts(resolvedLow, ftpWatts)
           val highWatts = toWatts(resolvedHigh, ftpWatts)
@@ -171,7 +174,7 @@ object ZwoParser {
         }
 
         "freeride" -> {
-          val duration = element.getAttrNumber("Duration").roundToInt()
+          val duration = element.getDurationSec()
           val powerLow = element.getOptionalAttrNumber("PowerLow")
           val power = element.getOptionalAttrNumber("Power")
           val powerHigh = element.getOptionalAttrNumber("PowerHigh")
@@ -210,9 +213,9 @@ object ZwoParser {
         }
 
         "intervalst" -> {
-          val repeat = maxOf(1, element.getAttrNumber("Repeat", 1.0).roundToInt())
-          val onDuration = element.getAttrNumber("OnDuration").roundToInt()
-          val offDuration = element.getAttrNumber("OffDuration").roundToInt()
+          val repeat = element.getAttrNumber("Repeat", 1.0).roundToInt().coerceIn(1, MAX_REPEATS)
+          val onDuration = element.getAttrNumber("OnDuration").roundToInt().coerceIn(1, MAX_SEGMENT_SEC)
+          val offDuration = element.getAttrNumber("OffDuration").roundToInt().coerceIn(1, MAX_SEGMENT_SEC)
           val onPower = toWatts(element.getAttrNumber("OnPower"), ftpWatts)
           val offPower = toWatts(element.getAttrNumber("OffPower"), ftpWatts)
           val cadenceRange = getCadenceRange(element)
@@ -244,6 +247,9 @@ object ZwoParser {
       }
     }
 
+    if (segments.size > MAX_SEGMENTS) {
+      throw IllegalArgumentException("Workout cannot contain more than $MAX_SEGMENTS segments.")
+    }
     if (segments.isEmpty()) {
       throw IllegalArgumentException("No workout steps found in this ZWO file.")
     }
@@ -379,5 +385,9 @@ object ZwoParser {
     if (value.isNullOrEmpty()) return null
     return value.toDoubleOrNull()
       ?: throw IllegalArgumentException("Invalid $name attribute in $tagName.")
+  }
+
+  private fun Element.getDurationSec(): Int {
+    return getAttrNumber("Duration").roundToInt().coerceIn(1, MAX_SEGMENT_SEC)
   }
 }

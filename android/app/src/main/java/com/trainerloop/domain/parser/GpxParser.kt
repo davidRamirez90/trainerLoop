@@ -5,6 +5,7 @@ import com.trainerloop.data.model.RoutePoint
 import java.io.InputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.math.asin
+import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -22,6 +23,7 @@ object GpxParser {
   private const val SMOOTH_HALF_WINDOW_M = 37.5 // ~75 m total window
   private const val MAX_GRADE_PCT = 20.0
   private const val MIN_POINT_SPACING_M = 0.5
+  private const val MAX_POINTS = 50_000
   private const val EARTH_RADIUS_M = 6_371_000.0
 
   private data class Raw(val lat: Double, val lon: Double, val ele: Double, var distM: Double = 0.0)
@@ -60,17 +62,23 @@ object GpxParser {
     }
 
     // Distance-windowed moving average over elevation.
-    val smoothed = DoubleArray(raw.size) { i ->
+    val smoothed = DoubleArray(raw.size)
+    var windowStart = 0
+    var windowEnd = -1
+    var windowSum = 0.0
+    for (i in raw.indices) {
       val center = raw[i].distM
-      var sum = 0.0
-      var count = 0
-      for (p in raw) {
-        if (p.distM >= center - SMOOTH_HALF_WINDOW_M && p.distM <= center + SMOOTH_HALF_WINDOW_M) {
-          sum += p.ele
-          count++
-        }
+      val lowerBound = center - SMOOTH_HALF_WINDOW_M
+      val upperBound = center + SMOOTH_HALF_WINDOW_M
+      while (windowStart < raw.size && raw[windowStart].distM < lowerBound) {
+        if (windowStart <= windowEnd) windowSum -= raw[windowStart].ele
+        windowStart++
       }
-      sum / count
+      while (windowEnd + 1 < raw.size && raw[windowEnd + 1].distM <= upperBound) {
+        windowEnd++
+        windowSum += raw[windowEnd].ele
+      }
+      smoothed[i] = windowSum / (windowEnd - windowStart + 1)
     }
 
     // Resample onto the uniform grid.
@@ -109,7 +117,13 @@ object GpxParser {
         gradePercent = grade.coerceIn(-MAX_GRADE_PCT, MAX_GRADE_PCT)
       )
     }
-    return Route(name, points)
+    val cappedPoints = if (points.size > MAX_POINTS) {
+      val stride = ceil(points.size / MAX_POINTS.toDouble()).toInt()
+      points.filterIndexed { i, _ -> i % stride == 0 }
+    } else {
+      points
+    }
+    return Route(name, cappedPoints)
   }
 
   private fun haversineM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
