@@ -4,6 +4,8 @@ import java.util.Locale
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -114,14 +116,16 @@ fun WorkoutLibraryScreen(
     Spacer(modifier = Modifier.height(12.dp))
 
     Row(
-      modifier = Modifier.fillMaxWidth(),
+      modifier = Modifier
+        .fillMaxWidth()
+        .horizontalScroll(rememberScrollState()),
       horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
       uiState.categories.forEach { category ->
         FilterChip(
           selected = uiState.selectedCategory == category,
           onClick = { viewModel.onCategorySelected(category) },
-          label = { Text(category.label) }
+          label = { Text(category.label, maxLines = 1, softWrap = false) }
         )
       }
     }
