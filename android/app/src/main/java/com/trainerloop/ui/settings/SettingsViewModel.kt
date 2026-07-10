@@ -31,7 +31,7 @@ data class SettingsUiState(
   val isSaved: Boolean = false
 )
 
-class SettingsViewModel(
+class SettingsViewModel @JvmOverloads constructor(
   application: Application,
   private val repository: ProfileRepository =
     (application as? TrainerLoopApplication)?.profileRepository ?: ProfileRepository(application)

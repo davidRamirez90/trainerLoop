@@ -47,7 +47,7 @@ data class LibraryUiState(
   val deletableIds: Set<String> = emptySet()
 )
 
-class WorkoutLibraryViewModel(
+class WorkoutLibraryViewModel @JvmOverloads constructor(
   application: Application,
   private val profileRepository: ProfileRepository =
     (application as? TrainerLoopApplication)?.profileRepository ?: ProfileRepository(application)
