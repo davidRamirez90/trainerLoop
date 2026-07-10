@@ -105,7 +105,8 @@ class WorkoutViewModel(
   private val ftmsControlManagerFlow: StateFlow<FtmsControlManager?> = MutableStateFlow(null),
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
   private val userProfile: UserProfile = UserProfile(),
-  coachProfile: CoachProfile? = null
+  coachProfile: CoachProfile? = null,
+  private val now: () -> Long = System::currentTimeMillis
 ) : ViewModel() {
 
   private val clock = WorkoutClock(workout.segments, dispatcher)
@@ -149,6 +150,7 @@ class WorkoutViewModel(
   private val recorder = MutableStateFlow<TelemetryRecorder?>(null)
 
   private var wasErgEnabled: Boolean = true
+  private var sessionStartMs: Long? = null
 
   private var ergWriteJob: Job? = null
 
@@ -300,6 +302,7 @@ class WorkoutViewModel(
   }
 
   fun start() {
+    if (sessionStartMs == null) sessionStartMs = now()
     clock.start()
     updateFromClock()
     sendControlWhenReady { it.startResume() }
@@ -324,6 +327,7 @@ class WorkoutViewModel(
       controlNow()?.stopPause(stop = true)
     }
     maybeEmitFinish()
+    sessionStartMs = null
     recorder.value?.reset(clock.sessionId.value)
     _uiState.value = _uiState.value.copy(
       intensityOffsetPct = 0,
@@ -474,7 +478,7 @@ class WorkoutViewModel(
     _finishEvent.value = WorkoutFinishData(
       workoutId = workout.id,
       workoutName = workout.name,
-      startTimeMs = System.currentTimeMillis() - state.elapsedSec * 1000L,
+      startTimeMs = sessionStartMs ?: (now() - state.elapsedSec * 1000L),
       samples = state.samples,
       coachJson = if (isRampTest) "" else liveCoach.sessionData().toJson()
     )

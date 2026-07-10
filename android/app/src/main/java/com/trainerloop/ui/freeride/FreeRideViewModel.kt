@@ -64,7 +64,8 @@ class FreeRideViewModel(
   private val ftmsControlManagerFlow: StateFlow<FtmsControlManager?> = MutableStateFlow(null),
   private val clickManagerFlow: StateFlow<ZwiftClickManager?> = MutableStateFlow(null),
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
-  userProfile: UserProfile = UserProfile()
+  userProfile: UserProfile = UserProfile(),
+  private val now: () -> Long = System::currentTimeMillis
 ) : ViewModel() {
 
   // ponytail: no fixed route duration — a 12 h cap stands in for "open-ended"
@@ -99,6 +100,7 @@ class FreeRideViewModel(
 
   private var lastSentWatts = -1
   private var lastSentAtSec = -10
+  private var sessionStartMs: Long? = null
 
   init {
     viewModelScope.launch {
@@ -167,6 +169,7 @@ class FreeRideViewModel(
   }
 
   fun start() {
+    if (sessionStartMs == null) sessionStartMs = now()
     clock.start()
     sendControlWhenReady { it.startResume() }
   }
@@ -189,10 +192,12 @@ class FreeRideViewModel(
       _finishEvent.value = WorkoutFinishData(
         workoutId = "gpx-free-ride",
         workoutName = route.name ?: "GPX Ride",
-        startTimeMs = System.currentTimeMillis() - _uiState.value.elapsedSec * 1000L,
+        startTimeMs = sessionStartMs ?:
+          (now() - _uiState.value.elapsedSec * 1000L),
         samples = samples
       )
     }
+    sessionStartMs = null
   }
 
   fun shiftUp() {
