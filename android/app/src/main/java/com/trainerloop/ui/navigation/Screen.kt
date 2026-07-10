@@ -1,5 +1,7 @@
 package com.trainerloop.ui.navigation
 
+import android.net.Uri
+
 sealed class Screen(val route: String) {
   // Bottom tabs
   object Home : Screen("home")
@@ -21,7 +23,7 @@ sealed class Screen(val route: String) {
   }
   object WorkoutComplete : Screen("workout_complete/{sessionId}/{workoutId}/{workoutName}/{startTimeMs}") {
     fun createRoute(sessionId: String, workoutId: String, workoutName: String, startTimeMs: Long): String {
-      val encodedName = java.net.URLEncoder.encode(workoutName, "UTF-8")
+      val encodedName = Uri.encode(workoutName)
       return "workout_complete/$sessionId/$workoutId/$encodedName/$startTimeMs"
     }
   }

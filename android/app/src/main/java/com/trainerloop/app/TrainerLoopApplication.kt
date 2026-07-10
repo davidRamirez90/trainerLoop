@@ -8,7 +8,6 @@ import com.trainerloop.ble.FtmsControlManager
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
 import com.trainerloop.ble.BleLog
-import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.model.Workout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,13 +40,8 @@ class TrainerLoopApplication : Application(), ManagerProvider {
   private var trainerConnection: BleConnection? = null
 
   var selectedWorkout: Workout? = null
-  var pendingSessionSamples: List<TelemetrySample>? = null
-  var pendingCoachJson: String? = null
-
   /** Set by FreeRideScreen while active: volume keys shift gears (true = up). */
   var volumeShiftHandler: ((Boolean) -> Unit)? = null
-  var pendingSessionType: String? = null
-  var pendingRouteId: String? = null
 
   fun attachTrainer(device: BluetoothDevice) {
     val previousConnection = trainerConnection
