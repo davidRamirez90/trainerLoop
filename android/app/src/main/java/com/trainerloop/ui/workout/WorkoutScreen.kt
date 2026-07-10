@@ -69,6 +69,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
@@ -160,13 +161,35 @@ fun WorkoutScreen(
     }
   }
 
-  LaunchedEffect(uiState.isRunning) {
-    if (uiState.isRunning) {
-      val timeStr = formatDuration(uiState.elapsedSec)
-      WorkoutForegroundService.start(context, uiState.currentPowerWatts, timeStr)
+  // Service lives while a session exists (running or paused); paused rides keep
+  // process protection but the service holds no wake lock (isRunning = false).
+  val sessionActive = uiState.elapsedSec > 0 || uiState.isRunning
+  LaunchedEffect(sessionActive, uiState.isRunning) {
+    if (sessionActive) {
+      WorkoutForegroundService.start(
+        context,
+        uiState.currentPowerWatts,
+        formatDuration(uiState.elapsedSec)
+      )
+      if (!uiState.isRunning) {
+        WorkoutForegroundService.update(
+          context,
+          uiState.currentPowerWatts,
+          formatDuration(uiState.elapsedSec),
+          false
+        )
+      }
     } else {
       WorkoutForegroundService.stop(context)
     }
+  }
+
+  DisposableEffect(Unit) {
+    onDispose { WorkoutForegroundService.stop(context) }
+  }
+
+  LaunchedEffect(Unit) {
+    context.trainerLoopApp.stopRequests.collect { viewModel.stop() }
   }
 
   // Throttle FGS notification re-posts: each update() is a startService IPC +

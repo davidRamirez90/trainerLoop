@@ -80,16 +80,35 @@ fun FreeRideScreen(
     onDispose { view.keepScreenOn = false }
   }
 
-  LaunchedEffect(uiState.isRunning) {
-    if (uiState.isRunning) {
+  // Service lives while a session exists (running or paused); paused rides keep
+  // process protection but the service holds no wake lock (isRunning = false).
+  val sessionActive = uiState.elapsedSec > 0 || uiState.isRunning
+  LaunchedEffect(sessionActive, uiState.isRunning) {
+    if (sessionActive) {
       WorkoutForegroundService.start(
         context,
         uiState.currentPowerWatts,
         formatTime(uiState.elapsedSec)
       )
+      if (!uiState.isRunning) {
+        WorkoutForegroundService.update(
+          context,
+          uiState.currentPowerWatts,
+          formatTime(uiState.elapsedSec),
+          false
+        )
+      }
     } else {
       WorkoutForegroundService.stop(context)
     }
+  }
+
+  DisposableEffect(Unit) {
+    onDispose { WorkoutForegroundService.stop(context) }
+  }
+
+  LaunchedEffect(Unit) {
+    context.trainerLoopApp.stopRequests.collect { viewModel.stop() }
   }
 
   LaunchedEffect(uiState.currentPowerWatts, uiState.elapsedSec / 3) {

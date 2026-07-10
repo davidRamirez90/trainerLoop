@@ -14,8 +14,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.launch
 
 class TrainerLoopApplication : Application(), ManagerProvider {
@@ -33,6 +35,11 @@ class TrainerLoopApplication : Application(), ManagerProvider {
 
   private val _clickManager = MutableStateFlow<ZwiftClickManager?>(null)
   val clickManager: StateFlow<ZwiftClickManager?> = _clickManager.asStateFlow()
+
+  val stopRequests = MutableSharedFlow<Unit>(
+    extraBufferCapacity = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST
+  )
 
   /**
    * The single BLE GATT connection for the trainer, shared between
