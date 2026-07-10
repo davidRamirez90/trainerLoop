@@ -1,8 +1,10 @@
 package com.trainerloop.ui.components
 
+import android.graphics.Matrix
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
@@ -36,7 +40,9 @@ import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.domain.WorkoutMath
+import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.ZoneColors
+import com.trainerloop.ui.theme.reducedMotionAware
 import com.trainerloop.ui.theme.zoneColorSet
 
 private const val HR_AXIS_MIN = 40f
@@ -64,12 +70,34 @@ fun WorkoutChart(
   var selectedIndex by remember { mutableStateOf<Int?>(null) }
 
   // Visible time window: whole session, or the current interval padded.
-  val (winStart, winEnd) = if (zoomToCurrent && totalDuration > 0) {
-    val curIdx = WorkoutMath.segmentIndexAt(segments, elapsedSec)
-    val (s, e) = bounds.getOrNull(curIdx)?.let { it.first to it.second } ?: (0 to totalDuration)
-    (s - ZOOM_PAD_SEC).coerceAtLeast(0) to (e + ZOOM_PAD_SEC).coerceAtMost(totalDuration)
-  } else 0 to totalDuration
-  val winSpan = (winEnd - winStart).coerceAtLeast(1)
+  val targetWindow = computeWorkoutChartWindow(
+    zoomToCurrent = zoomToCurrent,
+    totalDurationSec = totalDuration,
+    elapsedSec = elapsedSec,
+    segments = segments,
+    bounds = bounds
+  )
+  val winStart by animateFloatAsState(
+    targetValue = targetWindow.startSec,
+    animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
+    label = "Chart window start"
+  )
+  val winEnd by animateFloatAsState(
+    targetValue = targetWindow.endSec,
+    animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
+    label = "Chart window end"
+  )
+  val animatedElapsedSec by animateFloatAsState(
+    targetValue = elapsedSec.toFloat(),
+    animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
+    label = "Chart cursor"
+  )
+  val winSpan = (winEnd - winStart).coerceAtLeast(1f)
+
+  // Keep gesture hit-testing attached to the pointer input coroutine while the
+  // animated window changes on every frame.
+  val currentWinStart = rememberUpdatedState(winStart)
+  val currentWinEnd = rememberUpdatedState(winEnd)
 
   // Static across the ride (depends only on the plan), so don't rescan the plan
   // on every 1 Hz redraw.
@@ -78,6 +106,13 @@ fun WorkoutChart(
     else (0..totalDuration step (totalDuration / 100).coerceAtLeast(1))
       .maxOf { WorkoutMath.targetRangeAt(segments, it).high }
   }
+  val peakSample = remember(samples.size) { samples.maxOfOrNull { it.powerWatts } ?: 0 }
+  val cachedHrPath = remember(samples.size) { buildHrPath(samples) }
+  val cachedPowerPath = remember(samples.size) { buildPowerPath(samples) }
+  val hrScratchPath = remember { Path() }
+  val powerScratchPath = remember { Path() }
+  val hrMatrix = remember { Matrix() }
+  val powerMatrix = remember { Matrix() }
 
   val cursorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
   val hrLineColor = MaterialTheme.colorScheme.error
@@ -101,9 +136,12 @@ fun WorkoutChart(
         modifier = Modifier
           .fillMaxWidth()
           .height(160.dp)
-          .pointerInput(segments, winStart, winEnd) {
+          .pointerInput(segments) {
             detectTapGestures { offset ->
-              val sec = winStart + (offset.x / size.width) * winSpan
+              val currentStart = currentWinStart.value
+              val currentEnd = currentWinEnd.value
+              val currentSpan = (currentEnd - currentStart).coerceAtLeast(1f)
+              val sec = currentStart + (offset.x / size.width) * currentSpan
               val idx = bounds.indexOfFirst { sec >= it.first && sec < it.second }
               selectedIndex = if (idx < 0 || idx == selectedIndex) null else idx
             }
@@ -117,18 +155,12 @@ fun WorkoutChart(
         val chartHeight = heightPx - padding * 2
         val chartBottom = heightPx - padding
 
-        val peakSample = samples.maxOfOrNull { it.powerWatts } ?: 0
         val maxPowerAxis = (maxOf(peakTarget, peakSample, 1) * 1.1f)
 
-        fun xForTime(sec: Int): Float = ((sec - winStart) / winSpan.toFloat()) * width
+        fun xForTime(sec: Float): Float = ((sec - winStart) / winSpan) * width
 
-        fun yForPower(power: Int): Float {
+        fun yForPower(power: Float): Float {
           val ratio = (power / maxPowerAxis).coerceIn(0f, 1f)
-          return chartBottom - ratio * chartHeight
-        }
-
-        fun yForHr(bpm: Int): Float {
-          val ratio = ((bpm - HR_AXIS_MIN) / (HR_AXIS_MAX - HR_AXIS_MIN)).coerceIn(0f, 1f)
           return chartBottom - ratio * chartHeight
         }
 
@@ -139,10 +171,10 @@ fun WorkoutChart(
           val bandHeight = chartHeight * 0.3f
           val elevPath = Path()
           elevPath.moveTo(xForTime(winStart), chartBottom)
-          val elevStep = (winSpan / 200).coerceAtLeast(1)
+          val elevStep = (winSpan / 200f).coerceAtLeast(1f)
           var t = winStart
           while (t <= winEnd) {
-            val alt = elevationProfile[t.coerceIn(0, elevationProfile.lastIndex)]
+            val alt = elevationProfile[t.toInt().coerceIn(0, elevationProfile.lastIndex)]
             val y = chartBottom - ((alt - minAlt) / altSpan).toFloat() * bandHeight
             elevPath.lineTo(xForTime(t), y)
             t += elevStep
@@ -156,21 +188,21 @@ fun WorkoutChart(
         if (ftp > 0) {
           val gridColor = cursorColor.copy(alpha = 0.15f)
           listOf(ftp, ftp / 2).forEach { watts ->
-            val y = yForPower(watts)
+            val y = yForPower(watts.toFloat())
             drawLine(color = gridColor, start = Offset(0f, y), end = Offset(width, y), strokeWidth = 1.dp.toPx())
           }
         }
 
         // Full-height-from-zero interval blocks over the visible window.
-        val step = (winSpan / 200).coerceAtLeast(1)
+        val step = (winSpan / 200f).coerceAtLeast(1f)
         var sec = winStart
         while (sec <= winEnd) {
-          val range = WorkoutMath.targetRangeAt(segments, sec)
+          val range = WorkoutMath.targetRangeAt(segments, sec.toInt())
           val nextSec = (sec + step).coerceAtMost(winEnd)
           val xStart = xForTime(sec)
           val xEnd = xForTime(nextSec)
           val target = (range.low + range.high) / 2
-          val yTop = yForPower(target)
+          val yTop = yForPower(target.toFloat())
           drawRect(
             color = ZoneColors.forTarget(target, ftp, darkTheme).fill,
             topLeft = Offset(xStart, yTop),
@@ -182,8 +214,8 @@ fun WorkoutChart(
         // Highlight the tapped interval.
         selectedIndex?.let { idx ->
           bounds.getOrNull(idx)?.let { (s, e, _) ->
-            val xs = xForTime(s).coerceIn(0f, width)
-            val xe = xForTime(e).coerceIn(0f, width)
+            val xs = xForTime(s.toFloat()).coerceIn(0f, width)
+            val xe = xForTime(e.toFloat()).coerceIn(0f, width)
             drawRect(
               color = cursorColor.copy(alpha = 0.18f),
               topLeft = Offset(xs, 0f),
@@ -192,43 +224,56 @@ fun WorkoutChart(
           }
         }
 
-        // Only draw sample lines for points inside the window so zoom doesn't
-        // stretch straight lines to the edges.
-        val visible = samples.filter { it.timeSec in winStart..winEnd }
-
-        // HR line, own axis, broken across dropouts (hrBpm == 0).
-        if (visible.size >= 2) {
-          var hrPath: Path? = null
-          visible.forEach { sample ->
-            if (sample.hrBpm <= 0) {
-              hrPath = null
-            } else {
-              val point = Offset(xForTime(sample.timeSec), yForHr(sample.hrBpm))
-              val current = hrPath
-              if (current == null) {
-                hrPath = Path().apply { moveTo(point.x, point.y) }
-              } else {
-                current.lineTo(point.x, point.y)
-              }
-            }
-          }
-          hrPath?.let { drawPath(it, color = hrLineColor, style = Stroke(width = 2.dp.toPx())) }
+        // Cached paths are stored in time/value coordinates. Transform their
+        // geometry into screen coordinates so the stroke is not scaled.
+        if (samples.size >= 2) {
+          val xScale = width / winSpan
+          val hrRange = HR_AXIS_MAX - HR_AXIS_MIN
+          val hrScaleY = -chartHeight / hrRange
+          hrMatrix.setScale(xScale, hrScaleY)
+          hrMatrix.postTranslate(
+            -winStart * xScale,
+            chartBottom - HR_AXIS_MIN * hrScaleY
+          )
+          val hrScratchAndroidPath = hrScratchPath.asAndroidPath()
+          hrScratchAndroidPath.rewind()
+          hrScratchAndroidPath.addPath(cachedHrPath.asAndroidPath(), hrMatrix)
+          drawPath(hrScratchPath, color = hrLineColor, style = Stroke(width = 2.dp.toPx()))
         }
 
-        // Power line, drawn last so it stays on top of the zone blocks.
-        if (visible.size >= 2) {
-          val path = Path()
-          visible.firstOrNull()?.let { first ->
-            path.moveTo(xForTime(first.timeSec), yForPower(first.powerWatts))
+        // Power line, drawn last so it stays on top of the zone blocks. The
+        // newest segment is intentionally omitted from the cached path: it is
+        // drawn below from the animated elapsed value to make each live sample
+        // extend into place.
+        if (samples.size >= 2) {
+          val xScale = width / winSpan
+          val powerScaleY = -chartHeight / maxPowerAxis
+          powerMatrix.setScale(xScale, powerScaleY)
+          powerMatrix.postTranslate(-winStart * xScale, chartBottom)
+          val powerScratchAndroidPath = powerScratchPath.asAndroidPath()
+          powerScratchAndroidPath.rewind()
+          powerScratchAndroidPath.addPath(cachedPowerPath.asAndroidPath(), powerMatrix)
+          drawPath(powerScratchPath, color = powerLineColor, style = Stroke(width = 2.5.dp.toPx()))
+
+          val previous = samples[samples.lastIndex - 1]
+          val newest = samples.last()
+          val tailSpan = newest.timeSec - previous.timeSec
+          if (tailSpan > 0) {
+            val tailProgress = ((animatedElapsedSec - previous.timeSec) / tailSpan).coerceIn(0f, 1f)
+            val tailTime = previous.timeSec + tailSpan * tailProgress
+            val tailPower = previous.powerWatts +
+              (newest.powerWatts - previous.powerWatts) * tailProgress
+            drawLine(
+              color = powerLineColor,
+              start = Offset(xForTime(previous.timeSec.toFloat()), yForPower(previous.powerWatts.toFloat())),
+              end = Offset(xForTime(tailTime), yForPower(tailPower)),
+              strokeWidth = 2.5.dp.toPx()
+            )
           }
-          visible.drop(1).forEach { sample ->
-            path.lineTo(xForTime(sample.timeSec), yForPower(sample.powerWatts))
-          }
-          drawPath(path, color = powerLineColor, style = Stroke(width = 2.5.dp.toPx()))
         }
 
-        if (elapsedSec in winStart..winEnd) {
-          val currentX = xForTime(elapsedSec)
+        if (animatedElapsedSec in winStart..winEnd) {
+          val currentX = xForTime(animatedElapsedSec)
           drawLine(
             color = cursorColor,
             start = Offset(currentX, 0f),
@@ -253,6 +298,54 @@ fun WorkoutChart(
         }
       }
     }
+  }
+}
+
+internal data class WorkoutChartWindow(
+  val startSec: Float,
+  val endSec: Float
+)
+
+internal fun computeWorkoutChartWindow(
+  zoomToCurrent: Boolean,
+  totalDurationSec: Int,
+  elapsedSec: Int,
+  segments: List<WorkoutSegment>,
+  bounds: List<Triple<Int, Int, WorkoutSegment>>
+): WorkoutChartWindow {
+  if (!zoomToCurrent || totalDurationSec <= 0) {
+    return WorkoutChartWindow(startSec = 0f, endSec = totalDurationSec.toFloat())
+  }
+
+  val currentIndex = WorkoutMath.segmentIndexAt(segments, elapsedSec)
+  val (start, end) = bounds.getOrNull(currentIndex)?.let { it.first to it.second }
+    ?: (0 to totalDurationSec)
+  return WorkoutChartWindow(
+    startSec = (start - ZOOM_PAD_SEC).coerceAtLeast(0).toFloat(),
+    endSec = (end + ZOOM_PAD_SEC).coerceAtMost(totalDurationSec).toFloat()
+  )
+}
+
+private fun buildHrPath(samples: List<TelemetrySample>): Path = Path().apply {
+  var hasPoint = false
+  samples.forEach { sample ->
+    if (sample.hrBpm <= 0) {
+      hasPoint = false
+    } else if (hasPoint) {
+      lineTo(sample.timeSec.toFloat(), sample.hrBpm.toFloat())
+    } else {
+      moveTo(sample.timeSec.toFloat(), sample.hrBpm.toFloat())
+      hasPoint = true
+    }
+  }
+}
+
+private fun buildPowerPath(samples: List<TelemetrySample>): Path = Path().apply {
+  if (samples.size < 2) return@apply
+  moveTo(samples.first().timeSec.toFloat(), samples.first().powerWatts.toFloat())
+  for (index in 1 until samples.lastIndex) {
+    val sample = samples[index]
+    lineTo(sample.timeSec.toFloat(), sample.powerWatts.toFloat())
   }
 }
 

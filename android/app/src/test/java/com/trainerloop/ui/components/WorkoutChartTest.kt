@@ -1,6 +1,8 @@
 package com.trainerloop.ui.components
 
 import androidx.compose.ui.graphics.Color
+import com.trainerloop.data.model.SegmentPhase
+import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.ui.theme.ZoneColors
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -15,6 +17,16 @@ class WorkoutChartTest {
   private val amber = Color(0xFFF59E0B)
   private val orange = Color(0xFFF97316)
   private val red = Color(0xFFEF4444)
+
+  private val segments = listOf(
+    WorkoutSegment.FreeRide("warmup", 60, null, SegmentPhase.WARMUP),
+    WorkoutSegment.FreeRide("work", 120, null, SegmentPhase.WORK)
+  )
+
+  private val bounds = listOf(
+    Triple(0, 60, segments[0]),
+    Triple(60, 180, segments[1])
+  )
 
   @Test
   fun `below 55 percent is gray`() {
@@ -49,5 +61,33 @@ class WorkoutChartTest {
   @Test
   fun `zero ftp falls back to gray without dividing by zero`() {
     assertEquals(slate, ZoneColors.forTarget(targetWatts = 200, ftp = 0, dark = true).fill)
+  }
+
+  @Test
+  fun `full window covers the total duration`() {
+    val window = computeWorkoutChartWindow(
+      zoomToCurrent = false,
+      totalDurationSec = 180,
+      elapsedSec = 90,
+      segments = segments,
+      bounds = bounds
+    )
+
+    assertEquals(0f, window.startSec, 0f)
+    assertEquals(180f, window.endSec, 0f)
+  }
+
+  @Test
+  fun `focus window pads the current segment and clamps to duration`() {
+    val window = computeWorkoutChartWindow(
+      zoomToCurrent = true,
+      totalDurationSec = 180,
+      elapsedSec = 90,
+      segments = segments,
+      bounds = bounds
+    )
+
+    assertEquals(40f, window.startSec, 0f)
+    assertEquals(180f, window.endSec, 0f)
   }
 }
