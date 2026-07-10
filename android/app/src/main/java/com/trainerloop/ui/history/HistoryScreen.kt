@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
@@ -123,24 +124,29 @@ private fun SessionCard(session: SessionSummary, onClick: () -> Unit) {
         Text(
           text = session.workoutName,
           style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold
+          fontWeight = FontWeight.SemiBold,
+          modifier = Modifier
+            .weight(1f)
+            .padding(end = 8.dp),
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
         )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          if (session.icuSyncedAt != null) {
-            Icon(
-              imageVector = Icons.Filled.CloudDone,
-              contentDescription = "Synced to intervals.icu",
-              tint = MaterialTheme.colorScheme.primary,
-              modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-          }
-          Text(
-            text = formatSessionDate(session.startedAt),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+        if (session.icuSyncedAt != null) {
+          Icon(
+            imageVector = Icons.Filled.CloudDone,
+            contentDescription = "Synced to intervals.icu",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp)
           )
+          Spacer(modifier = Modifier.width(6.dp))
         }
+        Text(
+          text = formatSessionDate(session.startedAt),
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
       }
       Spacer(modifier = Modifier.height(12.dp))
       Row(
