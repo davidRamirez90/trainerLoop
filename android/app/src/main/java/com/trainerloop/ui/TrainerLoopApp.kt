@@ -5,6 +5,8 @@ import android.content.Context
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -28,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavBackStackEntry
@@ -58,6 +61,8 @@ import com.trainerloop.ui.navigation.sharedAxisXPopExit
 import com.trainerloop.ui.navigation.tabFadeThrough
 import com.trainerloop.ui.settings.SettingsScreen
 import com.trainerloop.ui.theme.LocalReducedMotion
+import com.trainerloop.ui.theme.MotionSpec
+import com.trainerloop.ui.theme.reducedMotionAware
 import com.trainerloop.ui.workout.detail.WorkoutDetailScreen
 import com.trainerloop.ui.complete.WorkoutCompleteScreen
 import com.trainerloop.ui.complete.WorkoutCompleteViewModelFactory
@@ -86,6 +91,11 @@ fun TrainerLoopApp(
         NavigationBar {
           Screen.bottomTabs.forEach { screen ->
             val selected = currentRoute == screen.route
+            val iconScale by animateFloatAsState(
+              targetValue = if (selected && !reducedMotion) 1.06f else 1f,
+              animationSpec = reducedMotionAware(MotionSpec.momentum),
+              label = "bottom-tab-icon-scale"
+            )
             NavigationBarItem(
               selected = selected,
               onClick = {
@@ -97,7 +107,16 @@ fun TrainerLoopApp(
                   }
                 }
               },
-              icon = { Icon(imageVector = screen.icon, contentDescription = screen.label) },
+              icon = {
+                Box(
+                  modifier = Modifier.graphicsLayer {
+                    scaleX = iconScale
+                    scaleY = iconScale
+                  }
+                ) {
+                  Icon(imageVector = screen.icon, contentDescription = screen.label)
+                }
+              },
               label = { Text(screen.label) }
             )
           }
