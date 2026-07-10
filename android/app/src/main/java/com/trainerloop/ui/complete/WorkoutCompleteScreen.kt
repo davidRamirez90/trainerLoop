@@ -35,6 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trainerloop.ui.components.SampleChart
+import com.trainerloop.ui.theme.NumericMedium
+import com.trainerloop.ui.theme.NumericSmall
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -79,7 +81,7 @@ fun WorkoutCompleteScreen(
       )
       Text(
         text = "${formatDuration(uiState.durationSec)} · ${uiState.avgPower} W avg",
-        style = MaterialTheme.typography.bodyMedium,
+        style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
         color = MaterialTheme.colorScheme.onSurfaceVariant
       )
 
@@ -276,13 +278,13 @@ private fun RampTestResultCard(
         val pct = if (prev > 0) delta * 100 / prev else 0
         Text(
           text = "$newFtp W",
-          style = MaterialTheme.typography.headlineLarge,
+          style = MaterialTheme.typography.headlineLarge.copy(fontFeatureSettings = "tnum"),
           fontWeight = FontWeight.Bold
         )
         Text(
           text = "${if (delta >= 0) "up" else "down"} ${kotlin.math.abs(delta)} W " +
             "(${if (delta >= 0) "+" else ""}$pct%) from $prev W",
-          style = MaterialTheme.typography.bodyMedium,
+          style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
           color = MaterialTheme.colorScheme.onSecondaryContainer
         )
         Spacer(modifier = Modifier.height(12.dp))
@@ -357,8 +359,7 @@ private fun SummaryCard(
     ) {
       Text(
         text = value,
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold,
+        style = NumericMedium,
         color = MaterialTheme.colorScheme.onPrimaryContainer
       )
       Text(
@@ -385,8 +386,7 @@ private fun StatRow(label: String, value: String) {
     )
     Text(
       text = value,
-      style = MaterialTheme.typography.bodyLarge,
-      fontWeight = FontWeight.Bold
+      style = NumericSmall.copy(fontWeight = FontWeight.Bold)
     )
   }
 }

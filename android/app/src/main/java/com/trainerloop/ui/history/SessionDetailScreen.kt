@@ -39,6 +39,8 @@ import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.domain.WorkoutSummaryMath
 import com.trainerloop.ui.components.SampleChart
+import com.trainerloop.ui.theme.NumericMedium
+import com.trainerloop.ui.theme.NumericSmall
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.time.Instant
@@ -213,8 +215,7 @@ private fun SummaryCard(label: String, value: String, modifier: Modifier = Modif
     ) {
       Text(
         text = value,
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold,
+        style = NumericMedium,
         color = MaterialTheme.colorScheme.onPrimaryContainer
       )
       Text(
@@ -241,8 +242,7 @@ private fun StatRow(label: String, value: String) {
     )
     Text(
       text = value,
-      style = MaterialTheme.typography.bodyLarge,
-      fontWeight = FontWeight.Bold
+      style = NumericSmall.copy(fontWeight = FontWeight.Bold)
     )
   }
 }

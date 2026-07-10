@@ -77,6 +77,8 @@ import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
 import com.trainerloop.ui.components.WorkoutChart
 import com.trainerloop.ui.theme.Green40
+import com.trainerloop.ui.theme.NumericMedium
+import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.zoneColorSet
 import com.trainerloop.ui.workout.WorkoutStatsPager
@@ -280,8 +282,7 @@ fun WorkoutScreen(
           )
           Text(
             text = formatDuration(uiState.elapsedSec),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
+            style = NumericMedium
           )
         }
         Column(horizontalAlignment = Alignment.End) {
@@ -292,8 +293,7 @@ fun WorkoutScreen(
           )
           Text(
             text = "${uiState.targetRange.low}-${uiState.targetRange.high} W",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
+            style = NumericMedium
           )
         }
       }
@@ -313,7 +313,7 @@ fun WorkoutScreen(
           )
           Text(
             text = "${uiState.inZoneSec}s / ${formatShortDuration(segElapsed)}",
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
             color = MaterialTheme.colorScheme.onSurfaceVariant
           )
         }
@@ -405,7 +405,7 @@ fun WorkoutScreen(
         )
         Text(
           text = "Segment ${uiState.segmentIndex + 1}/${uiState.segments.size}",
-          style = MaterialTheme.typography.bodySmall,
+          style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
@@ -475,8 +475,7 @@ fun WorkoutScreen(
         }
         Text(
           text = "${if (uiState.intensityOffsetPct >= 0) "+" else ""}${uiState.intensityOffsetPct}%",
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.Bold,
+          style = NumericSmall.copy(fontWeight = FontWeight.Bold),
           modifier = Modifier.align(Alignment.CenterVertically)
         )
         FilledTonalButton(
@@ -673,9 +672,17 @@ private fun RailMetric(
     Row(verticalAlignment = Alignment.Bottom) {
       Text(
         text = value,
-        style = if (big) MaterialTheme.typography.displayMedium.copy(fontFeatureSettings = "tnum")
-        else MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"),
-        fontWeight = FontWeight.Bold,
+        style = if (big) {
+          MaterialTheme.typography.displayMedium.copy(
+            fontWeight = FontWeight.Bold,
+            fontFeatureSettings = "tnum"
+          )
+        } else {
+          MaterialTheme.typography.headlineMedium.copy(
+            fontWeight = FontWeight.Bold,
+            fontFeatureSettings = "tnum"
+          )
+        },
         color = color ?: MaterialTheme.colorScheme.onSurface
       )
       if (unit.isNotEmpty()) {
@@ -847,7 +854,7 @@ private fun ImmersiveWorkoutChart(
       ) { Icon(Icons.Default.Remove, contentDescription = "Zoom out") }
       Text(
         text = "${zoom.toInt()}×",
-        style = MaterialTheme.typography.labelLarge,
+        style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
         fontWeight = FontWeight.Bold
       )
       FilledIconButton(
@@ -890,9 +897,9 @@ private fun BigMetric(
         Text(
           text = value,
           style = MaterialTheme.typography.displaySmall.copy(
+            fontWeight = FontWeight.Bold,
             fontFeatureSettings = "tnum"
           ),
-          fontWeight = FontWeight.Bold,
           color = valueColor
             ?: if (highlight) MaterialTheme.colorScheme.onPrimaryContainer
             else MaterialTheme.colorScheme.onSurface
@@ -913,7 +920,7 @@ private fun FooterStat(label: String, value: String) {
   Column(horizontalAlignment = Alignment.CenterHorizontally) {
     Text(
       text = value,
-      style = MaterialTheme.typography.bodyMedium,
+      style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
       fontWeight = FontWeight.SemiBold
     )
     Text(

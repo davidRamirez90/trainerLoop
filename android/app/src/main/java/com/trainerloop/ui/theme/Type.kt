@@ -5,6 +5,34 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
+val NumericDisplay = TextStyle(
+  fontWeight = FontWeight.Bold,
+  fontSize = 64.sp,
+  lineHeight = 68.sp,
+  fontFeatureSettings = "tnum"
+)
+
+val NumericLarge = TextStyle(
+  fontWeight = FontWeight.SemiBold,
+  fontSize = 40.sp,
+  lineHeight = 44.sp,
+  fontFeatureSettings = "tnum"
+)
+
+val NumericMedium = TextStyle(
+  fontWeight = FontWeight.Medium,
+  fontSize = 24.sp,
+  lineHeight = 28.sp,
+  fontFeatureSettings = "tnum"
+)
+
+val NumericSmall = TextStyle(
+  fontWeight = FontWeight.Medium,
+  fontSize = 16.sp,
+  lineHeight = 22.sp,
+  fontFeatureSettings = "tnum"
+)
+
 val Typography = Typography(
   displayLarge = TextStyle(
     fontWeight = FontWeight.ExtraBold,

@@ -44,6 +44,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.SessionSummary
 import com.trainerloop.ui.theme.ZoneColors
+import com.trainerloop.ui.theme.NumericSmall
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -249,8 +250,7 @@ private fun SessionStat(value: String, label: String) {
   Column {
     Text(
       text = value,
-      style = MaterialTheme.typography.titleMedium,
-      fontWeight = FontWeight.Bold
+      style = NumericSmall.copy(fontWeight = FontWeight.Bold)
     )
     Text(
       text = label,

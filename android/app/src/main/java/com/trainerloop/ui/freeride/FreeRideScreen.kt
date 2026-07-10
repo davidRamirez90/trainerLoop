@@ -184,8 +184,10 @@ fun FreeRideScreen(
         Text("GEAR", style = MaterialTheme.typography.labelSmall)
         Text(
           "${uiState.gear}",
-          style = MaterialTheme.typography.displayMedium,
-          fontWeight = FontWeight.Bold
+          style = MaterialTheme.typography.displayMedium.copy(
+            fontWeight = FontWeight.Bold,
+            fontFeatureSettings = "tnum"
+          )
         )
       }
       FilledTonalButton(
@@ -253,7 +255,13 @@ private fun RideMetric(label: String, value: String, unit: String, modifier: Mod
       Text(label, style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant)
       Row(verticalAlignment = Alignment.Bottom) {
-        Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(
+          value,
+          style = MaterialTheme.typography.headlineSmall.copy(
+            fontWeight = FontWeight.Bold,
+            fontFeatureSettings = "tnum"
+          )
+        )
         if (unit.isNotEmpty()) {
           Spacer(modifier = Modifier.width(2.dp))
           Text(unit, style = MaterialTheme.typography.labelSmall,
