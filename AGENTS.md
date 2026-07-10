@@ -1,40 +1,28 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-- `src/` holds the React + TypeScript app. Key areas include `src/components/` (UI building blocks), `src/hooks/` (state/telemetry logic), `src/data/` (mock workout data), and `src/utils/` (formatting helpers).
-- `public/` contains static assets served by Vite.
-- `docs/` tracks product and delivery notes (implementation plan, data model, UX flow).
-- `profiles/` stores coach profile JSON files.
-- `UI concepts/` contains UI references and wireframes.
+## Project structure
 
-## Build, Test, and Development Commands
-- `npm install` installs dependencies.
-- `npm run dev` starts the Vite dev server with HMR.
-- `npm run build` runs TypeScript build + Vite production build.
-- `npm run preview` serves the production build locally.
-- `npm run lint` runs ESLint across the repo.
+- `android/` is the Android Gradle project; the application module is `android/app`.
+- `android/app/src/main/java/com/trainerloop/domain/` contains the pure-Kotlin core (coaching, parsing, FIT, and ride simulation).
+- `android/app/src/main/java/com/trainerloop/ui/` contains the Jetpack Compose UI and ViewModels; `data/` contains models, repositories, and Room/remote sources.
+- `android/README.md` documents the app architecture, setup, and useful commands. Product and implementation notes live in `docs/plans/`.
 
-## Coding Style & Naming Conventions
-- TypeScript + React function components; keep logic in hooks when possible.
-- Use 2-space indentation, semicolons, and single quotes to match current files.
-- Component files use PascalCase (e.g., `src/components/WorkoutChart.tsx`).
-- Hooks use `useX` naming (e.g., `src/hooks/useTelemetrySimulation.ts`).
-- Prefer CSS variables in `src/index.css` and component styles in `src/App.css`.
+## Build and test
 
-## Testing Guidelines
-- No test framework is configured yet. When adding tests, introduce a test runner, document the command in this file, and keep tests close to source (for example in `src/__tests__/`).
-- Define any coverage expectations when tests are introduced.
+Run commands from `android/` with JDK 17:
 
-## Commit & Pull Request Guidelines
-- Recent commits use short prefixes like `feat:`, `chore:`, and `chg:` with concise summaries. Follow this pattern.
-- PRs should include a clear description, linked issue (if available), and screenshots for UI changes (workout screen updates in particular).
-- If UX or MVP scope shifts, update `docs/implementation-plan.md` progress notes.
+```bash
+./gradlew testDebugUnitTest lint
+```
 
-## Architecture Overview
-- The app is front-end only. Workout definitions live in `src/data/workout.ts` and simulated telemetry is generated in `src/hooks/useTelemetrySimulation.ts`.
+Use `./gradlew assembleDebug` for a debug APK. Instrumentation tests require an Android device or emulator.
 
-## Critical Reminders
-- **ALWAYS run `npm run build` after making code changes** to verify TypeScript compiles and there are no runtime errors before considering the task complete. This catches type errors, missing imports, and syntax issues that linting might miss.
-- **ALWAYS run `npm run lint` after making code changes** to ensure code follows the project's ESLint rules and catches style issues, unused variables, and potential bugs.
+## Kotlin and tests
 
-Bugs: add regression test when it fits.
+- Use Kotlin/Compose function components and 2-space indentation.
+- Do not use wildcard imports; keep imports explicit and follow existing naming conventions.
+- Use JUnit 4 for tests, with MockK and Turbine where appropriate. Keep Android-independent logic in `domain/` so it remains unit-testable.
+
+## Commits and documentation
+
+Use concise conventional prefixes such as `feat:`, `fix:`, `test:`, `chore:`, and `chg:`. Update `android/README.md` or the relevant `docs/plans/` note when architecture, setup, or delivery scope changes.

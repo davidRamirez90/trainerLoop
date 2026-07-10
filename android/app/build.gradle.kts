@@ -62,6 +62,12 @@ android {
   }
 }
 
+kapt {
+  arguments {
+    arg("room.schemaLocation", "$projectDir/schemas")
+  }
+}
+
 dependencies {
   implementation(platform("androidx.compose:compose-bom:2024.12.01"))
   implementation("androidx.compose.ui:ui")
@@ -85,6 +91,8 @@ dependencies {
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
   androidTestImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
   androidTestImplementation("androidx.test.ext:junit:1.2.1")
+  androidTestImplementation("androidx.test:runner:1.6.2")
+  androidTestImplementation("androidx.room:room-testing:2.6.1")
   androidTestImplementation("androidx.compose.ui:ui-test-junit4")
   debugImplementation("androidx.compose.ui:ui-tooling")
 }
