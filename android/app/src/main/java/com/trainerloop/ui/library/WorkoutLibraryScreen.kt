@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.Workout
+import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.components.WorkoutMiniChart
 import com.trainerloop.ui.theme.Spacing
 
@@ -175,10 +177,14 @@ fun WorkoutLibraryScreen(
 
 @Composable
 private fun RampTestCard(onClick: () -> Unit) {
+  val interactionSource = remember { MutableInteractionSource() }
+
   Card(
+    onClick = onClick,
     modifier = Modifier
       .fillMaxWidth()
-      .clickable(onClick = onClick),
+      .pressable(interactionSource),
+    interactionSource = interactionSource,
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.primaryContainer
     )
@@ -213,11 +219,14 @@ private fun WorkoutCard(
   val workout = item.workout
   val stats = item.stats
   var menuOpen by remember { mutableStateOf(false) }
+  val interactionSource = remember { MutableInteractionSource() }
 
   Card(
+    onClick = onClick,
     modifier = Modifier
       .fillMaxWidth()
-      .clickable(onClick = onClick),
+      .pressable(interactionSource),
+    interactionSource = interactionSource,
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceVariant
     )

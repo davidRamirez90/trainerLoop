@@ -2,6 +2,7 @@ package com.trainerloop.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.model.SessionSummary
 import com.trainerloop.ui.components.MetricBadge
+import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.theme.Green20
 import com.trainerloop.ui.theme.Green40
 import com.trainerloop.ui.theme.Spacing
@@ -200,6 +202,8 @@ private fun RiderHeader(
 
 @Composable
 private fun StartRideHero(onStartFreeRide: () -> Unit) {
+  val interactionSource = remember { MutableInteractionSource() }
+
   Card(
     modifier = Modifier.fillMaxWidth(),
     shape = RoundedCornerShape(24.dp)
@@ -224,7 +228,10 @@ private fun StartRideHero(onStartFreeRide: () -> Unit) {
       Spacer(modifier = Modifier.height(Spacing.lg))
       Button(
         onClick = onStartFreeRide,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+          .pressable(interactionSource)
+          .fillMaxWidth(),
+        interactionSource = interactionSource,
         colors = ButtonDefaults.buttonColors(
           containerColor = Color.White,
           contentColor = Green20

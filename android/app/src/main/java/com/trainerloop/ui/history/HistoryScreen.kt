@@ -3,6 +3,7 @@ package com.trainerloop.ui.history
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.SessionSummary
+import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
@@ -110,10 +112,14 @@ fun HistoryScreen(
 
 @Composable
 private fun SessionCard(session: SessionSummary, onClick: () -> Unit) {
+  val interactionSource = remember { MutableInteractionSource() }
+
   Card(
+    onClick = onClick,
     modifier = Modifier
       .fillMaxWidth()
-      .clickable(onClick = onClick),
+      .pressable(interactionSource),
+    interactionSource = interactionSource,
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceVariant
     )

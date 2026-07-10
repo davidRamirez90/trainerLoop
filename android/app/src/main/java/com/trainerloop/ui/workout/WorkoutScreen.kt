@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,6 +77,7 @@ import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
 import com.trainerloop.ui.components.WorkoutChart
+import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.theme.Green40
 import com.trainerloop.ui.theme.NumericMedium
 import com.trainerloop.ui.theme.NumericSmall
@@ -496,6 +498,10 @@ fun WorkoutScreen(
       Spacer(modifier = Modifier.height(12.dp))
 
       // Main controls
+      val playPauseInteractionSource = remember { MutableInteractionSource() }
+      val skipInteractionSource = remember { MutableInteractionSource() }
+      val stopInteractionSource = remember { MutableInteractionSource() }
+
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -504,7 +510,10 @@ fun WorkoutScreen(
           uiState.isRunning -> {
             Button(
               onClick = { viewModel.pause() },
-              modifier = Modifier.weight(1f)
+              modifier = Modifier
+                .pressable(playPauseInteractionSource)
+                .weight(1f),
+              interactionSource = playPauseInteractionSource
             ) {
               Icon(Icons.Default.Pause, contentDescription = null)
               Spacer(modifier = Modifier.width(4.dp))
@@ -515,7 +524,10 @@ fun WorkoutScreen(
             val resumable = uiState.elapsedSec > 0 && !uiState.isComplete
             Button(
               onClick = { if (resumable) viewModel.resume() else viewModel.start() },
-              modifier = Modifier.weight(1f)
+              modifier = Modifier
+                .pressable(playPauseInteractionSource)
+                .weight(1f),
+              interactionSource = playPauseInteractionSource
             ) {
               Icon(Icons.Default.PlayArrow, contentDescription = null)
               Spacer(modifier = Modifier.width(4.dp))
@@ -526,7 +538,9 @@ fun WorkoutScreen(
 
         FilledTonalButton(
           onClick = { viewModel.skipSegment() },
-          enabled = uiState.segmentEndSec < WorkoutMath.totalDurationSec(uiState.segments)
+          enabled = uiState.segmentEndSec < WorkoutMath.totalDurationSec(uiState.segments),
+          modifier = Modifier.pressable(skipInteractionSource),
+          interactionSource = skipInteractionSource
         ) {
           Icon(Icons.Default.SkipNext, contentDescription = null)
           Spacer(modifier = Modifier.width(4.dp))
@@ -535,6 +549,8 @@ fun WorkoutScreen(
 
         Button(
           onClick = { requestStop() },
+          modifier = Modifier.pressable(stopInteractionSource),
+          interactionSource = stopInteractionSource,
           colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
         ) {
           Icon(Icons.Default.Stop, contentDescription = null)
@@ -625,8 +641,17 @@ private fun LandscapeWorkout(
         unit = ""
       )
       Spacer(Modifier.weight(1f))
+      val playPauseInteractionSource = remember { MutableInteractionSource() }
+      val stopInteractionSource = remember { MutableInteractionSource() }
+
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilledIconButton(onClick = onPlayPause, modifier = Modifier.weight(1f)) {
+        FilledIconButton(
+          onClick = onPlayPause,
+          modifier = Modifier
+            .pressable(playPauseInteractionSource)
+            .weight(1f),
+          interactionSource = playPauseInteractionSource
+        ) {
           Icon(
             if (uiState.isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
             contentDescription = if (uiState.isRunning) "Pause" else "Play"
@@ -634,7 +659,10 @@ private fun LandscapeWorkout(
         }
         FilledIconButton(
           onClick = onStop,
-          modifier = Modifier.weight(1f),
+          modifier = Modifier
+            .pressable(stopInteractionSource)
+            .weight(1f),
+          interactionSource = stopInteractionSource,
           colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
             containerColor = MaterialTheme.colorScheme.error,
             contentColor = MaterialTheme.colorScheme.onError
