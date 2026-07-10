@@ -44,6 +44,34 @@ class FitEncoderTest {
   }
 
   @Test
+  fun `session definition uses cadence and power profile field numbers`() {
+    val bytes = FitEncoder.encode(
+      startTimeMs = utcMillis(2024, 0, 1, 12, 0, 0),
+      elapsedSec = 3,
+      samples = listOf(TelemetrySample(0, 200, 90, 140))
+    )
+    val definition = (0 until bytes.size - 2).first { index ->
+      (bytes[index].toInt() and 0xff) == 0x43 &&
+        (bytes[index + 3].toInt() and 0xff) == 18 &&
+        (bytes[index + 4].toInt() and 0xff) == 0
+    }
+    val fieldCount = bytes[definition + 5].toInt() and 0xff
+    val fields = (0 until fieldCount).map { offset ->
+      bytes[definition + 6 + offset * 3].toInt() and 0xff
+    }
+    assertEquals(listOf(253, 2, 5, 7, 8, 9, 18, 16, 17, 20, 21), fields)
+  }
+
+  @Test
+  fun `trailing CRC covers header and data`() {
+    val bytes = FitEncoder.encode(1_700_000_000_000L, 5, listOf(TelemetrySample(0, 200, 90, 140)))
+    val expected = crc16(bytes.dropLast(2).map { it.toInt() and 0xff })
+    val actual = (bytes[bytes.size - 2].toInt() and 0xff) or
+      ((bytes[bytes.size - 1].toInt() and 0xff) shl 8)
+    assertEquals(expected, actual)
+  }
+
+  @Test
   fun `virtual ride fields survive an encode decode round trip`() {
     val samples = (1..10).map { t ->
       TelemetrySample(
@@ -117,5 +145,23 @@ class FitEncoderTest {
 
     val array = Json.decodeFromString(JsonArray.serializer(), json)
     return array.map { it.jsonPrimitive.int.toByte() }.toTypedArray()
+  }
+
+  private fun crc16(bytes: List<Int>): Int {
+    val table = intArrayOf(
+      0x0000, 0xcc01, 0xd801, 0x1400, 0xf001, 0x3c00, 0x2800, 0xe401,
+      0xa001, 0x6c00, 0x7800, 0xb401, 0x5000, 0x9c01, 0x8801, 0x4400
+    )
+    var crc = 0
+    bytes.forEach { byte ->
+      val value = byte and 0xff
+      var tmp = table[crc and 0x0f]
+      crc = (crc shr 4) and 0x0fff
+      crc = crc xor tmp xor table[value and 0x0f]
+      tmp = table[crc and 0x0f]
+      crc = (crc shr 4) and 0x0fff
+      crc = crc xor tmp xor table[(value shr 4) and 0x0f]
+    }
+    return crc and 0xffff
   }
 }

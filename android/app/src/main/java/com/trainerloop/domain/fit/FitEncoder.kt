@@ -51,7 +51,7 @@ object FitEncoder {
     ((value shr 24) and 0xff).toInt()
   )
 
-  private fun encodeValue(field: FitField, value: Int?): List<Int> {
+  private fun encodeValue(field: FitField, value: Long?): List<Int> {
     if (field.baseType == BASE_TYPE_SINT32) {
       val v = value ?: INVALID_SINT32
       return encodeUint32(v.toLong() and 0xffffffffL) // two's complement LE
@@ -66,16 +66,16 @@ object FitEncoder {
 
     return when (field.baseType) {
       BASE_TYPE_UINT16 -> {
-        val next = clamp(value, 0, INVALID_UINT16)
-        encodeUint16(next)
+        val next = clamp(value, 0, INVALID_UINT16.toLong())
+        encodeUint16(next.toInt())
       }
       BASE_TYPE_UINT32 -> {
-        val next = clamp(value.toLong(), 0, INVALID_UINT32.toLong())
+        val next = clamp(value, 0, INVALID_UINT32.toLong())
         encodeUint32(next)
       }
       else -> {
-        val next = clamp(value, 0, INVALID_UINT8)
-        if (field.size == 1) listOf(next) else List(field.size) { next }
+        val next = clamp(value, 0, INVALID_UINT8.toLong())
+        if (field.size == 1) listOf(next.toInt()) else List(field.size) { next.toInt() }
       }
     }
   }
@@ -103,12 +103,12 @@ object FitEncoder {
   private fun buildDataMessage(
     localType: Int,
     fields: List<FitField>,
-    values: List<Int?>
+    values: List<Number?>
   ): List<Int> {
     val bytes = mutableListOf<Int>()
     bytes.add(localType and 0x0f)
     fields.forEachIndexed { index, field ->
-      bytes.addAll(encodeValue(field, values[index]))
+      bytes.addAll(encodeValue(field, values[index]?.toLong()))
     }
     return bytes
   }
@@ -205,8 +205,8 @@ object FitEncoder {
     val timerSec = kotlin.math.max(0, lastSampleSec)
     val totalElapsedSec = kotlin.math.max(elapsedSec, timerSec)
     val fitEndTimestamp = fitStartTimestamp + totalElapsedSec
-    val totalElapsedMs = totalElapsedSec * 1000
-    val totalTimerMs = timerSec * 1000
+    val totalElapsedMs = totalElapsedSec.toLong() * 1000L
+    val totalTimerMs = timerSec.toLong() * 1000L
 
     val avgPower = computeAverage(normalizedSamples, { it.powerWatts }, { true })
     val avgCadence = computeAverage(normalizedSamples, { it.cadenceRpm }, { it > 0 })
@@ -242,11 +242,11 @@ object FitEncoder {
       FitField(7, 4, BASE_TYPE_UINT32),
       FitField(8, 4, BASE_TYPE_UINT32),
       FitField(9, 4, BASE_TYPE_UINT32),  // total_distance, cm
-      FitField(15, 1, BASE_TYPE_UINT8),
+      FitField(18, 1, BASE_TYPE_UINT8), // avg_cadence
       FitField(16, 1, BASE_TYPE_UINT8),
       FitField(17, 1, BASE_TYPE_UINT8),
-      FitField(18, 2, BASE_TYPE_UINT16),
-      FitField(19, 2, BASE_TYPE_UINT16)
+      FitField(20, 2, BASE_TYPE_UINT16), // avg_power
+      FitField(21, 2, BASE_TYPE_UINT16)  // max_power
     )
     val activityFields = listOf(
       FitField(253, 4, BASE_TYPE_UINT32),
@@ -268,7 +268,7 @@ object FitEncoder {
       val cadence = if (sample.cadenceRpm > 0) sample.cadenceRpm else null
       val hr = if (sample.hrBpm > 0) sample.hrBpm else null
       val speed = sample.virtualSpeedKph?.let { (it / 3.6 * 1000).toInt() }
-      val distance = sample.virtualDistanceM?.let { (it * 100).toInt() }
+      val distance = sample.virtualDistanceM?.let { (it * 100).toLong() }
       val altitude = sample.virtualAltitudeM?.let { ((it + 500.0) * 5).toInt() }
       val lat = sample.positionLat?.let { (it * SEMICIRCLES_PER_DEGREE).toInt() }
       val lon = sample.positionLon?.let { (it * SEMICIRCLES_PER_DEGREE).toInt() }
@@ -286,7 +286,7 @@ object FitEncoder {
 
     val totalDistanceCm = normalizedSamples
       .lastOrNull { it.virtualDistanceM != null }
-      ?.virtualDistanceM?.let { (it * 100).toInt() }
+      ?.virtualDistanceM?.let { (it * 100).toLong() }
 
     dataBytes.addAll(buildDefinitionMessage(3, 18, sessionFields))
     dataBytes.addAll(
@@ -340,7 +340,7 @@ object FitEncoder {
     val fileBytes = MutableList(fileSize) { 0 }
     header.forEachIndexed { index, value -> fileBytes[index] = value }
     dataBytes.forEachIndexed { index, value -> fileBytes[header.size + index] = value }
-    val fileCrc = crc16(dataBytes)
+    val fileCrc = crc16(header + dataBytes)
     fileBytes[header.size + dataBytes.size] = fileCrc and 0xff
     fileBytes[header.size + dataBytes.size + 1] = (fileCrc shr 8) and 0xff
 
