@@ -30,12 +30,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.trainerloop.data.model.SegmentPhase
-import com.trainerloop.data.model.TargetRange
-import com.trainerloop.data.model.Workout
-import com.trainerloop.data.model.WorkoutSegment
-import com.trainerloop.data.model.WorkoutSource
 import com.trainerloop.data.model.TelemetrySample
+import com.trainerloop.domain.RampTest
+import com.trainerloop.domain.WorkoutResolver
 import com.trainerloop.ui.devices.DevicesScreen
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.ui.history.HistoryScreen
@@ -97,10 +94,24 @@ fun TrainerLoopApp(
           onNavigateToDevices = { navController.navigate(Screen.Devices.route) },
           onNavigateToWorkouts = { navController.navigate(Screen.Workouts.route) },
           onNavigateToBuilder = { navController.navigate(Screen.WorkoutBuilder.route) },
-          onStartFreeRide = { navController.navigate(Screen.WorkoutPlayer.createRoute(sessionId = System.currentTimeMillis())) },
+          onStartFreeRide = {
+            navController.navigate(
+              Screen.WorkoutPlayer.createRoute(
+                sessionId = System.currentTimeMillis(),
+                workoutId = WorkoutResolver.FREE_RIDE_ID
+              )
+            )
+          },
           onStartPlanned = { workout ->
-            context.trainerLoopApp.selectedWorkout = workout
-            navController.navigate(Screen.WorkoutPlayer.createRoute(sessionId = System.currentTimeMillis()))
+            if (com.trainerloop.ui.library.ImportedWorkoutStore.load(context).none { it.id == workout.id }) {
+              com.trainerloop.ui.library.ImportedWorkoutStore.add(context, workout)
+            }
+            navController.navigate(
+              Screen.WorkoutPlayer.createRoute(
+                sessionId = System.currentTimeMillis(),
+                workoutId = workout.id
+              )
+            )
           },
           onGpxRoutes = { navController.navigate(Screen.Routes.route) }
         )
@@ -193,13 +204,16 @@ fun TrainerLoopApp(
         val context = LocalContext.current
         WorkoutLibraryScreen(
           onWorkoutSelected = { workout ->
-            context.trainerLoopApp.selectedWorkout = workout
             navController.navigate(Screen.WorkoutDetail.createRoute(workout.id))
           },
           onStartRampTest = {
             val ftp = com.trainerloop.data.repository.ProfileRepository(context).getProfileSync().ftp
-            context.trainerLoopApp.selectedWorkout = com.trainerloop.domain.RampTest.generate(ftp)
-            navController.navigate(Screen.WorkoutPlayer.createRoute(sessionId = System.currentTimeMillis()))
+            navController.navigate(
+              Screen.WorkoutPlayer.createRoute(
+                sessionId = System.currentTimeMillis(),
+                workoutId = RampTest.generate(ftp).id
+              )
+            )
           }
         )
       }
@@ -230,28 +244,60 @@ fun TrainerLoopApp(
       composable(
         route = Screen.WorkoutDetail.route,
         arguments = listOf(navArgument("workoutId") { type = NavType.StringType })
-      ) {
+      ) { backStackEntry ->
         val context = LocalContext.current
-        val workout = context.trainerLoopApp.selectedWorkout
+        val workoutId = backStackEntry.arguments?.getString("workoutId") ?: return@composable
+        val ftp = remember { com.trainerloop.data.repository.ProfileRepository(context).getProfileSync().ftp }
+        val workout = remember(workoutId) {
+          WorkoutResolver.resolve(
+            workoutId,
+            ftp,
+            com.trainerloop.ui.library.ImportedWorkoutStore.load(context)
+          )
+        }
         if (workout == null) {
           LaunchedEffect(Unit) { navController.popBackStack() }
           return@composable
         }
         WorkoutDetailScreen(
           workout = workout,
-          onStartWorkout = { navController.navigate(Screen.WorkoutPlayer.createRoute(sessionId = System.currentTimeMillis())) },
+          onStartWorkout = {
+            navController.navigate(
+              Screen.WorkoutPlayer.createRoute(
+                sessionId = System.currentTimeMillis(),
+                workoutId = workout.id
+              )
+            )
+          },
           onBack = { navController.popBackStack() }
         )
       }
 
       composable(
         route = Screen.WorkoutPlayer.route,
-        arguments = listOf(navArgument("sessionId") { type = NavType.LongType })
-      ) {
+        arguments = listOf(
+          navArgument("sessionId") { type = NavType.LongType },
+          navArgument("workoutId") { type = NavType.StringType }
+        )
+      ) { backStackEntry ->
         val context = LocalContext.current
         val app = context.trainerLoopApp
-        val workout = app.selectedWorkout ?: sampleWorkout
         val profile = remember { com.trainerloop.data.repository.ProfileRepository(context).getProfileSync() }
+        val workoutId = backStackEntry.arguments?.getString("workoutId") ?: return@composable
+        val workout = remember(workoutId, profile.ftp) {
+          WorkoutResolver.resolve(
+            workoutId,
+            profile.ftp,
+            com.trainerloop.ui.library.ImportedWorkoutStore.load(context)
+          )
+        }
+        if (workout == null) {
+          LaunchedEffect(Unit) {
+            android.util.Log.e("TrainerLoopApp", "Unable to resolve workoutId=$workoutId")
+            navController.popBackStack()
+          }
+          return@composable
+        }
         val coachProfile = remember(profile.selectedCoachProfileId) {
           com.trainerloop.data.source.local.CoachProfileLoader.load(
             context, profile.selectedCoachProfileId
@@ -403,19 +449,3 @@ private val Screen.label: String
     Screen.Profile -> "Profile"
     else -> ""
   }
-
-// Temporary sample workout for development
-private val sampleWorkout = Workout(
-  id = "sample",
-  name = "Sweet Spot",
-  description = "Aerobic sweet spot training",
-  source = WorkoutSource.MANUAL,
-  segments = listOf(
-    WorkoutSegment.FreeRide(id = "warmup", durationSec = 300, label = "Warm Up", phase = SegmentPhase.WARMUP),
-    WorkoutSegment.Step(id = "ss1", durationSec = 300, label = "Sweet Spot", phase = SegmentPhase.WORK, isWork = true, targetRange = TargetRange(200, 210)),
-    WorkoutSegment.Step(id = "ss2", durationSec = 300, label = "Sweet Spot", phase = SegmentPhase.WORK, isWork = true, targetRange = TargetRange(210, 220)),
-    WorkoutSegment.Ramp(id = "ramp", durationSec = 120, label = "Ramp", phase = SegmentPhase.WORK, isWork = true, startPower = 220, endPower = 250),
-    WorkoutSegment.Step(id = "ss3", durationSec = 180, label = "Hard", phase = SegmentPhase.WORK, isWork = true, targetRange = TargetRange(250, 260)),
-    WorkoutSegment.FreeRide(id = "cd", durationSec = 300, label = "Cool Down", phase = SegmentPhase.COOLDOWN)
-  )
-)

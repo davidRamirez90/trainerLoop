@@ -9,7 +9,6 @@ import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
 import com.trainerloop.ble.BleLog
 import com.trainerloop.ble.ZwiftClickManager
-import com.trainerloop.data.model.Workout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,7 +42,6 @@ class TrainerLoopApplication : Application(), ManagerProvider {
    */
   private var trainerConnection: BleConnection? = null
 
-  var selectedWorkout: Workout? = null
   /** Set by FreeRideScreen while active: volume keys shift gears (true = up). */
   var volumeShiftHandler: ((Boolean) -> Unit)? = null
 

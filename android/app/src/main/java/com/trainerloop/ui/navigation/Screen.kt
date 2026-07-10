@@ -18,8 +18,9 @@ sealed class Screen(val route: String) {
   object WorkoutDetail : Screen("workout_detail/{workoutId}") {
     fun createRoute(workoutId: String): String = "workout_detail/$workoutId"
   }
-  object WorkoutPlayer : Screen("workout_player/{sessionId}") {
-    fun createRoute(sessionId: Long): String = "workout_player/$sessionId"
+  object WorkoutPlayer : Screen("workout_player/{sessionId}/{workoutId}") {
+    fun createRoute(sessionId: Long, workoutId: String): String =
+      "workout_player/$sessionId/${Uri.encode(workoutId)}"
   }
   object WorkoutComplete : Screen("workout_complete/{sessionId}/{workoutId}/{workoutName}/{startTimeMs}") {
     fun createRoute(sessionId: String, workoutId: String, workoutName: String, startTimeMs: Long): String {
