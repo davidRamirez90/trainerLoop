@@ -33,9 +33,9 @@ fun Modifier.pressable(
       awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         val press = PressInteraction.Press(down.position)
-        source.emit(press)
+        source.tryEmit(press)
         val up = waitForUpOrCancellation()
-        source.emit(
+        source.tryEmit(
           if (up == null) {
             PressInteraction.Cancel(press)
           } else {

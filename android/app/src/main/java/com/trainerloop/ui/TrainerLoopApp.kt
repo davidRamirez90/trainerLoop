@@ -2,6 +2,9 @@ package com.trainerloop.ui
 
 import android.app.Application
 import android.content.Context
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -27,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -44,7 +48,16 @@ import com.trainerloop.ui.library.WorkoutBuilderScreen
 import com.trainerloop.ui.home.HomeScreen
 import com.trainerloop.ui.library.WorkoutLibraryScreen
 import com.trainerloop.ui.navigation.Screen
+import com.trainerloop.ui.navigation.TabFadeThroughTransitions
+import com.trainerloop.ui.navigation.playerEnter
+import com.trainerloop.ui.navigation.playerExit
+import com.trainerloop.ui.navigation.sharedAxisXEnter
+import com.trainerloop.ui.navigation.sharedAxisXExit
+import com.trainerloop.ui.navigation.sharedAxisXPopEnter
+import com.trainerloop.ui.navigation.sharedAxisXPopExit
+import com.trainerloop.ui.navigation.tabFadeThrough
 import com.trainerloop.ui.settings.SettingsScreen
+import com.trainerloop.ui.theme.LocalReducedMotion
 import com.trainerloop.ui.workout.detail.WorkoutDetailScreen
 import com.trainerloop.ui.complete.WorkoutCompleteScreen
 import com.trainerloop.ui.complete.WorkoutCompleteViewModelFactory
@@ -60,6 +73,8 @@ fun TrainerLoopApp(
 ) {
   val currentBackStackEntry by navController.currentBackStackEntryAsState()
   val currentRoute = currentBackStackEntry?.destination?.route
+  val reducedMotion = LocalReducedMotion.current
+  val tabTransitions = tabFadeThrough(reducedMotion)
 
   Scaffold(
     containerColor = MaterialTheme.colorScheme.background,
@@ -93,7 +108,31 @@ fun TrainerLoopApp(
     NavHost(
       modifier = Modifier.padding(padding),
       navController = navController,
-      startDestination = Screen.Home.route
+      startDestination = Screen.Home.route,
+      enterTransition = {
+        defaultEnterTransition(
+          reducedMotion = reducedMotion,
+          tabTransitions = tabTransitions
+        )
+      },
+      exitTransition = {
+        defaultExitTransition(
+          reducedMotion = reducedMotion,
+          tabTransitions = tabTransitions
+        )
+      },
+      popEnterTransition = {
+        defaultPopEnterTransition(
+          reducedMotion = reducedMotion,
+          tabTransitions = tabTransitions
+        )
+      },
+      popExitTransition = {
+        defaultPopExitTransition(
+          reducedMotion = reducedMotion,
+          tabTransitions = tabTransitions
+        )
+      }
     ) {
       composable(Screen.Home.route) {
         val context = LocalContext.current
@@ -287,7 +326,11 @@ fun TrainerLoopApp(
         arguments = listOf(
           navArgument("sessionId") { type = NavType.LongType },
           navArgument("workoutId") { type = NavType.StringType }
-        )
+        ),
+        enterTransition = { playerEnter(reducedMotion) },
+        exitTransition = { tabTransitions.exit },
+        popEnterTransition = { playerEnter(reducedMotion) },
+        popExitTransition = { playerExit(reducedMotion) }
       ) { backStackEntry ->
         val context = LocalContext.current
         val app = context.trainerLoopApp
@@ -406,6 +449,63 @@ private const val FINISH_COACH_KEY = "finish_coach"
 private const val FINISH_TYPE_KEY = "finish_type"
 private const val FINISH_ROUTE_KEY = "finish_route"
 private const val FINISH_COMPLETED_KEY = "finish_completed"
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.defaultEnterTransition(
+  reducedMotion: Boolean,
+  tabTransitions: TabFadeThroughTransitions
+): EnterTransition {
+  val initialRoute = initialState.destination.route
+  val targetRoute = targetState.destination.route
+  return when {
+    targetRoute == Screen.WorkoutPlayer.route -> playerEnter(reducedMotion)
+    initialRoute.isBottomTabRoute() && targetRoute.isBottomTabRoute() -> tabTransitions.enter
+    else -> sharedAxisXEnter(reducedMotion)
+  }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.defaultExitTransition(
+  reducedMotion: Boolean,
+  tabTransitions: TabFadeThroughTransitions
+): ExitTransition {
+  val initialRoute = initialState.destination.route
+  val targetRoute = targetState.destination.route
+  return when {
+    targetRoute == Screen.WorkoutPlayer.route -> tabTransitions.exit
+    initialRoute == Screen.WorkoutPlayer.route -> tabTransitions.exit
+    initialRoute.isBottomTabRoute() && targetRoute.isBottomTabRoute() -> tabTransitions.exit
+    else -> sharedAxisXExit(reducedMotion)
+  }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.defaultPopEnterTransition(
+  reducedMotion: Boolean,
+  tabTransitions: TabFadeThroughTransitions
+): EnterTransition {
+  val initialRoute = initialState.destination.route
+  val targetRoute = targetState.destination.route
+  return when {
+    targetRoute == Screen.WorkoutPlayer.route -> playerEnter(reducedMotion)
+    initialRoute == Screen.WorkoutPlayer.route -> tabTransitions.enter
+    initialRoute.isBottomTabRoute() && targetRoute.isBottomTabRoute() -> tabTransitions.enter
+    else -> sharedAxisXPopEnter(reducedMotion)
+  }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.defaultPopExitTransition(
+  reducedMotion: Boolean,
+  tabTransitions: TabFadeThroughTransitions
+): ExitTransition {
+  val initialRoute = initialState.destination.route
+  val targetRoute = targetState.destination.route
+  return when {
+    initialRoute == Screen.WorkoutPlayer.route -> playerExit(reducedMotion)
+    initialRoute.isBottomTabRoute() && targetRoute.isBottomTabRoute() -> tabTransitions.exit
+    else -> sharedAxisXPopExit(reducedMotion)
+  }
+}
+
+private fun String?.isBottomTabRoute(): Boolean =
+  Screen.bottomTabs.any { it.route == this }
 
 private fun NavHostController.storeFinishPayload(
   context: Context,
