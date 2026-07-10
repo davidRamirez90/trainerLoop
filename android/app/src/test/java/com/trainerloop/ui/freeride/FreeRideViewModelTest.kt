@@ -2,6 +2,8 @@ package com.trainerloop.ui.freeride
 
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
+import com.trainerloop.ble.ClickShift
+import com.trainerloop.ble.ZwiftClickManager
 import com.trainerloop.ble.model.IndoorBikeData
 import com.trainerloop.data.model.Route
 import com.trainerloop.data.model.RoutePoint
@@ -9,6 +11,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -105,5 +108,40 @@ class FreeRideViewModelTest {
     assertNotNull(finish)
     assertTrue(finish!!.samples.isNotEmpty())
     assertEquals("Test", finish.workoutName)
+  }
+
+  @Test
+  fun `zwift click shift events change gear like the buttons`() = runTest(testDispatcher) {
+    val shifts = MutableSharedFlow<ClickShift>()
+    val click: ZwiftClickManager = mockk(relaxed = true) {
+      every { shiftEvents } returns shifts
+    }
+    val vm = FreeRideViewModel(
+      route = route(),
+      routeId = "r1",
+      ftmsManagerFlow = MutableStateFlow(mockFtms(MutableStateFlow(bikeData(180, 90.0)))),
+      hrManagerFlow = MutableStateFlow(null),
+      clickManagerFlow = MutableStateFlow<ZwiftClickManager?>(click),
+      dispatcher = testDispatcher
+    )
+    runCurrent()
+
+    shifts.emit(ClickShift.UP)
+    runCurrent()
+    assertEquals(8, vm.uiState.value.gear)
+
+    shifts.emit(ClickShift.DOWN)
+    shifts.emit(ClickShift.DOWN)
+    runCurrent()
+    assertEquals(6, vm.uiState.value.gear)
+  }
+
+  @Test
+  fun `no click paired behaves as today`() = runTest(testDispatcher) {
+    val vm = viewModel(MutableStateFlow(bikeData(180, 90.0)))
+    runCurrent()
+    assertEquals(7, vm.uiState.value.gear)
+    vm.shiftUp()
+    assertEquals(8, vm.uiState.value.gear)
   }
 }

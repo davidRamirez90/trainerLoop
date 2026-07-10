@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.trainerloop.ble.FtmsControlManager
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
+import com.trainerloop.ble.ZwiftClickManager
 import com.trainerloop.data.model.Route
 import com.trainerloop.data.model.UserProfile
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ class FreeRideViewModelFactory(
   private val ftmsManagerFlow: StateFlow<FtmsManager?>,
   private val hrManagerFlow: StateFlow<HrManager?>,
   private val ftmsControlManagerFlow: StateFlow<FtmsControlManager?>,
+  private val clickManagerFlow: StateFlow<ZwiftClickManager?>,
   private val userProfile: UserProfile
 ) : ViewModelProvider.Factory {
   @Suppress("UNCHECKED_CAST")
@@ -25,6 +27,7 @@ class FreeRideViewModelFactory(
       ftmsManagerFlow = ftmsManagerFlow,
       hrManagerFlow = hrManagerFlow,
       ftmsControlManagerFlow = ftmsControlManagerFlow,
+      clickManagerFlow = clickManagerFlow,
       userProfile = userProfile
     ) as T
 }

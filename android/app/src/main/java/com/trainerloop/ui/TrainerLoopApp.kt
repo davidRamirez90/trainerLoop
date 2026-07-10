@@ -143,7 +143,8 @@ fun TrainerLoopApp(
         val loaded = route ?: return@composable
         val profile = remember { com.trainerloop.data.repository.ProfileRepository(context).getProfileSync() }
         val freeRideFactory = remember(
-          loaded, routeId, app.ftmsManager, app.hrManager, app.ftmsControlManager, profile
+          loaded, routeId, app.ftmsManager, app.hrManager, app.ftmsControlManager,
+          app.clickManager, profile
         ) {
           com.trainerloop.ui.freeride.FreeRideViewModelFactory(
             route = loaded,
@@ -151,6 +152,7 @@ fun TrainerLoopApp(
             ftmsManagerFlow = app.ftmsManager,
             hrManagerFlow = app.hrManager,
             ftmsControlManagerFlow = app.ftmsControlManager,
+            clickManagerFlow = app.clickManager,
             userProfile = profile
           )
         }

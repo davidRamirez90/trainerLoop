@@ -2,10 +2,12 @@ package com.trainerloop.ui.freeride
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.trainerloop.ble.ClickShift
 import com.trainerloop.ble.FtmsControlManager
 import com.trainerloop.ble.FtmsControlStatus
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
+import com.trainerloop.ble.ZwiftClickManager
 import com.trainerloop.data.model.Route
 import com.trainerloop.data.model.SegmentPhase
 import com.trainerloop.data.model.TelemetrySample
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -59,6 +62,7 @@ class FreeRideViewModel(
   private val ftmsManagerFlow: StateFlow<FtmsManager?> = MutableStateFlow(null),
   private val hrManagerFlow: StateFlow<HrManager?> = MutableStateFlow(null),
   private val ftmsControlManagerFlow: StateFlow<FtmsControlManager?> = MutableStateFlow(null),
+  private val clickManagerFlow: StateFlow<ZwiftClickManager?> = MutableStateFlow(null),
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
   userProfile: UserProfile = UserProfile()
 ) : ViewModel() {
@@ -146,6 +150,19 @@ class FreeRideViewModel(
     }
     viewModelScope.launch {
       clock.isRunning.collect { _uiState.value = _uiState.value.copy(isRunning = it) }
+    }
+
+    // Zwift Click: third shift input beside the on-screen buttons and volume
+    // keys. Same entry points, so downstream (drivetrain, ERG) is untouched.
+    viewModelScope.launch {
+      clickManagerFlow
+        .flatMapLatest { manager -> manager?.shiftEvents ?: emptyFlow() }
+        .collect { shift ->
+          when (shift) {
+            ClickShift.UP -> shiftUp()
+            ClickShift.DOWN -> shiftDown()
+          }
+        }
     }
   }
 
