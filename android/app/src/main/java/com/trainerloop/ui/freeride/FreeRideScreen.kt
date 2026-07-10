@@ -1,5 +1,6 @@
 package com.trainerloop.ui.freeride
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,6 +59,8 @@ fun FreeRideScreen(
   val view = LocalView.current
   var showStopConfirm by remember { mutableStateOf(false) }
 
+  BackHandler(enabled = uiState.elapsedSec > 0) { showStopConfirm = true }
+
   LaunchedEffect(finishEvent) {
     finishEvent?.let {
       viewModel.consumeFinishEvent()
@@ -106,7 +109,12 @@ fun FreeRideScreen(
       title = { Text("End ride?") },
       text = { Text("The ride so far will be saved.") },
       confirmButton = {
-        TextButton(onClick = { showStopConfirm = false; viewModel.stop() }) { Text("End ride") }
+        TextButton(onClick = {
+          showStopConfirm = false
+          val hadSamples = uiState.samples.isNotEmpty()
+          viewModel.stop()
+          if (!hadSamples) onExit()
+        }) { Text("End ride") }
       },
       dismissButton = {
         TextButton(onClick = { showStopConfirm = false }) { Text("Keep riding") }
