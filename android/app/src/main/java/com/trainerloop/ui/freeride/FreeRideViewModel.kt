@@ -188,9 +188,10 @@ class FreeRideViewModel(
   }
 
   fun stop() {
+    recorder.value?.flush()
     clock.stop()
     viewModelScope.launch { ftmsControlManagerFlow.value?.stopPause(stop = true) }
-    val samples = _uiState.value.samples
+    val samples = recorder.value?.samples?.value ?: _uiState.value.samples
     if (samples.isNotEmpty()) {
       _finishEvent.value = WorkoutFinishData(
         workoutId = "gpx-free-ride",

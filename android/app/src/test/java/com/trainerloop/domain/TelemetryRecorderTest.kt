@@ -26,6 +26,30 @@ import org.junit.Test
 class TelemetryRecorderTest {
 
   @Test
+  fun `samples snapshot refreshes every 5 ticks and flush publishes immediately`() = runTest {
+    val testDispatcher = StandardTestDispatcher(testScheduler)
+    val clock = WorkoutClock(shortWorkout(durationSec = 5), testDispatcher)
+    val recorder = TelemetryRecorder(
+      clock,
+      TelemetryRecorder.DataProvider(
+        MutableStateFlow(stamp(bikeData(powerWatts = 200))),
+        MutableStateFlow(stamp(150))
+      ),
+      testDispatcher
+    )
+
+    recorder.startCollecting()
+    clock.start()
+    runCurrent()
+    advanceTimeBy(3_000)
+    runCurrent()
+
+    assertEquals(0, recorder.samples.value.size)
+    recorder.flush()
+    assertEquals(3, recorder.samples.value.size)
+  }
+
+  @Test
   fun `recorder seeded with prior samples appends instead of restarting`() = runTest {
     val testDispatcher = StandardTestDispatcher(testScheduler)
     val clock = WorkoutClock(shortWorkout(durationSec = 5), testDispatcher)
@@ -50,6 +74,7 @@ class TelemetryRecorderTest {
     advanceTimeBy(2000)
     runCurrent()
 
+    recorder.flush()
     assertEquals(listOf(1, 2), recorder.samples.value.map { it.timeSec })
   }
 
@@ -165,6 +190,7 @@ class TelemetryRecorderTest {
     advanceTimeBy(2000)
     runCurrent()
 
+    recorder.flush()
     val samples = recorder.samples.value
     assertEquals(3, samples.size)
     assertEquals(1, samples[0].timeSec)
@@ -206,6 +232,7 @@ class TelemetryRecorderTest {
     advanceTimeBy(1000)
     runCurrent()
 
+    recorder.flush()
     val samples = recorder.samples.value
     assertEquals(2, samples.size)
     assertEquals(150, samples[0].powerWatts)
@@ -231,6 +258,7 @@ class TelemetryRecorderTest {
     advanceTimeBy(1000)
     runCurrent()
 
+    recorder.flush()
     assertTrue(recorder.samples.value.isNotEmpty())
 
     recorder.reset(2)
@@ -265,6 +293,7 @@ class TelemetryRecorderTest {
     advanceTimeBy(3000)
     runCurrent()
 
+    recorder.flush()
     val sample = recorder.samples.value.last()
     assertNotNull(sample.virtualSpeedKph)
     assertTrue(sample.virtualSpeedKph!! > 0.0)
@@ -291,6 +320,7 @@ class TelemetryRecorderTest {
     advanceTimeBy(1000)
     runCurrent()
 
+    recorder.flush()
     assertNull(recorder.samples.value.last().virtualSpeedKph)
   }
 

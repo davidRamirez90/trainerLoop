@@ -102,13 +102,14 @@ class FreeRideViewModelTest {
     val vm = viewModel(ftmsData)
     vm.start()
     runCurrent()
-    advanceTimeBy(5_000)
+    advanceTimeBy(3_000)
     runCurrent()
     vm.stop()
     runCurrent()
     val finish = vm.finishEvent.value
     assertNotNull(finish)
     assertTrue(finish!!.samples.isNotEmpty())
+    assertEquals(3, finish.samples.size)
     assertEquals("Test", finish.workoutName)
     assertFalse(finish.completedNaturally)
   }

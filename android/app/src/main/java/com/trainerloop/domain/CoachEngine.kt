@@ -187,21 +187,15 @@ class CoachEngine(
 
     val targetMid = (input.targetRange.low + input.targetRange.high) / 2.0
     val recent = computeMetrics(
-      input.samples,
-      maxOf(0, input.activeSec - ADHERENCE_WINDOW_SEC),
-      input.activeSec,
+      input.samples.takeLast(ADHERENCE_WINDOW_SEC),
       targetMid
     )
     val stability = computeMetrics(
-      input.samples,
-      maxOf(0, input.activeSec - STABILITY_WINDOW_SEC),
-      input.activeSec,
+      input.samples.takeLast(STABILITY_WINDOW_SEC),
       targetMid
     )
     val drift = computeMetrics(
-      input.samples,
-      maxOf(0, input.activeSec - HR_DRIFT_WINDOW_SEC),
-      input.activeSec,
+      input.samples.takeLast(HR_DRIFT_WINDOW_SEC),
       targetMid
     )
     if (recent == null || stability == null || drift == null) return
@@ -353,11 +347,23 @@ class CoachEngine(
 
     private fun computeMetrics(
       samples: List<TelemetrySample>,
+      targetMid: Double
+    ): WindowMetrics? = computeMetricsForWindow(samples, targetMid)
+
+    private fun computeMetrics(
+      samples: List<TelemetrySample>,
       fromSec: Int,
       toSec: Int,
       targetMid: Double
+    ): WindowMetrics? = computeMetricsForWindow(
+      samples.filter { it.timeSec in fromSec..toSec },
+      targetMid
+    )
+
+    private fun computeMetricsForWindow(
+      window: List<TelemetrySample>,
+      targetMid: Double
     ): WindowMetrics? {
-      val window = samples.filter { it.timeSec in fromSec..toSec }
       if (window.size < MIN_SAMPLES) return null
       val powerValues = window.map { it.powerWatts }
       val cadenceValues = window.map { it.cadenceRpm }.filter { it > 0 }

@@ -57,6 +57,7 @@ class TelemetryRecorder(
   )
   val latest: StateFlow<TelemetrySample> = _latest.asStateFlow()
 
+  private val buffer = ArrayList(initialSamples)
   private val _samples = MutableStateFlow(initialSamples)
   val samples: StateFlow<List<TelemetrySample>> = _samples.asStateFlow()
 
@@ -111,9 +112,11 @@ class TelemetryRecorder(
 
         // Skip time 0 (initial flow values) and dedup by timeSec
         if (elapsedSec > 0) {
-          val existing = _samples.value
-          if (existing.isEmpty() || existing.last().timeSec < elapsedSec) {
-            _samples.value = existing + sample
+          if (buffer.isEmpty() || buffer.last().timeSec < elapsedSec) {
+            buffer.add(sample)
+            if (elapsedSec % SNAPSHOT_EVERY_SEC == 0) {
+              _samples.value = buffer.toList()
+            }
           }
         }
         com.trainerloop.ble.BleLog.d {
@@ -127,6 +130,7 @@ class TelemetryRecorder(
   @Suppress("UNUSED_PARAMETER")
   fun reset(sessionId: Int) {
     com.trainerloop.ble.BleLog.d("TelemetryRecorder.reset sessionId=$sessionId")
+    buffer.clear()
     _samples.value = emptyList()
     lastDataReceivedAtSec = null
     lastPowerWatts = 0
@@ -137,6 +141,10 @@ class TelemetryRecorder(
     )
   }
 
+  fun flush() {
+    _samples.value = buffer.toList()
+  }
+
   fun stop() {
     collecting = false
     scope.cancel()
@@ -145,5 +153,6 @@ class TelemetryRecorder(
   companion object {
     const val STALE_AFTER_MS = 3_000L
     const val HR_STALE_AFTER_MS = 5_000L
+    private const val SNAPSHOT_EVERY_SEC = 5
   }
 }

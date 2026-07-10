@@ -332,6 +332,7 @@ class WorkoutViewModel(
   }
 
   fun stop() {
+    recorder.value?.flush()
     clock.stop()
     viewModelScope.launch {
       controlNow()?.stopPause(stop = true)
@@ -502,13 +503,16 @@ class WorkoutViewModel(
   }
 
   fun maybeEmitFinish() {
+    val activeRecorder = recorder.value
+    activeRecorder?.flush()
     val state = _uiState.value
-    if (state.samples.isEmpty()) return
+    val samples = activeRecorder?.samples?.value ?: state.samples
+    if (samples.isEmpty()) return
     _finishEvent.value = WorkoutFinishData(
       workoutId = workout.id,
       workoutName = workout.name,
       startTimeMs = sessionStartMs ?: (now() - state.elapsedSec * 1000L),
-      samples = state.samples,
+      samples = samples,
       coachJson = if (isRampTest) "" else liveCoach.sessionData().toJson(),
       completedNaturally = state.isComplete
     )
