@@ -34,7 +34,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
@@ -52,13 +51,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
+import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.SessionSummary
-import com.trainerloop.ui.components.MetricBadge
+import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.ui.components.pressable
+import com.trainerloop.ui.components.WorkoutMiniChart
+import com.trainerloop.domain.WorkoutResolver
+import com.trainerloop.ui.library.ImportedWorkoutStore
 import com.trainerloop.ui.theme.Green20
 import com.trainerloop.ui.theme.Green40
+import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
+import com.trainerloop.ui.theme.zoneColorSet
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
+import java.util.Locale
 
+@Suppress("UNUSED_PARAMETER")
 @SuppressLint("MissingPermission")
 @Composable
 fun HomeScreen(
@@ -68,10 +78,12 @@ fun HomeScreen(
   onStartFreeRide: () -> Unit,
   onStartPlanned: (com.trainerloop.data.model.Workout) -> Unit,
   onGpxRoutes: () -> Unit,
+  onNavigateToProfile: () -> Unit,
   viewModel: HomeViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val plannedReady by viewModel.plannedWorkoutReady.collectAsStateWithLifecycle()
+  val context = LocalContext.current
 
   LaunchedEffect(plannedReady) {
     plannedReady?.let {
@@ -90,12 +102,21 @@ fun HomeScreen(
       RiderHeader(
         name = uiState.riderName,
         ftp = uiState.ftp,
-        weightKg = uiState.weightKg
+        weightKg = uiState.weightKg,
+        onClick = onNavigateToProfile
       )
     }
 
     item {
-      StartRideHero(onStartFreeRide = onStartFreeRide)
+      StartRideHero(
+        onStartFreeRide = onStartFreeRide,
+        trainerName = uiState.connectedTrainer?.name ?: uiState.trainerModel,
+        trainerConnected = uiState.isTrainerConnected,
+        trainerBattery = uiState.trainerBattery,
+        hrConnected = uiState.isHrConnected,
+        latestHrBpm = uiState.latestHrBpm,
+        onManageDevices = onNavigateToDevices
+      )
     }
 
     val hasPlan = uiState.plannedName != null || uiState.plannedLoading || uiState.plannedError != null
@@ -113,22 +134,7 @@ fun HomeScreen(
     }
 
     item {
-      DeviceStatusRow(
-        trainerName = uiState.connectedTrainer?.name,
-        trainerConnected = uiState.isTrainerConnected,
-        trainerBattery = uiState.trainerBattery,
-        hrConnected = uiState.isHrConnected,
-        latestHrBpm = uiState.latestHrBpm,
-        onManageDevices = onNavigateToDevices
-      )
-    }
-
-    item {
-      ActionRows(
-        onWorkoutLibrary = onNavigateToWorkouts,
-        onWorkoutBuilder = onNavigateToBuilder,
-        onGpxRoutes = onGpxRoutes
-      )
+      ActionRows(onWorkoutBuilder = onNavigateToBuilder, onGpxRoutes = onGpxRoutes)
     }
 
     // Today's plan takes over this slot when present — recent history only
@@ -153,7 +159,18 @@ fun HomeScreen(
         }
       } else {
         item {
-          RecentSessionCard(session = recentSession)
+          val recentWorkout = remember(recentSession.workoutId, uiState.ftp) {
+            WorkoutResolver.resolve(
+              recentSession.workoutId,
+              uiState.ftp,
+              ImportedWorkoutStore.load(context)
+            )
+          }
+          RecentSessionCard(
+            session = recentSession,
+            workout = recentWorkout,
+            ftp = uiState.ftp
+          )
         }
       }
     }
@@ -164,44 +181,63 @@ fun HomeScreen(
 private fun RiderHeader(
   name: String,
   ftp: Int,
-  weightKg: Double
+  weightKg: Double,
+  onClick: () -> Unit
 ) {
+  val interactionSource = remember { MutableInteractionSource() }
+
   Row(
-    modifier = Modifier.fillMaxWidth(),
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(vertical = Spacing.sm)
+      .pressable(interactionSource)
+      .clickable(
+        interactionSource = interactionSource,
+        indication = null,
+        onClick = onClick
+      ),
     verticalAlignment = Alignment.CenterVertically
   ) {
     Box(
       modifier = Modifier
-        .size(56.dp)
+        .size(44.dp)
         .clip(CircleShape)
         .background(MaterialTheme.colorScheme.primaryContainer),
       contentAlignment = Alignment.Center
     ) {
       Text(
         text = name.take(1).uppercase().takeIf { it.isNotBlank() } ?: "?",
-        style = MaterialTheme.typography.headlineMedium,
+        style = MaterialTheme.typography.titleLarge,
         color = MaterialTheme.colorScheme.onPrimaryContainer
       )
     }
 
-    Spacer(modifier = Modifier.width(16.dp))
+    Spacer(modifier = Modifier.width(Spacing.md))
 
     Column(modifier = Modifier.weight(1f)) {
       Text(
         text = name,
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.SemiBold
       )
-      Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        MetricBadge(label = "FTP", value = "$ftp W")
-        MetricBadge(label = "Weight", value = "${"%.1f".format(weightKg)} kg")
-      }
+      Text(
+        text = "FTP $ftp W · ${"%.1f".format(Locale.US, weightKg)} kg",
+        style = NumericSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+      )
     }
   }
 }
 
 @Composable
-private fun StartRideHero(onStartFreeRide: () -> Unit) {
+private fun StartRideHero(
+  onStartFreeRide: () -> Unit,
+  trainerName: String?,
+  trainerConnected: Boolean,
+  trainerBattery: Int?,
+  hrConnected: Boolean,
+  latestHrBpm: Int?,
+  onManageDevices: () -> Unit
+) {
   val interactionSource = remember { MutableInteractionSource() }
 
   Card(
@@ -212,38 +248,52 @@ private fun StartRideHero(onStartFreeRide: () -> Unit) {
       modifier = Modifier
         .fillMaxWidth()
         .background(Brush.linearGradient(listOf(Green20, Green40)))
-        .padding(Spacing.xl)
     ) {
-      Text(
-        text = "Ready to ride?",
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold,
-        color = Color.White
-      )
-      Text(
-        text = "Jump on the trainer and go",
-        style = MaterialTheme.typography.bodyMedium,
-        color = Color.White.copy(alpha = 0.8f)
-      )
-      Spacer(modifier = Modifier.height(Spacing.lg))
-      Button(
-        onClick = onStartFreeRide,
+      Column(
         modifier = Modifier
-          .pressable(interactionSource)
-          .fillMaxWidth(),
-        interactionSource = interactionSource,
-        colors = ButtonDefaults.buttonColors(
-          containerColor = Color.White,
-          contentColor = Green20
-        )
+          .fillMaxWidth()
+          .padding(Spacing.xl)
       ) {
-        Icon(
-          imageVector = Icons.AutoMirrored.Filled.DirectionsBike,
-          contentDescription = null,
-          modifier = Modifier.padding(end = 8.dp)
+        Text(
+          text = "Ready to ride?",
+          style = MaterialTheme.typography.headlineSmall,
+          fontWeight = FontWeight.Bold,
+          color = Color.White
         )
-        Text("Start Free Ride", fontWeight = FontWeight.SemiBold)
+        Text(
+          text = "Jump on the trainer and go",
+          style = MaterialTheme.typography.bodyMedium,
+          color = Color.White.copy(alpha = 0.8f)
+        )
+        Spacer(modifier = Modifier.height(Spacing.lg))
+        Button(
+          onClick = onStartFreeRide,
+          modifier = Modifier
+            .pressable(interactionSource)
+            .fillMaxWidth(),
+          interactionSource = interactionSource,
+          colors = ButtonDefaults.buttonColors(
+            containerColor = Color.White,
+            contentColor = Green20
+          )
+        ) {
+          Icon(
+            imageVector = Icons.AutoMirrored.Filled.DirectionsBike,
+            contentDescription = null,
+            modifier = Modifier.padding(end = 8.dp)
+          )
+          Text("Start Free Ride", fontWeight = FontWeight.SemiBold)
+        }
       }
+
+      ConnectionStrip(
+        trainerName = trainerName,
+        trainerConnected = trainerConnected,
+        trainerBattery = trainerBattery,
+        hrConnected = hrConnected,
+        latestHrBpm = latestHrBpm,
+        onManageDevices = onManageDevices
+      )
     }
   }
 }
@@ -346,7 +396,7 @@ private fun PlannedWorkoutCard(
 }
 
 @Composable
-private fun DeviceStatusRow(
+private fun ConnectionStrip(
   trainerName: String?,
   trainerConnected: Boolean,
   trainerBattery: Int?,
@@ -354,88 +404,75 @@ private fun DeviceStatusRow(
   latestHrBpm: Int?,
   onManageDevices: () -> Unit
 ) {
+  val interactionSource = remember { MutableInteractionSource() }
+
   Row(
-    modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = Arrangement.spacedBy(8.dp)
+    modifier = Modifier
+      .fillMaxWidth()
+      .background(Color.Black.copy(alpha = 0.12f))
+      .pressable(interactionSource)
+      .clickable(
+        interactionSource = interactionSource,
+        indication = null,
+        onClick = onManageDevices
+      )
+      .padding(horizontal = Spacing.xl, vertical = Spacing.md),
+    verticalAlignment = Alignment.CenterVertically
   ) {
-    DeviceChip(
+    ConnectionStatus(
       modifier = Modifier.weight(1f),
+      icon = if (trainerConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
       connected = trainerConnected,
-      label = if (trainerConnected) trainerName ?: "Trainer" else "No trainer",
-      detail = if (trainerConnected) {
-        trainerBattery?.let { "Battery $it%" } ?: "Connected"
-      } else "Tap to pair",
-      onClick = onManageDevices
+      label = trainerName ?: "Trainer",
+      value = if (trainerConnected) trainerBattery?.let { "$it%" } ?: "—" else "—"
     )
-    DeviceChip(
+    Spacer(modifier = Modifier.width(Spacing.md))
+    ConnectionStatus(
       modifier = Modifier.weight(1f),
+      icon = if (hrConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
       connected = hrConnected,
-      label = if (hrConnected) latestHrBpm?.let { "$it bpm" } ?: "HR sensor" else "No HR",
-      detail = if (hrConnected) "Connected" else "Tap to pair",
-      onClick = onManageDevices
+      label = "HR",
+      value = if (hrConnected) latestHrBpm?.let { "$it bpm" } ?: "—" else "—"
     )
   }
 }
 
 @Composable
-private fun DeviceChip(
+private fun ConnectionStatus(
   modifier: Modifier = Modifier,
+  icon: androidx.compose.ui.graphics.vector.ImageVector,
   connected: Boolean,
   label: String,
-  detail: String,
-  onClick: () -> Unit
+  value: String
 ) {
-  Surface(
+  Row(
     modifier = modifier,
-    shape = RoundedCornerShape(16.dp),
-    color = MaterialTheme.colorScheme.surfaceVariant,
-    onClick = onClick
+    verticalAlignment = Alignment.CenterVertically
   ) {
-    Row(
-      modifier = Modifier.padding(Spacing.lg),
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      Icon(
-        imageVector = if (connected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
-        contentDescription = if (connected) "Device connected" else "Device disconnected",
-        tint = if (connected) Green40 else MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.size(20.dp)
-      )
-      Spacer(modifier = Modifier.width(8.dp))
-      Column {
-        Text(
-          text = label,
-          style = MaterialTheme.typography.labelLarge,
-          fontWeight = FontWeight.SemiBold,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis
-        )
-        Text(
-          text = detail,
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis
-        )
-      }
-    }
+    Icon(
+      imageVector = icon,
+      contentDescription = if (connected) "Device connected" else "Device disconnected",
+      tint = Color.White.copy(alpha = if (connected) 1f else 0.65f),
+      modifier = Modifier.size(18.dp)
+    )
+    Spacer(modifier = Modifier.width(Spacing.sm))
+    Text(
+      text = "$label · $value",
+      style = MaterialTheme.typography.labelMedium,
+      color = Color.White.copy(alpha = if (connected) 1f else 0.75f),
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis
+    )
   }
 }
 
 @Composable
 private fun ActionRows(
-  onWorkoutLibrary: () -> Unit,
   onWorkoutBuilder: () -> Unit,
   onGpxRoutes: () -> Unit
 ) {
   Card(modifier = Modifier.fillMaxWidth()) {
     Column {
-      ActionRow(
-        icon = Icons.AutoMirrored.Filled.DirectionsBike,
-        label = "Workout Library",
-        onClick = onWorkoutLibrary
-      )
-      HorizontalDivider()
       ActionRow(
         icon = Icons.Default.Build,
         label = "Workout Builder",
@@ -457,11 +494,18 @@ private fun ActionRow(
   label: String,
   onClick: () -> Unit
 ) {
+  val interactionSource = remember { MutableInteractionSource() }
+
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .clickable(onClick = onClick)
-      .padding(Spacing.lg),
+      .padding(Spacing.lg)
+      .pressable(interactionSource)
+      .clickable(
+        interactionSource = interactionSource,
+        indication = null,
+        onClick = onClick
+      ),
     verticalAlignment = Alignment.CenterVertically
   ) {
     Icon(
@@ -485,42 +529,56 @@ private fun ActionRow(
 }
 
 @Composable
-private fun RecentSessionCard(session: SessionSummary) {
+private fun RecentSessionCard(
+  session: SessionSummary,
+  workout: Workout?,
+  ftp: Int
+) {
   Card(
     modifier = Modifier.fillMaxWidth(),
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceVariant
     )
   ) {
-    Column(modifier = Modifier.padding(Spacing.lg)) {
-      Text(
-        text = session.workoutName,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold
-      )
-      Spacer(modifier = Modifier.height(4.dp))
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
-      ) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(Spacing.lg),
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
         Text(
-          text = formatSessionDate(session.startedAt),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
+          text = session.workoutName,
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold,
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis
         )
+        Spacer(modifier = Modifier.height(Spacing.xs))
         Text(
-          text = formatDuration(session.durationSec),
+          text = formatSessionMeta(session),
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
       }
-      if (session.avgPower > 0) {
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-          text = "Avg Power: ${session.avgPower} W",
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+
+      if (workout != null) {
+        Spacer(modifier = Modifier.width(Spacing.md))
+        val chartColors = zoneColorSet(representativePower(workout), ftp)
+        Box(
+          modifier = Modifier
+            .size(width = 112.dp, height = 72.dp)
+            .clip(RoundedCornerShape(Spacing.md))
+            .background(chartColors.fill.copy(alpha = 0.14f))
+            .padding(horizontal = Spacing.sm, vertical = Spacing.xs)
+        ) {
+          WorkoutMiniChart(
+            workout = workout,
+            ftp = ftp,
+            chartHeight = 60.dp,
+            lineColor = chartColors.line
+          )
+        }
       }
     }
   }
@@ -529,13 +587,35 @@ private fun RecentSessionCard(session: SessionSummary) {
 private fun formatSessionDate(startedAt: String): String {
   return try {
     val instant = Instant.parse(startedAt)
-    DateTimeFormatter.ofPattern("MMM d, yyyy")
-      .withZone(ZoneId.systemDefault())
-      .format(instant)
+    val date = instant.atZone(ZoneId.systemDefault()).toLocalDate()
+    val daysAgo = ChronoUnit.DAYS.between(date, LocalDate.now())
+    if (daysAgo in 0..6) {
+      DateTimeFormatter.ofPattern("EEEE", Locale.getDefault()).format(date)
+    } else {
+      DateTimeFormatter.ofPattern("d MMM", Locale.getDefault()).format(date)
+    }
   } catch (_: Exception) {
     startedAt
   }
 }
+
+private fun formatSessionMeta(session: SessionSummary): String {
+  val parts = mutableListOf(
+    formatSessionDate(session.startedAt),
+    "${session.durationSec / 60} min"
+  )
+  if (session.avgPower > 0) parts += "${session.avgPower} W"
+  return parts.joinToString(" · ")
+}
+
+private fun representativePower(workout: Workout): Int =
+  workout.segments.firstNotNullOfOrNull { segment ->
+    when (segment) {
+      is WorkoutSegment.Step -> (segment.targetRange.low + segment.targetRange.high) / 2
+      is WorkoutSegment.Ramp -> (segment.startPower + segment.endPower) / 2
+      is WorkoutSegment.FreeRide -> null
+    }
+  } ?: 0
 
 private fun formatDuration(seconds: Int): String {
   val hours = seconds / 3600

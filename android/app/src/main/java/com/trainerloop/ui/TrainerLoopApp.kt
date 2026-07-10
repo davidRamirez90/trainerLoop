@@ -159,6 +159,13 @@ fun TrainerLoopApp(
           onNavigateToDevices = { navController.navigate(Screen.Devices.route) },
           onNavigateToWorkouts = { navController.navigate(Screen.Workouts.route) },
           onNavigateToBuilder = { navController.navigate(Screen.WorkoutBuilder.route) },
+          onNavigateToProfile = {
+            navController.navigate(Screen.Profile.route) {
+              popUpTo(Screen.Home.route) { saveState = true }
+              launchSingleTop = true
+              restoreState = true
+            }
+          },
           onStartFreeRide = {
             navController.navigate(
               Screen.WorkoutPlayer.createRoute(
