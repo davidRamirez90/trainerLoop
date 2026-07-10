@@ -19,12 +19,95 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.Locale
+
+enum class DeviceCapability(val label: String) {
+  TRAINER("Trainer"),
+  HEART_RATE("Heart Rate"),
+  CONTROLLER("Controller")
+}
+
+data class AggregatedDevice(
+  val device: BleDevice,
+  val capabilities: Set<DeviceCapability>
+)
+
+fun aggregateDevices(
+  trainers: List<BleDevice>,
+  hrSensors: List<BleDevice>,
+  controllers: List<BleDevice>
+): List<AggregatedDevice> {
+  val aggregated = linkedMapOf<String, AggregatedDevice>()
+
+  fun add(devices: List<BleDevice>, capability: DeviceCapability) {
+    devices.forEach { device ->
+      val identity = device.address.uppercase(Locale.ROOT)
+      val existing = aggregated[identity]
+      aggregated[identity] = if (existing == null) {
+        AggregatedDevice(device, linkedSetOf(capability))
+      } else {
+        existing.copy(
+          device = mergeDevices(existing.device, device),
+          capabilities = existing.capabilities + capability
+        )
+      }
+    }
+  }
+
+  add(trainers, DeviceCapability.TRAINER)
+  add(hrSensors, DeviceCapability.HEART_RATE)
+  add(controllers, DeviceCapability.CONTROLLER)
+  return aggregated.values.toList()
+}
+
+internal fun connectAggregatedDevice(
+  device: AggregatedDevice,
+  connectTrainer: (BleDevice) -> Unit,
+  connectHr: (BleDevice) -> Unit,
+  connectClick: (BleDevice) -> Unit
+) {
+  if (DeviceCapability.TRAINER in device.capabilities) connectTrainer(device.device)
+  if (DeviceCapability.HEART_RATE in device.capabilities) connectHr(device.device)
+  if (DeviceCapability.CONTROLLER in device.capabilities) connectClick(device.device)
+}
+
+internal fun disconnectAggregatedDevice(
+  device: AggregatedDevice,
+  disconnectTrainer: () -> Unit,
+  disconnectHr: () -> Unit,
+  disconnectClick: () -> Unit
+) {
+  if (DeviceCapability.TRAINER in device.capabilities) disconnectTrainer()
+  if (DeviceCapability.HEART_RATE in device.capabilities) disconnectHr()
+  if (DeviceCapability.CONTROLLER in device.capabilities) disconnectClick()
+}
+
+fun connectedDevices(state: DevicesUiState): List<AggregatedDevice> = aggregateDevices(
+  trainers = listOfNotNull(state.connectedTrainer),
+  hrSensors = listOfNotNull(state.connectedHr),
+  controllers = listOfNotNull(state.connectedClick)
+)
+
+internal fun DevicesUiState.isConnecting(device: AggregatedDevice): Boolean =
+  (DeviceCapability.TRAINER in device.capabilities && isConnectingTrainer &&
+    pendingTrainerAddress.equals(device.device.address, ignoreCase = true)) ||
+    (DeviceCapability.HEART_RATE in device.capabilities && isConnectingHr &&
+      pendingHrAddress.equals(device.device.address, ignoreCase = true)) ||
+    (DeviceCapability.CONTROLLER in device.capabilities && isConnectingClick &&
+      pendingClickAddress.equals(device.device.address, ignoreCase = true))
+
+private fun mergeDevices(first: BleDevice, second: BleDevice): BleDevice = first.copy(
+  name = first.name ?: second.name,
+  services = (first.services + second.services).distinct(),
+  rssi = maxOf(first.rssi, second.rssi)
+)
 
 data class DevicesUiState(
   val isScanning: Boolean = false,
   val trainerDevices: List<BleDevice> = emptyList(),
   val hrDevices: List<BleDevice> = emptyList(),
   val clickDevices: List<BleDevice> = emptyList(),
+  val availableDevices: List<AggregatedDevice> = emptyList(),
   val connectedTrainer: BleDevice? = null,
   val connectedHr: BleDevice? = null,
   val connectedClick: BleDevice? = null,
@@ -130,6 +213,7 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
             trainerDevices = trainers,
             hrDevices = hrSensors,
             clickDevices = controllers,
+            availableDevices = aggregateDevices(trainers, hrSensors, controllers),
             isScanning = true
           )
         }
@@ -156,6 +240,24 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
     scanTimeoutJob?.cancel()
     scanner.stopScan()
     _uiState.value = _uiState.value.copy(isScanning = false)
+  }
+
+  fun connectDevice(device: AggregatedDevice) {
+    connectAggregatedDevice(
+      device = device,
+      connectTrainer = ::connectTrainer,
+      connectHr = ::connectHr,
+      connectClick = ::connectClick
+    )
+  }
+
+  fun disconnectDevice(device: AggregatedDevice) {
+    disconnectAggregatedDevice(
+      device = device,
+      disconnectTrainer = ::disconnectTrainer,
+      disconnectHr = ::disconnectHr,
+      disconnectClick = ::disconnectClick
+    )
   }
 
   fun connectTrainer(device: BleDevice) {

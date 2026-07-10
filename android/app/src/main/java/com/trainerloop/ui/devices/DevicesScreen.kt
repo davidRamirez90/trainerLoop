@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,11 +33,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.trainerloop.ble.model.BleDevice
 import com.trainerloop.ui.theme.Green40
 
 @Composable
@@ -74,6 +73,13 @@ fun DevicesScreen(
 
     Spacer(modifier = Modifier.height(16.dp))
 
+    val pairedDevices = connectedDevices(uiState)
+    val availableDevices = uiState.availableDevices.filter {
+      pairedDevices.none { paired ->
+        paired.device.address.equals(it.device.address, ignoreCase = true)
+      }
+    }
+
     LazyColumn(
       modifier = Modifier.weight(1f),
       verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -87,7 +93,7 @@ fun DevicesScreen(
         )
       }
 
-      if (uiState.connectedTrainer == null && uiState.connectedHr == null && uiState.connectedClick == null) {
+      if (pairedDevices.isEmpty()) {
         item {
           Text(
             text = "No devices paired yet. Connect a trainer or HR sensor below.",
@@ -97,40 +103,14 @@ fun DevicesScreen(
         }
       }
 
-      uiState.connectedTrainer?.let { device ->
-        item {
-          PairedDeviceCard(
-            name = device.name ?: "Trainer",
-            connected = true,
-            detail = buildString {
-              uiState.trainerBattery?.let { append("Battery $it%") }
-              if (isBlank()) append("Connected")
-            },
-            onDisconnect = { viewModel.disconnectTrainer() }
-          )
-        }
-      }
-
-      uiState.connectedHr?.let { device ->
-        item {
-          PairedDeviceCard(
-            name = device.name ?: "Heart Rate",
-            connected = true,
-            detail = uiState.latestHrBpm?.let { "HR $it bpm" } ?: "Connected",
-            onDisconnect = { viewModel.disconnectHr() }
-          )
-        }
-      }
-
-      uiState.connectedClick?.let { device ->
-        item {
-          PairedDeviceCard(
-            name = device.name ?: "Zwift Click",
-            connected = true,
-            detail = uiState.clickBattery?.let { "Battery $it%" } ?: "Connected",
-            onDisconnect = { viewModel.disconnectClick() }
-          )
-        }
+      items(pairedDevices) { aggregated ->
+        PairedDeviceCard(
+          name = pairedDeviceName(aggregated),
+          capabilities = aggregated.capabilities,
+          connected = true,
+          detail = pairedDeviceDetail(aggregated, uiState),
+          onDisconnect = { viewModel.disconnectDevice(aggregated) }
+        )
       }
 
       item { Spacer(modifier = Modifier.height(8.dp)) }
@@ -144,67 +124,17 @@ fun DevicesScreen(
         )
       }
 
-      val pairedAddresses = setOfNotNull(
-        uiState.connectedTrainer?.address,
-        uiState.connectedHr?.address,
-        uiState.connectedClick?.address
-      )
-      val availableTrainers = uiState.trainerDevices.filter { it.address !in pairedAddresses }
-      val availableHr = uiState.hrDevices.filter { it.address !in pairedAddresses }
-      val availableControllers = uiState.clickDevices.filter { it.address !in pairedAddresses }
-
-      if (availableTrainers.isNotEmpty()) {
-        item {
-          Text(
-            text = "Trainers",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
-        items(availableTrainers) { device ->
+      if (availableDevices.isNotEmpty()) {
+        items(availableDevices) { device ->
           AvailableDeviceCard(
             device = device,
-            isConnecting = uiState.isConnectingTrainer && uiState.pendingTrainerAddress == device.address,
-            onConnect = { viewModel.connectTrainer(device) }
+            isConnecting = uiState.isConnecting(device),
+            onConnect = { viewModel.connectDevice(device) }
           )
         }
       }
 
-      if (availableHr.isNotEmpty()) {
-        item {
-          Text(
-            text = "Heart Rate Sensors",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
-        items(availableHr) { device ->
-          AvailableDeviceCard(
-            device = device,
-            isConnecting = uiState.isConnectingHr && uiState.pendingHrAddress == device.address,
-            onConnect = { viewModel.connectHr(device) }
-          )
-        }
-      }
-
-      if (availableControllers.isNotEmpty()) {
-        item {
-          Text(
-            text = "Controllers",
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
-        items(availableControllers) { device ->
-          AvailableDeviceCard(
-            device = device,
-            isConnecting = uiState.isConnectingClick && uiState.pendingClickAddress == device.address,
-            onConnect = { viewModel.connectClick(device) }
-          )
-        }
-      }
-
-      if (availableTrainers.isEmpty() && availableHr.isEmpty() && availableControllers.isEmpty() && !uiState.isScanning) {
+      if (availableDevices.isEmpty() && !uiState.isScanning) {
         item {
           Text(
             text = "No devices found. Tap Scan to search.",
@@ -298,6 +228,7 @@ private fun StatusRow(label: String, ok: Boolean) {
 @Composable
 private fun PairedDeviceCard(
   name: String,
+  capabilities: Set<DeviceCapability>,
   connected: Boolean,
   detail: String,
   onDisconnect: () -> Unit
@@ -328,6 +259,7 @@ private fun PairedDeviceCard(
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold
           )
+          CapabilityBadges(capabilities)
           Text(
             text = detail,
             style = MaterialTheme.typography.bodySmall,
@@ -344,7 +276,7 @@ private fun PairedDeviceCard(
 
 @Composable
 private fun AvailableDeviceCard(
-  device: BleDevice,
+  device: AggregatedDevice,
   isConnecting: Boolean,
   onConnect: () -> Unit
 ) {
@@ -370,11 +302,12 @@ private fun AvailableDeviceCard(
         Spacer(modifier = Modifier.padding(horizontal = 12.dp))
         Column {
           Text(
-            text = device.name ?: "Unknown",
+            text = device.device.name ?: "Unknown",
             style = MaterialTheme.typography.titleMedium
           )
+          CapabilityBadges(device.capabilities)
           Text(
-            text = "${device.address} · RSSI ${device.rssi}",
+            text = "${device.device.address} · RSSI ${device.device.rssi}",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
           )
@@ -396,4 +329,47 @@ private fun AvailableDeviceCard(
       }
     }
   }
+}
+
+@Composable
+private fun CapabilityBadges(capabilities: Set<DeviceCapability>) {
+  Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    capabilities
+      .sortedBy { it.ordinal }
+      .forEach { capability ->
+        AssistChip(
+          onClick = {},
+          enabled = false,
+          modifier = Modifier.height(28.dp),
+          label = {
+            Text(
+              text = capability.label,
+              style = MaterialTheme.typography.labelSmall
+            )
+          }
+        )
+      }
+  }
+}
+
+private fun pairedDeviceName(device: AggregatedDevice): String {
+  return device.device.name ?: device.capabilities.first().label
+}
+
+private fun pairedDeviceDetail(
+  device: AggregatedDevice,
+  state: DevicesUiState
+): String {
+  val details = buildList {
+    if (DeviceCapability.TRAINER in device.capabilities) {
+      state.trainerBattery?.let { add("Battery $it%") }
+    }
+    if (DeviceCapability.HEART_RATE in device.capabilities) {
+      state.latestHrBpm?.let { add("HR $it bpm") }
+    }
+    if (DeviceCapability.CONTROLLER in device.capabilities) {
+      state.clickBattery?.let { add("Battery $it%") }
+    }
+  }
+  return details.takeIf { it.isNotEmpty() }?.joinToString(" · ") ?: "Connected"
 }
