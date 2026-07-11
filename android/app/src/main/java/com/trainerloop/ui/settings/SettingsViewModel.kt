@@ -132,6 +132,10 @@ class SettingsViewModel @JvmOverloads constructor(
     )
   }
 
+  fun clearSavedStatus() {
+    _uiState.value = _uiState.value.copy(isSaved = false)
+  }
+
   fun save() {
     viewModelScope.launch {
       val state = _uiState.value

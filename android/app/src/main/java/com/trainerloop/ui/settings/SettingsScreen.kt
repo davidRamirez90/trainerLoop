@@ -1,7 +1,13 @@
 package com.trainerloop.ui.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +29,8 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -32,6 +40,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -45,9 +55,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.Spacing
+import com.trainerloop.ui.theme.reducedMotionAware
+import kotlinx.coroutines.delay
 
 @Composable
 fun SettingsScreen(
@@ -55,6 +71,18 @@ fun SettingsScreen(
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   var activeDialog by remember { mutableStateOf<SettingsDialog?>(null) }
+  var apiKeyVisible by remember { mutableStateOf(false) }
+
+  DisposableEffect(Unit) {
+    onDispose { viewModel.save() }
+  }
+
+  LaunchedEffect(uiState.isSaved) {
+    if (uiState.isSaved) {
+      delay(2_000)
+      viewModel.clearSavedStatus()
+    }
+  }
 
   when (activeDialog) {
     SettingsDialog.POWER_ZONES -> ZonesDialog(
@@ -217,7 +245,19 @@ fun SettingsScreen(
       TextButton(onClick = { advancedExpanded = !advancedExpanded }) {
         Text(if (advancedExpanded) "Hide advanced" else "Advanced")
       }
-      if (advancedExpanded) {
+      AnimatedVisibility(
+        visible = advancedExpanded,
+        enter = expandVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeIn(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>())
+        ),
+        exit = shrinkVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeOut(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>())
+        )
+      ) {
         LabeledSlider(
           label = "Bike weight",
           valueText = "${uiState.bikeWeightKg} kg",
@@ -281,7 +321,19 @@ fun SettingsScreen(
           onValueChange = viewModel::updateIntervalsApiKey,
           label = { Text("API Key") },
           singleLine = true,
-          visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+          visualTransformation = if (apiKeyVisible) {
+            VisualTransformation.None
+          } else {
+            PasswordVisualTransformation()
+          },
+          trailingIcon = {
+            androidx.compose.material3.IconButton(onClick = { apiKeyVisible = !apiKeyVisible }) {
+              Icon(
+                imageVector = if (apiKeyVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                contentDescription = if (apiKeyVisible) "Hide API key" else "Show API key"
+              )
+            }
+          },
           modifier = Modifier.fillMaxWidth()
         )
       }
@@ -295,20 +347,29 @@ fun SettingsScreen(
       )
     }
 
-    Button(
-      onClick = { viewModel.save() },
-      modifier = Modifier.fillMaxWidth()
-    ) {
-      Text("Save")
-    }
-
-    if (uiState.isSaved) {
-      Text(
-        text = "Profile saved",
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.align(Alignment.CenterHorizontally)
-      )
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+      Button(
+        onClick = { viewModel.save() },
+        modifier = Modifier.fillMaxWidth()
+      ) {
+        Text("Save")
+      }
+      AnimatedVisibility(
+        visible = uiState.isSaved,
+        enter = fadeIn(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>())
+        ),
+        exit = fadeOut(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>())
+        )
+      ) {
+        Text(
+          text = "Saved ✓",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.primary,
+          modifier = Modifier.padding(top = Spacing.sm)
+        )
+      }
     }
   }
 }
@@ -545,7 +606,7 @@ private fun CompactNumberField(
   OutlinedTextField(
     value = value,
     onValueChange = onValueChange,
-    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = keyboardType),
+    keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
     singleLine = true,
     shape = RoundedCornerShape(12.dp),
     suffix = if (suffix.isNotBlank()) {
