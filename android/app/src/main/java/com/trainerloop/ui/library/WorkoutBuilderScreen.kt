@@ -1,5 +1,9 @@
 package com.trainerloop.ui.library
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -9,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
@@ -16,6 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,43 +37,33 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
-import com.trainerloop.data.model.SegmentPhase
-import com.trainerloop.data.model.TargetRange
-import com.trainerloop.data.model.Workout
-import com.trainerloop.data.model.WorkoutSegment
-import com.trainerloop.data.model.WorkoutSource
-
-// ponytail: steps only (duration + watt range); ramps/free-ride via file import if needed
-private class BuilderStep {
-  var minutes by mutableStateOf("5")
-  var lowW by mutableStateOf("150")
-  var highW by mutableStateOf("160")
-}
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trainerloop.app.trainerLoopApp
+import com.trainerloop.ui.components.WorkoutMiniChart
+import com.trainerloop.ui.theme.MotionSpec
+import com.trainerloop.ui.theme.NumericSmall
+import com.trainerloop.ui.theme.Spacing
+import com.trainerloop.ui.theme.reducedMotionAware
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutBuilderScreen(
   onSaved: () -> Unit,
-  onBack: () -> Unit
+  onBack: () -> Unit,
+  viewModel: WorkoutBuilderViewModel = viewModel()
 ) {
   val context = LocalContext.current
-  var name by remember { mutableStateOf("") }
-  val steps = remember { mutableStateListOf(BuilderStep()) }
-
-  val valid = name.isNotBlank() && steps.isNotEmpty() && steps.all {
-    (it.minutes.toIntOrNull() ?: 0) > 0 &&
-      (it.lowW.toIntOrNull() ?: 0) > 0 &&
-      (it.highW.toIntOrNull() ?: 0) >= (it.lowW.toIntOrNull() ?: 0)
-  }
+  val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
+  val draft = uiState
+  val previewWorkout = remember(draft) { draft.toWorkout(id = "builder_preview") }
+  val previewMotionSpec = reducedMotionAware(MotionSpec.default)
 
   Scaffold(
     contentWindowInsets = WindowInsets(0),
@@ -86,69 +83,106 @@ fun WorkoutBuilderScreen(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding)
-        .padding(16.dp)
+        .padding(Spacing.lg)
     ) {
       OutlinedTextField(
-        value = name,
-        onValueChange = { name = it },
+        value = uiState.name,
+        onValueChange = viewModel::onNameChange,
         label = { Text("Workout name") },
         singleLine = true,
         modifier = Modifier.fillMaxWidth()
       )
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.md))
+
+      Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+          containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+      ) {
+        Column(modifier = Modifier.padding(Spacing.md)) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Text("Live preview", style = MaterialTheme.typography.titleSmall)
+            Text(
+              text = "${previewWorkout.segments.sumOf { it.durationSec } / 60} min",
+              style = NumericSmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+          }
+          AnimatedContent(
+            targetState = previewWorkout,
+            transitionSpec = {
+              fadeIn(animationSpec = previewMotionSpec) togetherWith
+                fadeOut(animationSpec = previewMotionSpec)
+            },
+            label = "workout builder preview"
+          ) { workout ->
+            WorkoutMiniChart(
+              workout = workout,
+              ftp = ftp,
+              modifier = Modifier.padding(top = Spacing.sm)
+            )
+          }
+        }
+      }
+
+      Spacer(modifier = Modifier.height(Spacing.md))
 
       LazyColumn(
         modifier = Modifier.weight(1f),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
       ) {
-        itemsIndexed(steps) { index, step ->
+        itemsIndexed(uiState.steps) { index, step ->
           StepCard(
             index = index,
             step = step,
-            canDelete = steps.size > 1,
-            onDelete = { steps.removeAt(index) }
+            canMoveUp = index > 0,
+            canMoveDown = index < uiState.steps.lastIndex,
+            onMoveUp = { viewModel.moveStep(index, index - 1) },
+            onMoveDown = { viewModel.moveStep(index, index + 1) },
+            onDelete = { viewModel.deleteStep(index) },
+            onMinutesChange = { viewModel.onMinutesChange(index, it) },
+            onLowWChange = { viewModel.onLowWChange(index, it) },
+            onHighWChange = { viewModel.onHighWChange(index, it) }
           )
         }
         item {
           OutlinedButton(
-            onClick = { steps.add(BuilderStep()) },
+            onClick = viewModel::addStep,
             modifier = Modifier.fillMaxWidth()
           ) {
             Icon(Icons.Default.Add, contentDescription = null)
-            Spacer(modifier = Modifier.padding(4.dp))
+            Spacer(modifier = Modifier.width(Spacing.xs))
             Text("Add interval")
           }
         }
       }
 
-      Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(Spacing.md))
 
       Button(
         onClick = {
-          val workout = Workout(
-            id = "custom_${System.currentTimeMillis()}",
-            name = name.trim(),
-            description = "Custom workout",
-            source = WorkoutSource.MANUAL,
-            segments = steps.mapIndexed { i, s ->
-              WorkoutSegment.Step(
-                id = "step$i",
-                durationSec = s.minutes.toInt() * 60,
-                label = "Interval ${i + 1}",
-                phase = SegmentPhase.WORK,
-                isWork = true,
-                targetRange = TargetRange(s.lowW.toInt(), s.highW.toInt())
-              )
-            }
-          )
+          val workout = uiState.toWorkout(id = "custom_${System.currentTimeMillis()}")
           ImportedWorkoutStore.add(context, workout)
           onSaved()
         },
-        enabled = valid,
+        enabled = uiState.isValid,
         modifier = Modifier.fillMaxWidth()
       ) {
         Text("Save Workout")
+      }
+      uiState.saveReason?.let { reason ->
+        Text(
+          text = reason,
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.error,
+          modifier = Modifier.padding(top = Spacing.xs)
+        )
       }
     }
   }
@@ -157,9 +191,15 @@ fun WorkoutBuilderScreen(
 @Composable
 private fun StepCard(
   index: Int,
-  step: BuilderStep,
-  canDelete: Boolean,
-  onDelete: () -> Unit
+  step: BuilderStepDraft,
+  canMoveUp: Boolean,
+  canMoveDown: Boolean,
+  onMoveUp: () -> Unit,
+  onMoveDown: () -> Unit,
+  onDelete: () -> Unit,
+  onMinutesChange: (String) -> Unit,
+  onLowWChange: (String) -> Unit,
+  onHighWChange: (String) -> Unit
 ) {
   Card(
     modifier = Modifier.fillMaxWidth(),
@@ -167,7 +207,7 @@ private fun StepCard(
       containerColor = MaterialTheme.colorScheme.surfaceVariant
     )
   ) {
-    Column(modifier = Modifier.padding(12.dp)) {
+    Column(modifier = Modifier.padding(Spacing.md)) {
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -177,7 +217,19 @@ private fun StepCard(
           text = "Interval ${index + 1}",
           style = MaterialTheme.typography.titleSmall
         )
-        if (canDelete) {
+        Row {
+          IconButton(onClick = onMoveUp, enabled = canMoveUp) {
+            Icon(
+              Icons.Default.KeyboardArrowUp,
+              contentDescription = "Move interval ${index + 1} up"
+            )
+          }
+          IconButton(onClick = onMoveDown, enabled = canMoveDown) {
+            Icon(
+              Icons.Default.KeyboardArrowDown,
+              contentDescription = "Move interval ${index + 1} down"
+            )
+          }
           IconButton(onClick = onDelete) {
             Icon(
               Icons.Default.Delete,
@@ -187,10 +239,10 @@ private fun StepCard(
           }
         }
       }
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        NumberField(step.minutes, "Minutes", Modifier.weight(1f)) { step.minutes = it }
-        NumberField(step.lowW, "Low W", Modifier.weight(1f)) { step.lowW = it }
-        NumberField(step.highW, "High W", Modifier.weight(1f)) { step.highW = it }
+      Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        NumberField(step.minutes, "Minutes", Modifier.weight(1f), onMinutesChange)
+        NumberField(step.lowW, "Low W", Modifier.weight(1f), onLowWChange)
+        NumberField(step.highW, "High W", Modifier.weight(1f), onHighWChange)
       }
     }
   }
@@ -208,6 +260,7 @@ private fun NumberField(
     onValueChange = { onValueChange(it.filter { c -> c.isDigit() }) },
     label = { Text(label) },
     singleLine = true,
+    textStyle = NumericSmall,
     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
     modifier = modifier
   )
