@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -35,6 +36,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -57,6 +61,19 @@ fun WorkoutCompleteScreen(
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
+  var displayedUploadStatus by remember { mutableStateOf<String?>(null) }
+  var displayedError by remember { mutableStateOf<String?>(null) }
+  var displayedFtpPushStatus by remember { mutableStateOf<String?>(null) }
+
+  LaunchedEffect(uiState.uploadStatus) {
+    uiState.uploadStatus?.let { displayedUploadStatus = it }
+  }
+  LaunchedEffect(uiState.error) {
+    uiState.error?.let { displayedError = it }
+  }
+  LaunchedEffect(uiState.ftpPushStatus) {
+    uiState.ftpPushStatus?.let { displayedFtpPushStatus = it }
+  }
 
   LaunchedEffect(uiState.isDiscarded) {
     if (uiState.isDiscarded) onDiscard()
@@ -83,6 +100,7 @@ fun WorkoutCompleteScreen(
         .fillMaxSize()
         .padding(padding)
         .padding(horizontal = 16.dp)
+        .navigationBarsPadding()
         .verticalScroll(rememberScrollState())
     ) {
       Text(
@@ -101,6 +119,7 @@ fun WorkoutCompleteScreen(
       if (uiState.isRampTest) {
         RampTestResultCard(
           uiState = uiState,
+          displayedFtpPushStatus = displayedFtpPushStatus,
           onAccept = viewModel::acceptFtp,
           onDiscard = viewModel::discardFtp,
           onPush = viewModel::pushFtpToIcu,
@@ -233,13 +252,15 @@ fun WorkoutCompleteScreen(
           animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
         ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
       ) {
-        uiState.uploadStatus?.let { status ->
-          Spacer(modifier = Modifier.height(8.dp))
-          Text(
-            text = status,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
+        displayedUploadStatus?.let { status ->
+          Column {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+              text = status,
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+          }
         }
       }
 
@@ -262,7 +283,7 @@ fun WorkoutCompleteScreen(
       enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
       exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
     ) {
-      uiState.error?.let { error ->
+      displayedError?.let { error ->
         Snackbar(
           modifier = Modifier.padding(16.dp),
           action = {
@@ -281,6 +302,7 @@ fun WorkoutCompleteScreen(
 @Composable
 private fun RampTestResultCard(
   uiState: WorkoutCompleteUiState,
+  displayedFtpPushStatus: String?,
   onAccept: () -> Unit,
   onDiscard: () -> Unit,
   onPush: () -> Unit,
@@ -391,13 +413,15 @@ private fun RampTestResultCard(
           animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
         ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
       ) {
-        uiState.ftpPushStatus?.let { status ->
-          Spacer(modifier = Modifier.height(8.dp))
-          Text(
-            text = status,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer
-          )
+        displayedFtpPushStatus?.let { status ->
+          Column {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+              text = status,
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+          }
         }
       }
     }

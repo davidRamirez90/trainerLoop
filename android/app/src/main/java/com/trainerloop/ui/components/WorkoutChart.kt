@@ -29,6 +29,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,6 +64,7 @@ import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.reducedMotionAware
 import com.trainerloop.ui.theme.zoneColorSet
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -92,6 +94,8 @@ fun WorkoutChart(
 
   var zoomToCurrent by remember { mutableStateOf(false) }
   var selectedIndex by remember { mutableStateOf<Int?>(null) }
+  var tooltipIndex by remember { mutableStateOf<Int?>(null) }
+  var selectionInteraction by remember { mutableStateOf(0) }
   var tooltipX by remember { mutableStateOf(0f) }
   var tooltipGrabOffset by remember { mutableStateOf(0f) }
   var tooltipWidthPx by remember { mutableStateOf(0) }
@@ -125,6 +129,12 @@ fun WorkoutChart(
     animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
     label = "Chart selected interval highlight"
   )
+  LaunchedEffect(selectedIndex, selectionInteraction) {
+    if (selectedIndex != null) {
+      delay(4_000)
+      selectedIndex = null
+    }
+  }
   val panOffset = remember { Animatable(0f) }
   val panScope = rememberCoroutineScope()
   val reducedMotion = com.trainerloop.ui.theme.LocalReducedMotion.current
@@ -234,6 +244,12 @@ fun WorkoutChart(
                 selectedIndex = null
                 return
               }
+              selectionInteraction++
+              if (initialPress && selectedIndex == idx) {
+                selectedIndex = null
+                return
+              }
+              tooltipIndex = idx
               selectedIndex = idx
               if (initialPress) {
                 val intervalX = (bounds[idx].first - currentStart) / currentSpan * chartWidth
@@ -500,7 +516,7 @@ fun WorkoutChart(
         enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
         exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
       ) {
-        selectedIndex?.let { idx ->
+        tooltipIndex?.let { idx ->
           bounds.getOrNull(idx)?.let { (start, _, seg) ->
             IntervalTooltip(
               index = idx,

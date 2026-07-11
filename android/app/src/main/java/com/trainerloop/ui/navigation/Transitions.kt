@@ -8,11 +8,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.tween
 import com.trainerloop.ui.theme.MotionSpec
-
-private const val FadeThroughDurationMillis = 200
-private const val ReducedMotionDurationMillis = 150
 
 data class TabFadeThroughTransitions(
   val enter: EnterTransition,
@@ -87,22 +83,10 @@ fun playerExit(reducedMotion: Boolean): ExitTransition =
 
 private fun navigationFadeIn(reducedMotion: Boolean): EnterTransition =
   fadeIn(
-    animationSpec = tween(
-      durationMillis = if (reducedMotion) {
-        ReducedMotionDurationMillis
-      } else {
-        FadeThroughDurationMillis
-      }
-    )
+    animationSpec = if (reducedMotion) MotionSpec.reducedMotionFade else MotionSpec.fadeThrough
   )
 
 private fun navigationFadeOut(reducedMotion: Boolean): ExitTransition =
   fadeOut(
-    animationSpec = tween(
-      durationMillis = if (reducedMotion) {
-        ReducedMotionDurationMillis
-      } else {
-        FadeThroughDurationMillis
-      }
-    )
+    animationSpec = if (reducedMotion) MotionSpec.reducedMotionFade else MotionSpec.fadeThrough
   )

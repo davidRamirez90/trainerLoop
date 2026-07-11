@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -39,8 +40,11 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -64,6 +68,10 @@ fun WorkoutBuilderScreen(
 ) {
   val context = LocalContext.current
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  var displayedSaveReason by remember { mutableStateOf<String?>(null) }
+  LaunchedEffect(uiState.saveReason) {
+    uiState.saveReason?.let { displayedSaveReason = it }
+  }
   val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
   val draft = uiState
   val previewWorkout = remember(draft) { draft.toWorkout(id = "builder_preview") }
@@ -88,6 +96,7 @@ fun WorkoutBuilderScreen(
         .fillMaxSize()
         .padding(padding)
         .padding(Spacing.lg)
+        .navigationBarsPadding()
     ) {
       OutlinedTextField(
         value = uiState.name,
@@ -189,7 +198,7 @@ fun WorkoutBuilderScreen(
           animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
         ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
       ) {
-        uiState.saveReason?.let { reason ->
+        displayedSaveReason?.let { reason ->
           Text(
             text = reason,
             style = MaterialTheme.typography.labelSmall,

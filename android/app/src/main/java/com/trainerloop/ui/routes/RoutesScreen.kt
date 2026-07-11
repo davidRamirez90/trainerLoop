@@ -32,6 +32,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -55,6 +59,10 @@ fun RoutesScreen(
 ) {
   val routes by viewModel.routes.collectAsStateWithLifecycle()
   val importError by viewModel.importError.collectAsStateWithLifecycle()
+  var displayedImportError by remember { mutableStateOf<String?>(null) }
+  LaunchedEffect(importError) {
+    importError?.let { displayedImportError = it }
+  }
   val hasRoutes = routes.isNotEmpty()
 
   val picker = rememberLauncherForActivityResult(
@@ -127,7 +135,7 @@ fun RoutesScreen(
           enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
           exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
         ) {
-          importError?.let {
+          displayedImportError?.let {
             Text(
               text = it,
               color = MaterialTheme.colorScheme.error,

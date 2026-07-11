@@ -9,7 +9,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,8 +58,8 @@ private fun AnimatedContentTransitionScope<Int>.metricValueTransition(
   springSpec: FiniteAnimationSpec<IntOffset>
 ): ContentTransform {
   if (reducedMotion) {
-    return fadeIn(animationSpec = tween(150)) togetherWith
-      fadeOut(animationSpec = tween(150))
+    return fadeIn(animationSpec = MotionSpec.reducedMotionFade) togetherWith
+      fadeOut(animationSpec = MotionSpec.reducedMotionFade)
   }
 
   val enterOffset = if (increasing) 1 else -1
@@ -69,12 +68,12 @@ private fun AnimatedContentTransitionScope<Int>.metricValueTransition(
     slideInVertically(
       animationSpec = springSpec,
       initialOffsetY = { fullHeight -> fullHeight * enterOffset }
-    ) + fadeIn(animationSpec = tween(150))
+    ) + fadeIn(animationSpec = MotionSpec.reducedMotionFade)
     ) togetherWith (
     slideOutVertically(
       animationSpec = springSpec,
       targetOffsetY = { fullHeight -> fullHeight * exitOffset }
-    ) + fadeOut(animationSpec = tween(150))
+    ) + fadeOut(animationSpec = MotionSpec.reducedMotionFade)
     )
   return contentTransform.using(null)
 }

@@ -47,7 +47,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -70,6 +74,10 @@ fun DevicesScreen(
   viewModel: DevicesViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  var displayedError by remember { mutableStateOf<String?>(null) }
+  LaunchedEffect(uiState.error) {
+    uiState.error?.let { displayedError = it }
+  }
   val defaultMotionSpec = reducedMotionAware(MotionSpec.default)
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   val permissionLauncher = rememberLauncherForActivityResult(
@@ -127,10 +135,12 @@ fun DevicesScreen(
             animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
           ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
         ) {
-          PermissionBanner(
-            onGrant = { permissionLauncher.launch(BlePermissions.REQUIRED) }
-          )
-          Spacer(modifier = Modifier.size(Spacing.md))
+          Column {
+            PermissionBanner(
+              onGrant = { permissionLauncher.launch(BlePermissions.REQUIRED) }
+            )
+            Spacer(modifier = Modifier.size(Spacing.md))
+          }
         }
 
         val pairedDevices = connectedDevices(uiState)
@@ -237,7 +247,7 @@ fun DevicesScreen(
         enter = fadeIn(animationSpec = defaultMotionSpec),
         exit = fadeOut(animationSpec = defaultMotionSpec)
       ) {
-        uiState.error?.let { error ->
+        displayedError?.let { error ->
           Snackbar(
             modifier = Modifier.padding(Spacing.lg),
             action = {

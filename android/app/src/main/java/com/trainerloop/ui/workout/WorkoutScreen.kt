@@ -72,6 +72,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -90,6 +91,7 @@ import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
+import com.trainerloop.domain.coach.FeedbackItem
 import com.trainerloop.ui.components.WorkoutChart
 import com.trainerloop.ui.components.workoutProfileSummary
 import com.trainerloop.ui.haptics.Haptics
@@ -129,6 +131,11 @@ fun WorkoutScreen(
       android.media.ToneGenerator.MAX_VOLUME
     )
   }
+  var completionCueConsumed by rememberSaveable { mutableStateOf(false) }
+  var displayedLiveFeedback by remember { mutableStateOf<FeedbackItem?>(null) }
+  LaunchedEffect(uiState.liveFeedback) {
+    uiState.liveFeedback?.let { displayedLiveFeedback = it }
+  }
   val darkTheme = isSystemInDarkTheme()
   val currentPowerColor = zoneColorSet(uiState.currentPowerWatts, ftp).line
   var showStopConfirm by remember { mutableStateOf(false) }
@@ -147,7 +154,8 @@ fun WorkoutScreen(
   }
 
   LaunchedEffect(uiState.isComplete) {
-    if (uiState.isComplete) {
+    if (uiState.isComplete && !completionCueConsumed) {
+      completionCueConsumed = true
       Haptics.workoutComplete(view)
       if (completionSoundEnabled) {
         toneGen.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 250)
@@ -432,9 +440,11 @@ fun WorkoutScreen(
           animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
         ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
       ) {
-        uiState.liveFeedback?.let { feedback ->
-          com.trainerloop.ui.coach.LiveFeedbackCard(item = feedback)
-          Spacer(modifier = Modifier.height(8.dp))
+        displayedLiveFeedback?.let { feedback ->
+          Column {
+            com.trainerloop.ui.coach.LiveFeedbackCard(item = feedback)
+            Spacer(modifier = Modifier.height(8.dp))
+          }
         }
       }
 

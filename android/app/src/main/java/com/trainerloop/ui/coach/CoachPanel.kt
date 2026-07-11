@@ -16,6 +16,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.CoachEvent
@@ -32,6 +37,11 @@ fun CoachPanel(
   onReject: () -> Unit,
   modifier: Modifier = Modifier
 ) {
+  var displayedSuggestion by remember { mutableStateOf<CoachSuggestion?>(null) }
+  LaunchedEffect(pendingSuggestion) {
+    pendingSuggestion?.let { displayedSuggestion = it }
+  }
+
   Column(modifier = modifier) {
     Text(
       text = "Coach",
@@ -49,13 +59,15 @@ fun CoachPanel(
         animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
       ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
     ) {
-      pendingSuggestion?.let { suggestion ->
-        CoachSuggestionCard(
-          suggestion = suggestion,
-          onAccept = onAccept,
-          onReject = onReject
-        )
-        Spacer(modifier = Modifier.height(8.dp))
+      displayedSuggestion?.let { suggestion ->
+        Column {
+          CoachSuggestionCard(
+            suggestion = suggestion,
+            onAccept = onAccept,
+            onReject = onReject
+          )
+          Spacer(modifier = Modifier.height(8.dp))
+        }
       }
     }
 

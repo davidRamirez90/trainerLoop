@@ -32,12 +32,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavHostController
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.dialog
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.trainerloop.data.model.TelemetrySample
@@ -461,7 +463,10 @@ fun TrainerLoopApp(
         )
       }
 
-      composable(Screen.Devices.route) {
+      dialog(
+        route = Screen.Devices.route,
+        dialogProperties = DialogProperties(usePlatformDefaultWidth = false)
+      ) {
         DevicesScreen(
           onBack = { navController.popBackStack() }
         )

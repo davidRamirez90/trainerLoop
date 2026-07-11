@@ -225,13 +225,13 @@ private fun RiderHeader(
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .padding(vertical = Spacing.sm)
       .pressable(interactionSource)
       .clickable(
         interactionSource = interactionSource,
         indication = null,
         onClick = onClick
-      ),
+      )
+      .padding(vertical = Spacing.sm),
     verticalAlignment = Alignment.CenterVertically
   ) {
     Box(
@@ -433,34 +433,36 @@ private fun PlannedWorkoutCard(
           animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
         ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
       ) {
-        Spacer(modifier = Modifier.height(Spacing.lg))
-        Button(
-          onClick = onStart,
-          enabled = !loading,
-          modifier = Modifier.fillMaxWidth()
-        ) {
-          AnimatedContent(
-            targetState = loading,
-            transitionSpec = {
-              fadeIn(animationSpec = fastMotionSpec) togetherWith
-                fadeOut(animationSpec = fastMotionSpec)
-            },
-            label = "planned-workout-action"
-          ) { isLoading ->
-            if (isLoading) {
-              CircularProgressIndicator(
-                modifier = Modifier.size(18.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.onPrimary
-              )
-            } else {
-              Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                  imageVector = Icons.Default.PlayArrow,
-                  contentDescription = null,
-                  modifier = Modifier.padding(end = 8.dp)
+        Column {
+          Spacer(modifier = Modifier.height(Spacing.lg))
+          Button(
+            onClick = onStart,
+            enabled = !loading,
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            AnimatedContent(
+              targetState = loading,
+              transitionSpec = {
+                fadeIn(animationSpec = fastMotionSpec) togetherWith
+                  fadeOut(animationSpec = fastMotionSpec)
+              },
+              label = "planned-workout-action"
+            ) { isLoading ->
+              if (isLoading) {
+                CircularProgressIndicator(
+                  modifier = Modifier.size(18.dp),
+                  strokeWidth = 2.dp,
+                  color = MaterialTheme.colorScheme.onPrimary
                 )
-                Text("Quick Start", fontWeight = FontWeight.SemiBold)
+              } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp)
+                  )
+                  Text("Quick Start", fontWeight = FontWeight.SemiBold)
+                }
               }
             }
           }
@@ -594,13 +596,13 @@ private fun ActionRow(
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .padding(Spacing.lg)
       .pressable(interactionSource)
       .clickable(
         interactionSource = interactionSource,
         indication = null,
         onClick = onClick
-      ),
+      )
+      .padding(Spacing.lg),
     verticalAlignment = Alignment.CenterVertically
   ) {
     Icon(
