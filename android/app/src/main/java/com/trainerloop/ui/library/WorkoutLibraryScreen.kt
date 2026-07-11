@@ -2,8 +2,16 @@ package com.trainerloop.ui.library
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberScrollState
@@ -38,6 +46,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -57,6 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,7 +78,9 @@ import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.components.WorkoutMiniChart
 import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
+import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.reducedMotionAware
+import androidx.compose.ui.unit.IntSize
 import java.util.Locale
 
 /** Momentum-class flourish for the favorite toggle; reduced motion resolves this to a snap. */
@@ -82,6 +94,7 @@ fun WorkoutLibraryScreen(
   viewModel: WorkoutLibraryViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
   val context = LocalContext.current
   val snackbarHostState = remember { SnackbarHostState() }
 
@@ -113,7 +126,15 @@ fun WorkoutLibraryScreen(
 
   Scaffold(
     contentWindowInsets = WindowInsets(0),
-    snackbarHost = { SnackbarHost(snackbarHostState) }
+    snackbarHost = {
+      AnimatedVisibility(
+        visible = snackbarHostState.currentSnackbarData != null,
+        enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+        exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+      ) {
+        SnackbarHost(snackbarHostState)
+      }
+    }
   ) { padding ->
     Column(
       modifier = Modifier
@@ -133,17 +154,33 @@ fun WorkoutLibraryScreen(
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (uiState.canSync) {
           Button(onClick = { viewModel.sync() }, enabled = !uiState.isSyncing) {
-            if (uiState.isSyncing) {
-              CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                color = MaterialTheme.colorScheme.onPrimary,
-                strokeWidth = 2.dp
-              )
-            } else {
-              Icon(Icons.Outlined.Sync, contentDescription = null)
+            AnimatedContent(
+              targetState = uiState.isSyncing,
+              transitionSpec = {
+                fadeIn(animationSpec = fastMotionSpec) togetherWith
+                  fadeOut(animationSpec = fastMotionSpec)
+              },
+              label = "workout-sync-icon"
+            ) { syncing ->
+              if (syncing) {
+                CircularProgressIndicator(
+                  modifier = Modifier.size(16.dp),
+                  color = MaterialTheme.colorScheme.onPrimary,
+                  strokeWidth = 2.dp
+                )
+              } else {
+                Icon(Icons.Outlined.Sync, contentDescription = null)
+              }
             }
             Spacer(modifier = Modifier.width(Spacing.sm))
-            Text(if (uiState.isSyncing) "Syncing…" else "Sync")
+            AnimatedContent(
+              targetState = uiState.isSyncing,
+              transitionSpec = {
+                fadeIn(animationSpec = fastMotionSpec) togetherWith
+                  fadeOut(animationSpec = fastMotionSpec)
+              },
+              label = "workout-sync-label"
+            ) { syncing -> Text(if (syncing) "Syncing…" else "Sync") }
           }
         }
         IconButton(onClick = {
@@ -177,19 +214,35 @@ fun WorkoutLibraryScreen(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
       ) {
         uiState.categories.forEach { category ->
+          val selected = uiState.selectedCategory == category
+          val containerColor by animateColorAsState(
+            targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
+            label = "category-chip-color-${category.label}"
+          )
           FilterChip(
-            selected = uiState.selectedCategory == category,
+            selected = selected,
             onClick = { viewModel.onCategorySelected(category) },
-            label = { Text(category.label, maxLines = 1, softWrap = false) }
+            label = { Text(category.label, maxLines = 1, softWrap = false) },
+            colors = FilterChipDefaults.filterChipColors(
+              containerColor = containerColor,
+              selectedContainerColor = containerColor
+            )
           )
         }
       }
 
       Spacer(modifier = Modifier.height(Spacing.xl))
 
-      if (uiState.isLoading) {
-        CircularProgressIndicator()
-      }
+      AnimatedVisibility(
+        visible = uiState.isLoading,
+        enter = expandVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+        exit = shrinkVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+      ) { CircularProgressIndicator() }
 
       LazyColumn(
         modifier = Modifier.weight(1f),
@@ -282,6 +335,12 @@ private fun WorkoutCard(
     animationSpec = reducedMotionAware(StarBounceSpec),
     label = "favorite-star-bounce"
   )
+  val starTint by animateColorAsState(
+    targetValue = if (isFavorite) MaterialTheme.colorScheme.primary
+    else MaterialTheme.colorScheme.onSurfaceVariant,
+    animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
+    label = "favorite-star-color"
+  )
 
   Card(
     onClick = onClick,
@@ -324,8 +383,7 @@ private fun WorkoutCard(
           Icon(
             imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
             contentDescription = if (isFavorite) "Unfavorite" else "Favorite",
-            tint = if (isFavorite) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.onSurfaceVariant
+            tint = starTint
           )
         }
         Box {

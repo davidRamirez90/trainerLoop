@@ -25,8 +25,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -77,6 +84,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.app.WorkoutForegroundService
@@ -415,9 +423,19 @@ fun WorkoutScreen(
       Spacer(modifier = Modifier.weight(1f))
 
       // Live coach feedback (auto-dismisses after 12 s)
-      uiState.liveFeedback?.let { feedback ->
-        com.trainerloop.ui.coach.LiveFeedbackCard(item = feedback)
-        Spacer(modifier = Modifier.height(8.dp))
+      AnimatedVisibility(
+        visible = uiState.liveFeedback != null,
+        enter = expandVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+        exit = shrinkVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+      ) {
+        uiState.liveFeedback?.let { feedback ->
+          com.trainerloop.ui.coach.LiveFeedbackCard(item = feedback)
+          Spacer(modifier = Modifier.height(8.dp))
+        }
       }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -693,6 +711,7 @@ private fun LandscapeWorkout(
   onPlayPause: () -> Unit,
   onStop: () -> Unit
 ) {
+  val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
   Row(
     modifier = Modifier
       .fillMaxSize()
@@ -780,10 +799,19 @@ private fun LandscapeWorkout(
             .weight(1f),
           interactionSource = playPauseInteractionSource
         ) {
-          Icon(
-            if (uiState.isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-            contentDescription = if (uiState.isRunning) "Pause" else "Play"
-          )
+          AnimatedContent(
+            targetState = uiState.isRunning,
+            transitionSpec = {
+              fadeIn(animationSpec = fastMotionSpec) togetherWith
+                fadeOut(animationSpec = fastMotionSpec)
+            },
+            label = "landscape-transport-icon"
+          ) { running ->
+            Icon(
+              if (running) Icons.Default.Pause else Icons.Default.PlayArrow,
+              contentDescription = if (running) "Pause" else "Play"
+            )
+          }
         }
         FilledIconButton(
           onClick = onStop,
@@ -947,7 +975,11 @@ private fun ImmersiveWorkoutChart(
       horizontalArrangement = Arrangement.spacedBy(8.dp),
       verticalAlignment = Alignment.CenterVertically
     ) {
-      if (!followEnabled) {
+      AnimatedVisibility(
+        visible = !followEnabled,
+        enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.fast)),
+        exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.fast))
+      ) {
         FilledTonalButton(
           onClick = { followEnabled = true },
           modifier = Modifier.heightIn(min = 48.dp),

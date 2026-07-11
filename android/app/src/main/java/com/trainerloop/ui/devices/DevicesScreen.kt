@@ -3,8 +3,12 @@ package com.trainerloop.ui.devices
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -48,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.ble.BlePermissions
@@ -65,6 +70,7 @@ fun DevicesScreen(
   viewModel: DevicesViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val defaultMotionSpec = reducedMotionAware(MotionSpec.default)
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   val permissionLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -114,8 +120,12 @@ fun DevicesScreen(
 
         AnimatedVisibility(
           visible = !uiState.hasPermissions,
-          enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
-          exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+          enter = expandVertically(
+            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+          ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+          exit = shrinkVertically(
+            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+          ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
         ) {
           PermissionBanner(
             onGrant = { permissionLauncher.launch(BlePermissions.REQUIRED) }
@@ -144,8 +154,16 @@ fun DevicesScreen(
             )
           }
 
-          if (pairedDevices.isEmpty()) {
-            item {
+          item {
+            AnimatedVisibility(
+              visible = pairedDevices.isEmpty(),
+              enter = expandVertically(
+                animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+              ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+              exit = shrinkVertically(
+                animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+              ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+            ) {
               Text(
                 text = "No devices connected yet. Connect a trainer or HR sensor below.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -181,8 +199,16 @@ fun DevicesScreen(
             }
           }
 
-          if (availableDevices.isEmpty() && !uiState.isScanning) {
-            item {
+          item {
+            AnimatedVisibility(
+              visible = availableDevices.isEmpty() && !uiState.isScanning,
+              enter = expandVertically(
+                animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+              ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+              exit = shrinkVertically(
+                animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+              ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+            ) {
               Text(
                 text = "No devices found. Tap Scan to search.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -191,27 +217,40 @@ fun DevicesScreen(
             }
           }
 
-          if (uiState.isScanning) {
-            item { ScanningPlaceholder() }
+          item {
+            AnimatedVisibility(
+              visible = uiState.isScanning,
+              enter = expandVertically(
+                animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+              ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+              exit = shrinkVertically(
+                animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+              ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+            ) { ScanningPlaceholder() }
           }
         }
       }
 
-      uiState.error?.let { error ->
-        Snackbar(
-          modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(Spacing.lg),
-          action = {
-            TextButton(
-              onClick = { viewModel.clearError() },
-              modifier = Modifier.pressable()
-            ) {
-              Text("Dismiss")
+      androidx.compose.animation.AnimatedVisibility(
+        visible = uiState.error != null,
+        modifier = Modifier.align(Alignment.BottomCenter),
+        enter = fadeIn(animationSpec = defaultMotionSpec),
+        exit = fadeOut(animationSpec = defaultMotionSpec)
+      ) {
+        uiState.error?.let { error ->
+          Snackbar(
+            modifier = Modifier.padding(Spacing.lg),
+            action = {
+              TextButton(
+                onClick = { viewModel.clearError() },
+                modifier = Modifier.pressable()
+              ) {
+                Text("Dismiss")
+              }
             }
+          ) {
+            Text(error)
           }
-        ) {
-          Text(error)
         }
       }
     }
@@ -347,6 +386,7 @@ private fun AvailableDeviceCard(
   isConnecting: Boolean,
   onConnect: () -> Unit
 ) {
+  val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
   Card(
     modifier = Modifier.fillMaxWidth(),
     colors = CardDefaults.cardColors(
@@ -382,14 +422,23 @@ private fun AvailableDeviceCard(
         enabled = !isConnecting,
         modifier = Modifier.pressable()
       ) {
-        if (isConnecting) {
-          CircularProgressIndicator(
-            modifier = Modifier.size(Spacing.lg),
-            strokeWidth = Spacing.xs / 2,
-            color = MaterialTheme.colorScheme.onPrimary
-          )
-        } else {
-          Text("Connect")
+        AnimatedContent(
+          targetState = isConnecting,
+          transitionSpec = {
+            fadeIn(animationSpec = fastMotionSpec) togetherWith
+              fadeOut(animationSpec = fastMotionSpec)
+          },
+          label = "device-connect-content"
+        ) { connecting ->
+          if (connecting) {
+            CircularProgressIndicator(
+              modifier = Modifier.size(Spacing.lg),
+              strokeWidth = Spacing.xs / 2,
+              color = MaterialTheme.colorScheme.onPrimary
+            )
+          } else {
+            Text("Connect")
+          }
         }
       }
     }

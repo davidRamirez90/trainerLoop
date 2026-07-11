@@ -1,6 +1,14 @@
 package com.trainerloop.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.platform.LocalContext
 import com.trainerloop.data.model.Workout
@@ -63,6 +72,8 @@ import com.trainerloop.ui.theme.Green20
 import com.trainerloop.ui.theme.Green40
 import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
+import com.trainerloop.ui.theme.MotionSpec
+import com.trainerloop.ui.theme.reducedMotionAware
 import com.trainerloop.ui.theme.zoneColorSet
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -82,6 +93,7 @@ fun HomeScreen(
   viewModel: HomeViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val defaultMotionSpec = reducedMotionAware(MotionSpec.default)
   val plannedReady by viewModel.plannedWorkoutReady.collectAsStateWithLifecycle()
   val context = LocalContext.current
 
@@ -120,8 +132,16 @@ fun HomeScreen(
     }
 
     val hasPlan = uiState.plannedName != null || uiState.plannedLoading || uiState.plannedError != null
-    if (hasPlan) {
-      item {
+    item(key = "planned-workout") {
+      AnimatedVisibility(
+        visible = hasPlan,
+        enter = expandVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeIn(animationSpec = defaultMotionSpec),
+        exit = shrinkVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeOut(animationSpec = defaultMotionSpec)
+      ) {
         PlannedWorkoutCard(
           name = uiState.plannedName,
           workout = uiState.plannedWorkout,
@@ -139,38 +159,54 @@ fun HomeScreen(
 
     // Today's plan takes over this slot when present — recent history only
     // shows on rest days / when no workout is scheduled.
-    if (!hasPlan) {
-      item {
-        Text(
-          text = "Recent Workouts",
-          style = MaterialTheme.typography.titleLarge,
-          fontWeight = FontWeight.SemiBold
-        )
-      }
-
-      val recentSession = uiState.recentSession
-      if (recentSession == null) {
-        item {
+    item(key = "recent-workouts") {
+      AnimatedVisibility(
+        visible = !hasPlan,
+        enter = expandVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeIn(animationSpec = defaultMotionSpec),
+        exit = shrinkVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeOut(animationSpec = defaultMotionSpec)
+      ) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
           Text(
-            text = "No saved workouts yet.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "Recent Workouts",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold
           )
-        }
-      } else {
-        item {
-          val recentWorkout = remember(recentSession.workoutId, uiState.ftp) {
-            WorkoutResolver.resolve(
-              recentSession.workoutId,
-              uiState.ftp,
-              ImportedWorkoutStore.load(context)
-            )
+
+          val recentSession = uiState.recentSession
+          AnimatedContent(
+            targetState = recentSession != null,
+            transitionSpec = {
+              fadeIn(animationSpec = defaultMotionSpec) togetherWith
+                fadeOut(animationSpec = defaultMotionSpec)
+            },
+            label = "recent-workout-empty-state"
+          ) { hasRecent ->
+            if (!hasRecent) {
+              Text(
+                text = "No saved workouts yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+            } else {
+              val session = requireNotNull(recentSession)
+              val recentWorkout = remember(session.workoutId, uiState.ftp) {
+                WorkoutResolver.resolve(
+                  session.workoutId,
+                  uiState.ftp,
+                  ImportedWorkoutStore.load(context)
+                )
+              }
+              RecentSessionCard(
+                session = session,
+                workout = recentWorkout,
+                ftp = uiState.ftp
+              )
+            }
           }
-          RecentSessionCard(
-            session = recentSession,
-            workout = recentWorkout,
-            ftp = uiState.ftp
-          )
         }
       }
     }
@@ -307,6 +343,7 @@ private fun PlannedWorkoutCard(
   error: String?,
   onStart: () -> Unit
 ) {
+  val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
   val onColor = MaterialTheme.colorScheme.onSecondaryContainer
   Card(
     modifier = Modifier.fillMaxWidth(),
@@ -332,16 +369,34 @@ private fun PlannedWorkoutCard(
         )
       }
       Spacer(modifier = Modifier.height(8.dp))
-      Text(
-        text = name ?: error ?: "Loading planned workout…",
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Bold,
-        color = onColor,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis
-      )
+      AnimatedContent(
+        targetState = name ?: error ?: "Loading planned workout…",
+        transitionSpec = {
+          fadeIn(animationSpec = fastMotionSpec) togetherWith
+            fadeOut(animationSpec = fastMotionSpec)
+        },
+        label = "planned-workout-state"
+      ) { title ->
+        Text(
+          text = title,
+          style = MaterialTheme.typography.titleLarge,
+          fontWeight = FontWeight.Bold,
+          color = onColor,
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis
+        )
+      }
 
-      if (workout != null) {
+      AnimatedVisibility(
+        visible = workout != null,
+        enter = expandVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+        exit = shrinkVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+      ) {
+        if (workout != null) {
         val totalSec = remember(workout) {
           com.trainerloop.domain.WorkoutMath.totalDurationSec(workout.segments)
         }
@@ -366,28 +421,48 @@ private fun PlannedWorkoutCard(
           chartHeight = 72.dp,
           lineColor = onColor.copy(alpha = 0.9f)
         )
+        }
       }
 
-      if (name != null) {
+      AnimatedVisibility(
+        visible = name != null,
+        enter = expandVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+        exit = shrinkVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+      ) {
         Spacer(modifier = Modifier.height(Spacing.lg))
         Button(
           onClick = onStart,
           enabled = !loading,
           modifier = Modifier.fillMaxWidth()
         ) {
-          if (loading) {
-            CircularProgressIndicator(
-              modifier = Modifier.size(18.dp),
-              strokeWidth = 2.dp,
-              color = MaterialTheme.colorScheme.onPrimary
-            )
-          } else {
-            Icon(
-              imageVector = Icons.Default.PlayArrow,
-              contentDescription = null,
-              modifier = Modifier.padding(end = 8.dp)
-            )
-            Text("Quick Start", fontWeight = FontWeight.SemiBold)
+          AnimatedContent(
+            targetState = loading,
+            transitionSpec = {
+              fadeIn(animationSpec = fastMotionSpec) togetherWith
+                fadeOut(animationSpec = fastMotionSpec)
+            },
+            label = "planned-workout-action"
+          ) { isLoading ->
+            if (isLoading) {
+              CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary
+              )
+            } else {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                  imageVector = Icons.Default.PlayArrow,
+                  contentDescription = null,
+                  modifier = Modifier.padding(end = 8.dp)
+                )
+                Text("Quick Start", fontWeight = FontWeight.SemiBold)
+              }
+            }
           }
         }
       }
@@ -445,21 +520,41 @@ private fun ConnectionStatus(
   label: String,
   value: String
 ) {
+  val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
+  val iconTint by animateColorAsState(
+    targetValue = Color.White.copy(alpha = if (connected) 1f else 0.65f),
+    animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
+    label = "connection-icon-color"
+  )
+  val textColor by animateColorAsState(
+    targetValue = Color.White.copy(alpha = if (connected) 1f else 0.75f),
+    animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
+    label = "connection-text-color"
+  )
   Row(
     modifier = modifier,
     verticalAlignment = Alignment.CenterVertically
   ) {
-    Icon(
-      imageVector = icon,
-      contentDescription = if (connected) "Device connected" else "Device disconnected",
-      tint = Color.White.copy(alpha = if (connected) 1f else 0.65f),
-      modifier = Modifier.size(18.dp)
-    )
+    AnimatedContent(
+      targetState = connected,
+      transitionSpec = {
+        fadeIn(animationSpec = fastMotionSpec) togetherWith
+          fadeOut(animationSpec = fastMotionSpec)
+      },
+      label = "connection-icon"
+    ) { isConnected ->
+      Icon(
+        imageVector = icon,
+        contentDescription = if (isConnected) "Device connected" else "Device disconnected",
+        tint = iconTint,
+        modifier = Modifier.size(18.dp)
+      )
+    }
     Spacer(modifier = Modifier.width(Spacing.sm))
     Text(
       text = "$label · $value",
       style = MaterialTheme.typography.labelMedium,
-      color = Color.White.copy(alpha = if (connected) 1f else 0.75f),
+      color = textColor,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis
     )

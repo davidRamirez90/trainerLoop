@@ -11,6 +11,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
 import androidx.compose.material3.Button
@@ -34,9 +41,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import com.trainerloop.ui.components.SampleChart
 import com.trainerloop.ui.theme.NumericMedium
 import com.trainerloop.ui.theme.NumericSmall
+import com.trainerloop.ui.theme.MotionSpec
+import com.trainerloop.ui.theme.reducedMotionAware
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,6 +56,7 @@ fun WorkoutCompleteScreen(
   onDone: () -> Unit
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
 
   LaunchedEffect(uiState.isDiscarded) {
     if (uiState.isDiscarded) onDiscard()
@@ -192,7 +203,14 @@ fun WorkoutCompleteScreen(
           enabled = !uiState.isSaved && !uiState.isSaving,
           modifier = Modifier.weight(1f)
         ) {
-          Text(if (uiState.isSaved) "Saved" else "Save")
+          AnimatedContent(
+            targetState = uiState.isSaved,
+            transitionSpec = {
+              fadeIn(animationSpec = fastMotionSpec) togetherWith
+                fadeOut(animationSpec = fastMotionSpec)
+            },
+            label = "complete-save-label"
+          ) { saved -> Text(if (saved) "Saved" else "Save") }
         }
       }
 
@@ -206,13 +224,23 @@ fun WorkoutCompleteScreen(
         Text("Share FIT")
       }
 
-      uiState.uploadStatus?.let { status ->
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-          text = status,
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+      AnimatedVisibility(
+        visible = uiState.uploadStatus != null,
+        enter = expandVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+        exit = shrinkVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+      ) {
+        uiState.uploadStatus?.let { status ->
+          Spacer(modifier = Modifier.height(8.dp))
+          Text(
+            text = status,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
       }
 
       Spacer(modifier = Modifier.height(8.dp))
@@ -229,16 +257,22 @@ fun WorkoutCompleteScreen(
     }
 
     // Error snackbar
-    uiState.error?.let { error ->
-      Snackbar(
-        modifier = Modifier.padding(16.dp),
-        action = {
-          TextButton(onClick = { viewModel.clearError() }) {
-            Text("Dismiss")
+    AnimatedVisibility(
+      visible = uiState.error != null,
+      enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+      exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+    ) {
+      uiState.error?.let { error ->
+        Snackbar(
+          modifier = Modifier.padding(16.dp),
+          action = {
+            TextButton(onClick = { viewModel.clearError() }) {
+              Text("Dismiss")
+            }
           }
+        ) {
+          Text(error)
         }
-      ) {
-        Text(error)
       }
     }
   }
@@ -252,6 +286,8 @@ private fun RampTestResultCard(
   onPush: () -> Unit,
   onDeclinePush: () -> Unit
 ) {
+  val defaultMotionSpec = reducedMotionAware(MotionSpec.default)
+  val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
   Card(
     modifier = Modifier.fillMaxWidth(),
     colors = CardDefaults.cardColors(
@@ -267,73 +303,102 @@ private fun RampTestResultCard(
       Spacer(modifier = Modifier.height(8.dp))
 
       val newFtp = uiState.rampTestNewFtp
-      if (newFtp == null) {
-        Text(
-          text = "Test too short — no FTP calculated",
-          style = MaterialTheme.typography.bodyLarge
-        )
-      } else {
-        val prev = uiState.rampTestPreviousFtp
-        val delta = newFtp - prev
-        val pct = if (prev > 0) delta * 100 / prev else 0
-        Text(
-          text = "$newFtp W",
-          style = MaterialTheme.typography.headlineLarge.copy(fontFeatureSettings = "tnum"),
-          fontWeight = FontWeight.Bold
-        )
-        Text(
-          text = "${if (delta >= 0) "up" else "down"} ${kotlin.math.abs(delta)} W " +
-            "(${if (delta >= 0) "+" else ""}$pct%) from $prev W",
-          style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-          color = MaterialTheme.colorScheme.onSecondaryContainer
-        )
-        Spacer(modifier = Modifier.height(12.dp))
+      AnimatedContent(
+        targetState = newFtp != null,
+        transitionSpec = {
+          fadeIn(animationSpec = defaultMotionSpec) togetherWith
+            fadeOut(animationSpec = defaultMotionSpec)
+        },
+        label = "ramp-test-result"
+      ) { hasResult ->
+        if (!hasResult) {
+          Text(
+            text = "Test too short — no FTP calculated",
+            style = MaterialTheme.typography.bodyLarge
+          )
+        } else {
+          val resultFtp = requireNotNull(newFtp)
+          val prev = uiState.rampTestPreviousFtp
+          val delta = resultFtp - prev
+          val pct = if (prev > 0) delta * 100 / prev else 0
+          Text(
+            text = "$resultFtp W",
+            style = MaterialTheme.typography.headlineLarge.copy(fontFeatureSettings = "tnum"),
+            fontWeight = FontWeight.Bold
+          )
+          Text(
+            text = "${if (delta >= 0) "up" else "down"} ${kotlin.math.abs(delta)} W " +
+              "(${if (delta >= 0) "+" else ""}$pct%) from $prev W",
+            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+            color = MaterialTheme.colorScheme.onSecondaryContainer
+          )
+          Spacer(modifier = Modifier.height(12.dp))
 
-        when {
-          !uiState.ftpDecided -> Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-          ) {
-            OutlinedButton(onClick = onDiscard, modifier = Modifier.weight(1f)) {
-              Text("Discard FTP")
-            }
-            Button(onClick = onAccept, modifier = Modifier.weight(1f)) {
-              Text("Accept FTP")
+          AnimatedContent(
+            targetState = Triple(uiState.ftpDecided, uiState.showIcuFtpPrompt, uiState.ftpAccepted),
+            transitionSpec = {
+              fadeIn(animationSpec = fastMotionSpec) togetherWith
+                fadeOut(animationSpec = fastMotionSpec)
+            },
+            label = "ramp-test-actions"
+          ) { actionState ->
+            when {
+              !actionState.first -> Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+              ) {
+                OutlinedButton(onClick = onDiscard, modifier = Modifier.weight(1f)) {
+                  Text("Discard FTP")
+                }
+                Button(onClick = onAccept, modifier = Modifier.weight(1f)) {
+                  Text("Accept FTP")
+                }
+              }
+              actionState.second -> {
+                Text(
+                  text = "FTP saved. Set FTP on intervals.icu now?",
+                  style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                  OutlinedButton(onClick = onDeclinePush, modifier = Modifier.weight(1f)) {
+                    Text("Later")
+                  }
+                  Button(onClick = onPush, modifier = Modifier.weight(1f)) {
+                    Text("Yes")
+                  }
+                }
+              }
+              else -> Text(
+                text = if (actionState.third) "New FTP saved to your profile" else "FTP discarded",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+              )
             }
           }
-          uiState.showIcuFtpPrompt -> {
-            Text(
-              text = "FTP saved. Set FTP on intervals.icu now?",
-              style = MaterialTheme.typography.bodyMedium
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-              OutlinedButton(onClick = onDeclinePush, modifier = Modifier.weight(1f)) {
-                Text("Later")
-              }
-              Button(onClick = onPush, modifier = Modifier.weight(1f)) {
-                Text("Yes")
-              }
-            }
-          }
-          else -> Text(
-            text = if (uiState.ftpAccepted) "New FTP saved to your profile" else "FTP discarded",
+        }
+      }
+
+      AnimatedVisibility(
+        visible = uiState.ftpPushStatus != null,
+        enter = expandVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+        exit = shrinkVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+      ) {
+        uiState.ftpPushStatus?.let { status ->
+          Spacer(modifier = Modifier.height(8.dp))
+          Text(
+            text = status,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSecondaryContainer
           )
         }
-      }
-
-      uiState.ftpPushStatus?.let { status ->
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-          text = status,
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSecondaryContainer
-        )
       }
     }
   }

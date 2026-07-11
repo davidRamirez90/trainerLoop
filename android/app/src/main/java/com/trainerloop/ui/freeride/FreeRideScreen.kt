@@ -1,6 +1,13 @@
 package com.trainerloop.ui.freeride
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,11 +51,14 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.ui.components.RouteProfileChart
 import com.trainerloop.ui.components.AnimatedMetricValue
 import com.trainerloop.ui.workout.WorkoutFinishData
+import com.trainerloop.ui.theme.MotionSpec
+import com.trainerloop.ui.theme.reducedMotionAware
 
 @Composable
 fun FreeRideScreen(
@@ -57,6 +67,7 @@ fun FreeRideScreen(
   onExit: () -> Unit
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+  val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
   val finishEvent by viewModel.finishEvent.collectAsStateWithLifecycle()
   val context = LocalContext.current
   val view = LocalView.current
@@ -157,7 +168,17 @@ fun FreeRideScreen(
       fontWeight = FontWeight.SemiBold
     )
 
-    if (uiState.routeComplete) {
+    AnimatedVisibility(
+      visible = uiState.routeComplete,
+      enter = expandVertically(
+        animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+      ) +
+        fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+      exit = shrinkVertically(
+        animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+      ) +
+        fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+    ) {
       Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
       ) {
@@ -228,20 +249,29 @@ fun FreeRideScreen(
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       val resumable = uiState.elapsedSec > 0
-      if (uiState.isRunning) {
-        Button(onClick = { viewModel.pause() }, modifier = Modifier.weight(1f)) {
-          Icon(Icons.Default.Pause, contentDescription = null)
-          Spacer(modifier = Modifier.width(4.dp))
-          Text("Pause")
-        }
-      } else {
-        Button(
-          onClick = { if (resumable) viewModel.resume() else viewModel.start() },
-          modifier = Modifier.weight(1f)
-        ) {
-          Icon(Icons.Default.PlayArrow, contentDescription = null)
-          Spacer(modifier = Modifier.width(4.dp))
-          Text(if (resumable) "Resume" else "Start")
+      Button(
+        onClick = {
+          if (uiState.isRunning) viewModel.pause()
+          else if (resumable) viewModel.resume() else viewModel.start()
+        },
+        modifier = Modifier.weight(1f)
+      ) {
+        AnimatedContent(
+          targetState = uiState.isRunning to resumable,
+          transitionSpec = {
+            fadeIn(animationSpec = fastMotionSpec) togetherWith
+              fadeOut(animationSpec = fastMotionSpec)
+          },
+          label = "free-ride-transport"
+        ) { state ->
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+              if (state.first) Icons.Default.Pause else Icons.Default.PlayArrow,
+              contentDescription = if (state.first) "Pause" else "Start"
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(if (state.first) "Pause" else if (state.second) "Resume" else "Start")
+          }
         }
       }
       Button(

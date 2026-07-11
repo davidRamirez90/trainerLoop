@@ -1,8 +1,11 @@
 package com.trainerloop.ui.library
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -50,6 +53,7 @@ import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.reducedMotionAware
+import androidx.compose.ui.unit.IntSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -176,13 +180,23 @@ fun WorkoutBuilderScreen(
       ) {
         Text("Save Workout")
       }
-      uiState.saveReason?.let { reason ->
-        Text(
-          text = reason,
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.error,
-          modifier = Modifier.padding(top = Spacing.xs)
-        )
+      AnimatedVisibility(
+        visible = uiState.saveReason != null,
+        enter = expandVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+        exit = shrinkVertically(
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+        ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+      ) {
+        uiState.saveReason?.let { reason ->
+          Text(
+            text = reason,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(top = Spacing.xs)
+          )
+        }
       }
     }
   }

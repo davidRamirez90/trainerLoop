@@ -3,8 +3,10 @@ package com.trainerloop.ui.routes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -37,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.repository.RouteSummary
 import com.trainerloop.ui.components.pressable
@@ -77,7 +79,11 @@ fun RoutesScreen(
           }
         },
         actions = {
-          if (hasRoutes) {
+          AnimatedVisibility(
+            visible = hasRoutes,
+            enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+            exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+          ) {
             IconButton(onClick = importGpx, modifier = Modifier.pressable()) {
               Icon(Icons.Default.Add, contentDescription = "Import GPX")
             }
@@ -91,11 +97,26 @@ fun RoutesScreen(
       contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.lg),
       verticalArrangement = Arrangement.spacedBy(Spacing.sm)
     ) {
-      if (!hasRoutes) {
-        item {
-          Button(onClick = importGpx, modifier = Modifier.fillMaxWidth().pressable()) {
-            Icon(Icons.Default.Add, contentDescription = null)
-            Text("Import GPX")
+      item(key = "route-empty-state") {
+        AnimatedVisibility(
+          visible = !hasRoutes,
+          enter = expandVertically(
+            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+          ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+          exit = shrinkVertically(
+            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+          ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+        ) {
+          Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Button(onClick = importGpx, modifier = Modifier.fillMaxWidth().pressable()) {
+              Icon(Icons.Default.Add, contentDescription = null)
+              Text("Import GPX")
+            }
+            Text(
+              "No routes yet — import a GPX file to ride it.",
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
           }
         }
       }
@@ -116,22 +137,26 @@ fun RoutesScreen(
         }
       }
 
-      if (!hasRoutes) {
-        item {
-          Text(
-            "No routes yet — import a GPX file to ride it.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
+      item(key = "route-list") {
+        AnimatedVisibility(
+          visible = hasRoutes,
+          enter = expandVertically(
+            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+          ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+          exit = shrinkVertically(
+            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+          ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+        ) {
+          Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            routes.forEach { route ->
+              RouteRow(
+                route = route,
+                onClick = { onRouteClick(route.id) },
+                onDelete = { viewModel.deleteRoute(route.id) }
+              )
+            }
+          }
         }
-      }
-
-      items(routes, key = { it.id }) { route ->
-        RouteRow(
-          route = route,
-          onClick = { onRouteClick(route.id) },
-          onDelete = { viewModel.deleteRoute(route.id) }
-        )
       }
     }
   }

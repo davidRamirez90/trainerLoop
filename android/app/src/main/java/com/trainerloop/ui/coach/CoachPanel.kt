@@ -1,5 +1,10 @@
 package com.trainerloop.ui.coach
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.CoachEvent
 import com.trainerloop.data.model.CoachSuggestion
+import com.trainerloop.ui.theme.MotionSpec
+import com.trainerloop.ui.theme.reducedMotionAware
+import androidx.compose.ui.unit.IntSize
 
 @Composable
 fun CoachPanel(
@@ -32,13 +40,23 @@ fun CoachPanel(
 
     Spacer(modifier = Modifier.height(8.dp))
 
-    if (pendingSuggestion != null) {
-      CoachSuggestionCard(
-        suggestion = pendingSuggestion,
-        onAccept = onAccept,
-        onReject = onReject
-      )
-      Spacer(modifier = Modifier.height(8.dp))
+    AnimatedVisibility(
+      visible = pendingSuggestion != null,
+      enter = expandVertically(
+        animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+      ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+      exit = shrinkVertically(
+        animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+      ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+    ) {
+      pendingSuggestion?.let { suggestion ->
+        CoachSuggestionCard(
+          suggestion = suggestion,
+          onAccept = onAccept,
+          onReject = onReject
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+      }
     }
 
     if (events.isNotEmpty()) {

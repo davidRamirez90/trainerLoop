@@ -1,8 +1,12 @@
 package com.trainerloop.ui.components
 
 import android.graphics.Matrix
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -21,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.changedToUp
@@ -114,6 +120,11 @@ fun WorkoutChart(
     animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
     label = "Chart cursor"
   )
+  val selectedHighlightAlpha by animateFloatAsState(
+    targetValue = if (selectedIndex != null) 0.18f else 0f,
+    animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
+    label = "Chart selected interval highlight"
+  )
   val panOffset = remember { Animatable(0f) }
   val panScope = rememberCoroutineScope()
   val reducedMotion = com.trainerloop.ui.theme.LocalReducedMotion.current
@@ -178,10 +189,19 @@ fun WorkoutChart(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.End
     ) {
+      val focusChipColor by animateColorAsState(
+        targetValue = if (zoomToCurrent) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
+        label = "chart-focus-chip-color"
+      )
       FilterChip(
         selected = zoomToCurrent,
         onClick = { zoomToCurrent = !zoomToCurrent },
-        label = { Text(if (zoomToCurrent) "Focus" else "Full") }
+        label = { Text(if (zoomToCurrent) "Focus" else "Full") },
+        colors = FilterChipDefaults.filterChipColors(
+          containerColor = focusChipColor,
+          selectedContainerColor = focusChipColor
+        )
       )
     }
 
@@ -409,7 +429,7 @@ fun WorkoutChart(
             val xs = xForTime(s.toFloat()).coerceIn(0f, width)
             val xe = xForTime(e.toFloat()).coerceIn(0f, width)
             drawRect(
-              color = cursorColor.copy(alpha = 0.18f),
+              color = cursorColor.copy(alpha = selectedHighlightAlpha),
               topLeft = Offset(xs, 0f),
               size = Size(xe - xs, heightPx)
             )
@@ -475,23 +495,29 @@ fun WorkoutChart(
         }
       }
 
-      selectedIndex?.let { idx ->
-        bounds.getOrNull(idx)?.let { (start, _, seg) ->
-          IntervalTooltip(
-            index = idx,
-            count = segments.size,
-            start = start,
-            segment = seg,
-            ftp = ftp,
-            modifier = Modifier
-              .align(Alignment.TopStart)
-              .offset {
-                val maxX = (chartWidthPx - tooltipWidthPx).coerceAtLeast(0)
-                IntOffset(tooltipX.roundToInt().coerceIn(0, maxX), 0)
-              }
-              .onSizeChanged { tooltipWidthPx = it.width }
-              .padding(8.dp)
-          )
+      androidx.compose.animation.AnimatedVisibility(
+        visible = selectedIndex != null,
+        enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+        exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+      ) {
+        selectedIndex?.let { idx ->
+          bounds.getOrNull(idx)?.let { (start, _, seg) ->
+            IntervalTooltip(
+              index = idx,
+              count = segments.size,
+              start = start,
+              segment = seg,
+              ftp = ftp,
+              modifier = Modifier
+                .align(Alignment.TopStart)
+                .offset {
+                  val maxX = (chartWidthPx - tooltipWidthPx).coerceAtLeast(0)
+                  IntOffset(tooltipX.roundToInt().coerceIn(0, maxX), 0)
+                }
+                .onSizeChanged { tooltipWidthPx = it.width }
+                .padding(8.dp)
+            )
+          }
         }
       }
     }

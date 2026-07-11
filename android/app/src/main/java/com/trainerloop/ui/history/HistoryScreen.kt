@@ -2,6 +2,10 @@ package com.trainerloop.ui.history
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -61,53 +65,62 @@ fun HistoryScreen(
   viewModel: HistoryViewModel = viewModel()
 ) {
   val sessions by viewModel.sessions.collectAsStateWithLifecycle()
+  val defaultMotionSpec = reducedMotionAware(MotionSpec.default)
 
-  if (sessions.isEmpty()) {
-    Box(
-      modifier = Modifier
-        .fillMaxSize()
-        .padding(horizontal = Spacing.lg),
-      contentAlignment = Alignment.Center
-    ) {
-      Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(
-          imageVector = Icons.Default.History,
-          contentDescription = null,
-          tint = MaterialTheme.colorScheme.onSurfaceVariant,
-          modifier = Modifier.size(56.dp)
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-          text = "No rides yet",
-          style = MaterialTheme.typography.titleLarge,
-          fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-          text = "Finished workouts will show up here.",
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+  AnimatedContent(
+    targetState = sessions.isEmpty(),
+    transitionSpec = {
+      fadeIn(animationSpec = defaultMotionSpec) togetherWith
+        fadeOut(animationSpec = defaultMotionSpec)
+    },
+    label = "history-empty-state"
+  ) { empty ->
+    if (empty) {
+      Box(
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(horizontal = Spacing.lg),
+        contentAlignment = Alignment.Center
+      ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+          Icon(
+            imageVector = Icons.Default.History,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(56.dp)
+          )
+          Spacer(modifier = Modifier.height(12.dp))
+          Text(
+            text = "No rides yet",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.SemiBold
+          )
+          Spacer(modifier = Modifier.height(4.dp))
+          Text(
+            text = "Finished workouts will show up here.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
       }
-    }
-    return
-  }
-
-  LazyColumn(
-    modifier = Modifier
-      .fillMaxSize()
-      .padding(horizontal = Spacing.lg),
-    verticalArrangement = Arrangement.spacedBy(Spacing.xl)
-  ) {
-    item {
-      Text(
-        text = "History",
-        style = MaterialTheme.typography.headlineLarge
-      )
-    }
-    item { WeeklyLoadChart(sessions) }
-    items(sessions, key = { it.id }) { session ->
-      SessionCard(session, onClick = { onSessionClick(session.id) })
+    } else {
+      LazyColumn(
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(horizontal = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xl)
+      ) {
+        item {
+          Text(
+            text = "History",
+            style = MaterialTheme.typography.headlineLarge
+          )
+        }
+        item { WeeklyLoadChart(sessions) }
+        items(sessions, key = { it.id }) { session ->
+          SessionCard(session, onClick = { onSessionClick(session.id) })
+        }
+      }
     }
   }
 }

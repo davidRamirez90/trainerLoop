@@ -1,6 +1,11 @@
 package com.trainerloop.ui.complete
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +36,9 @@ import com.trainerloop.domain.coach.CoachSessionData
 import com.trainerloop.domain.coach.FeedbackItem
 import com.trainerloop.domain.coach.executionScore
 import kotlin.math.roundToInt
+import com.trainerloop.ui.theme.MotionSpec
+import com.trainerloop.ui.theme.reducedMotionAware
+import androidx.compose.ui.unit.IntSize
 
 /** Post-ride coach summary (§11): execution score, fatigue curve, feedback timeline. */
 @Composable
@@ -138,7 +146,15 @@ private fun FeedbackRow(item: FeedbackItem) {
       )
       Text(text = item.message, style = MaterialTheme.typography.bodySmall)
     }
-    if (expanded) {
+    AnimatedVisibility(
+      visible = expanded,
+      enter = expandVertically(
+        animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+      ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+      exit = shrinkVertically(
+        animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+      ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+    ) {
       Column(modifier = Modifier.padding(start = 8.dp, top = 2.dp, bottom = 4.dp)) {
         Text(
           text = "rule ${item.ruleId} · ${item.category.name.lowercase()} · sev ${item.severity}",

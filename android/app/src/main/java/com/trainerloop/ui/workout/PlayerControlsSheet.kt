@@ -1,6 +1,8 @@
 package com.trainerloop.ui.workout
 
 import android.view.View
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationVector
 import androidx.compose.animation.core.TwoWayConverter
@@ -9,6 +11,11 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.OverscrollEffect
 import androidx.compose.foundation.background
@@ -67,6 +74,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Velocity
 import com.trainerloop.ui.components.pressable
@@ -326,20 +334,40 @@ fun PlayerControlsSheet(
       )
     }
 
-    if (showRecovery) {
-      Spacer(modifier = Modifier.height(Spacing.md))
-      FilledTonalButton(
-        onClick = onExtendRecovery,
-        modifier = Modifier.fillMaxWidth().pressable()
-      ) {
-        Text("+30s recovery")
+    AnimatedVisibility(
+      visible = showRecovery,
+      enter = expandVertically(
+        animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+      ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+      exit = shrinkVertically(
+        animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+      ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+    ) {
+      Column {
+        Spacer(modifier = Modifier.height(Spacing.md))
+        FilledTonalButton(
+          onClick = onExtendRecovery,
+          modifier = Modifier.fillMaxWidth().pressable()
+        ) {
+          Text("+30s recovery")
+        }
       }
     }
 
-    if (isComplete) {
-      Spacer(modifier = Modifier.height(Spacing.md))
-      Button(onClick = onFinish, modifier = Modifier.fillMaxWidth().pressable()) {
-        Text("Finish Workout")
+    AnimatedVisibility(
+      visible = isComplete,
+      enter = expandVertically(
+        animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+      ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+      exit = shrinkVertically(
+        animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+      ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+    ) {
+      Column {
+        Spacer(modifier = Modifier.height(Spacing.md))
+        Button(onClick = onFinish, modifier = Modifier.fillMaxWidth().pressable()) {
+          Text("Finish Workout")
+        }
       }
     }
   }
@@ -355,6 +383,7 @@ private fun TransportRow(
   onStop: () -> Unit,
   skipEnabled: Boolean
 ) {
+  val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
   val playPauseInteractionSource = remember { MutableInteractionSource() }
   val skipInteractionSource = remember { MutableInteractionSource() }
   val stopInteractionSource = remember { MutableInteractionSource() }
@@ -370,16 +399,32 @@ private fun TransportRow(
         .weight(1f),
       interactionSource = playPauseInteractionSource
     ) {
-      Icon(
-        if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-        contentDescription = if (isRunning) "Pause" else "Start"
-      )
+      AnimatedContent(
+        targetState = isRunning,
+        transitionSpec = {
+          fadeIn(animationSpec = fastMotionSpec) togetherWith
+            fadeOut(animationSpec = fastMotionSpec)
+        },
+        label = "transport-icon"
+      ) { running ->
+        Icon(
+          if (running) Icons.Default.Pause else Icons.Default.PlayArrow,
+          contentDescription = if (running) "Pause" else "Start"
+        )
+      }
       Spacer(modifier = Modifier.width(Spacing.xs))
-      Text(
-        if (isRunning) "Pause"
-        else if (elapsedSec > 0 && !isComplete) "Resume"
-        else "Start"
-      )
+      AnimatedContent(
+        targetState = when {
+          isRunning -> "Pause"
+          elapsedSec > 0 && !isComplete -> "Resume"
+          else -> "Start"
+        },
+        transitionSpec = {
+          fadeIn(animationSpec = fastMotionSpec) togetherWith
+            fadeOut(animationSpec = fastMotionSpec)
+        },
+        label = "transport-label"
+      ) { label -> Text(label) }
     }
 
     FilledTonalButton(
