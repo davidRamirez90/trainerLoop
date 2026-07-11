@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.Workout
@@ -45,6 +47,7 @@ fun WorkoutMiniChart(
     modifier = modifier
       .fillMaxWidth()
       .height(chartHeight)
+      .semantics { contentDescription = workoutProfileSummary(workout.segments) }
   ) {
     if (isFreeRideOnly) {
       val bandHeight = size.height * 0.4f

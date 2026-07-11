@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.TelemetrySample
 import kotlinx.coroutines.launch
@@ -55,12 +57,20 @@ private fun ChartPage(
 
   val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
   val maxValue = values.maxOrNull()?.coerceAtLeast(1) ?: 1
+  val minValue = values.minOrNull() ?: 0
   val totalDuration = samples.lastOrNull()?.timeSec?.coerceAtLeast(1) ?: 1
+  val metricName = when (selectedTab) {
+    0 -> "Power"
+    1 -> "Heart rate"
+    else -> "Cadence"
+  }
+  val summary = "$metricName chart: ${totalDuration / 60} minutes, values $minValue to $maxValue $unit."
 
   Canvas(
     modifier = Modifier
       .fillMaxWidth()
       .height(160.dp)
+      .semantics { contentDescription = summary }
   ) {
     val width = size.width
     val heightPx = size.height

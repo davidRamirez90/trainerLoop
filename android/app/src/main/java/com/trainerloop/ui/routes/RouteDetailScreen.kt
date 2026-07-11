@@ -152,12 +152,23 @@ private fun ElevationHero(points: List<RoutePoint>) {
   val darkTheme = isSystemInDarkTheme()
   val amberLine = ZoneColors.forZone(zone = 4, dark = darkTheme).line
   val redLine = ZoneColors.forZone(zone = 6, dark = darkTheme).line
+  val elevationSummary = if (points.size >= 2) {
+    String.format(
+      Locale.US,
+      "Elevation profile: %.1f kilometers, elevations %.0f to %.0f meters.",
+      points.last().distanceM / 1000.0,
+      points.minOf { it.elevationM },
+      points.maxOf { it.elevationM }
+    )
+  } else {
+    "Elevation profile unavailable."
+  }
 
   Canvas(
     modifier = Modifier
       .fillMaxWidth()
       .height(200.dp)
-      .semantics { contentDescription = "Elevation profile" }
+      .semantics { contentDescription = elevationSummary }
   ) {
     if (points.size < 2) return@Canvas
 

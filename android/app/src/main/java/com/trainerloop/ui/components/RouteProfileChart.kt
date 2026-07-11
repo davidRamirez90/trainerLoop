@@ -8,8 +8,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.RoutePoint
+import java.util.Locale
 
 /** Elevation-vs-distance silhouette with an optional rider position marker. */
 @Composable
@@ -22,8 +25,23 @@ fun RouteProfileChart(
   val fillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
   val lineColor = MaterialTheme.colorScheme.primary
   val markerColor = MaterialTheme.colorScheme.error
+  val totalDistanceM = points.last().distanceM
+  val minElevationM = points.minOf { it.elevationM }
+  val maxElevationM = points.maxOf { it.elevationM }
+  val summary = String.format(
+    Locale.US,
+    "Elevation profile: %.1f kilometers, elevations %.0f to %.0f meters.",
+    totalDistanceM / 1000.0,
+    minElevationM,
+    maxElevationM
+  )
 
-  Canvas(modifier = modifier.fillMaxWidth().height(120.dp)) {
+  Canvas(
+    modifier = modifier
+      .fillMaxWidth()
+      .height(120.dp)
+      .semantics { contentDescription = summary }
+  ) {
     val total = points.last().distanceM
     val minEle = points.minOf { it.elevationM }
     val eleSpan = (points.maxOf { it.elevationM } - minEle).coerceAtLeast(1.0)

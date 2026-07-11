@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,6 +71,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -79,6 +83,7 @@ import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
 import com.trainerloop.ui.components.WorkoutChart
+import com.trainerloop.ui.components.workoutProfileSummary
 import com.trainerloop.ui.haptics.Haptics
 import com.trainerloop.ui.components.AnimatedMetricValue
 import com.trainerloop.ui.components.pressable
@@ -587,7 +592,12 @@ private fun PowerHero(
   )
 
   Column(
-    modifier = Modifier.fillMaxWidth(),
+    modifier = Modifier
+      .fillMaxWidth()
+      .clearAndSetSemantics {
+        contentDescription = "Power " +
+          if (sessionHasStarted) "$powerWatts watts" else "not available"
+      },
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
     Row(verticalAlignment = Alignment.Bottom) {
@@ -633,7 +643,9 @@ private fun SecondaryMetricTile(
   compact: Boolean = false
 ) {
   Card(
-    modifier = modifier,
+    modifier = modifier.clearAndSetSemantics {
+      contentDescription = liveMetricDescription(label, value, unit, zeroIsUnavailable = true)
+    },
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceContainer
     )
@@ -851,6 +863,7 @@ private fun ImmersiveWorkoutChart(
       Canvas(
         modifier = Modifier
           .horizontalScroll(scrollState)
+          .semantics { contentDescription = workoutProfileSummary(segments) }
           .pointerInput(Unit) {
             awaitEachGesture {
               awaitFirstDown(requireUnconsumed = false)
@@ -937,7 +950,7 @@ private fun ImmersiveWorkoutChart(
       if (!followEnabled) {
         FilledTonalButton(
           onClick = { followEnabled = true },
-          modifier = Modifier.height(36.dp),
+          modifier = Modifier.heightIn(min = 48.dp),
           contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)
         ) {
           Box(
@@ -953,7 +966,7 @@ private fun ImmersiveWorkoutChart(
       FilledIconButton(
         onClick = { if (zoomIdx > 0) zoomIdx-- },
         enabled = zoomIdx > 0,
-        modifier = Modifier.size(36.dp)
+        modifier = Modifier.size(48.dp)
       ) { Icon(Icons.Default.Remove, contentDescription = "Zoom out") }
       Text(
         text = "${zoom.toInt()}×",
@@ -963,7 +976,7 @@ private fun ImmersiveWorkoutChart(
       FilledIconButton(
         onClick = { if (zoomIdx < ZOOM_LEVELS.lastIndex) zoomIdx++ },
         enabled = zoomIdx < ZOOM_LEVELS.lastIndex,
-        modifier = Modifier.size(36.dp)
+        modifier = Modifier.size(48.dp)
       ) { Icon(Icons.Default.Add, contentDescription = "Zoom in") }
     }
   }
@@ -997,7 +1010,14 @@ private fun BigMetric(
   }
 
   Card(
-    modifier = modifier,
+    modifier = modifier.clearAndSetSemantics {
+      contentDescription = liveMetricDescription(
+        label,
+        value,
+        unit,
+        zeroIsUnavailable = animatedShowDashWhenZero
+      )
+    },
     colors = CardDefaults.cardColors(
       containerColor = if (highlight) MaterialTheme.colorScheme.primaryContainer
       else MaterialTheme.colorScheme.surfaceVariant
@@ -1038,6 +1058,20 @@ private fun BigMetric(
       }
     }
   }
+}
+
+private fun liveMetricDescription(
+  label: String,
+  value: Any,
+  unit: String,
+  zeroIsUnavailable: Boolean
+): String {
+  val valueText = if (zeroIsUnavailable && value.toString() == "0") {
+    "not available"
+  } else {
+    value.toString()
+  }
+  return listOf(label, valueText, unit).filter { it.isNotBlank() }.joinToString(" ")
 }
 
 @Composable

@@ -63,6 +63,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -272,7 +274,8 @@ fun PlayerControlsSheet(
       horizontalArrangement = Arrangement.SpaceBetween
     ) {
       BiasStepButton(
-        icon = { Icon(Icons.Default.Remove, contentDescription = "Decrease bias") },
+        icon = { Icon(Icons.Default.Remove, contentDescription = null) },
+        description = "Decrease bias",
         isActive = isRunning && !isComplete,
         view = view,
         onStep = onBiasDown
@@ -286,6 +289,7 @@ fun PlayerControlsSheet(
       }
       BiasStepButton(
         icon = { Text("+", style = NumericMedium.copy(fontSize = 22.sp)) },
+        description = "Increase bias",
         isActive = isRunning && !isComplete,
         view = view,
         onStep = onBiasUp
@@ -404,6 +408,7 @@ private fun TransportRow(
 @Composable
 private fun BiasStepButton(
   icon: @Composable () -> Unit,
+  description: String,
   isActive: Boolean,
   view: View,
   onStep: () -> Unit
@@ -430,6 +435,7 @@ private fun BiasStepButton(
     onClick = ::step,
     modifier = Modifier
       .size(52.dp)
+      .clearAndSetSemantics { contentDescription = description }
       .pressable(interactionSource),
     interactionSource = interactionSource,
     contentPadding = PaddingValues(0.dp)

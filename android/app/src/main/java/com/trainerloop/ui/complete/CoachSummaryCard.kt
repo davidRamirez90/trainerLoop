@@ -23,6 +23,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trainerloop.domain.coach.CoachSessionData
@@ -179,6 +181,11 @@ private fun FatigueSparkline(curve: List<Double>) {
     modifier = Modifier
       .fillMaxWidth()
       .height(48.dp)
+      .semantics {
+        contentDescription = "Fatigue over the ride: scores from " +
+          "${curve.minOrNull()?.roundToInt() ?: 0} to ${curve.maxOrNull()?.roundToInt() ?: 0}, " +
+          "ending at ${curve.lastOrNull()?.roundToInt() ?: 0}."
+      }
   ) {
     val maxY = 100.0
     val stepX = size.width / (curve.size - 1)

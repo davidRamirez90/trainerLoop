@@ -36,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -182,7 +184,8 @@ private fun WeeklyLoadChart(sessions: List<SessionSummary>) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .height(Spacing.xxl * 4),
+        .height(Spacing.xxl * 4)
+        .clearAndSetSemantics { contentDescription = weeklyLoadSummary(loads) },
       horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
       verticalAlignment = Alignment.Bottom
     ) {
@@ -226,6 +229,19 @@ private fun WeeklyLoadChart(sessions: List<SessionSummary>) {
       }
     }
   }
+}
+
+private fun weeklyLoadSummary(loads: List<WeekLoad>): String {
+  val values = loads.joinToString(", ") { load ->
+    val hours = load.totalSec / 3600.0
+    val formattedHours = if (hours % 1.0 == 0.0) {
+      "${hours.toInt()} hours"
+    } else {
+      String.format(Locale.US, "%.1f hours", hours)
+    }
+    "${load.weekLabel} $formattedHours"
+  }
+  return "Weekly riding time: $values."
 }
 
 private fun formatSessionMeta(session: SessionSummary): String {

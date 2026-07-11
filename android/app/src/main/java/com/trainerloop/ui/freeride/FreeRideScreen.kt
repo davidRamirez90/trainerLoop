@@ -40,6 +40,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trainerloop.app.trainerLoopApp
@@ -264,7 +266,18 @@ private fun RideMetric(
   animatedShowDashWhenZero: Boolean = false
 ) {
   val valueColor = MaterialTheme.colorScheme.onSurface
-  Card(modifier = modifier) {
+  Card(
+    modifier = modifier.clearAndSetSemantics {
+      val spokenValue = if (animatedShowDashWhenZero && value == "0") {
+        "not available"
+      } else {
+        value
+      }
+      contentDescription = listOf(label, spokenValue, unit)
+        .filter { it.isNotBlank() }
+        .joinToString(" ")
+    }
+  ) {
     Column(
       modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
       horizontalAlignment = Alignment.CenterHorizontally

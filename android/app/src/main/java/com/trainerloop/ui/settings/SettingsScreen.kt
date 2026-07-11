@@ -728,7 +728,7 @@ private fun SettingsRow(
     trailing?.invoke()
       ?: Icon(
         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-        contentDescription = "Open $label",
+        contentDescription = null,
         tint = MaterialTheme.colorScheme.onSurfaceVariant
       )
   }

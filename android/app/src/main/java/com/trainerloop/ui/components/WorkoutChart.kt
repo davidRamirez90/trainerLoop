@@ -44,6 +44,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.trainerloop.ui.theme.Spacing
@@ -188,6 +190,7 @@ fun WorkoutChart(
         modifier = Modifier
           .fillMaxWidth()
           .height(160.dp)
+          .semantics { contentDescription = workoutProfileSummary(segments) }
           .onSizeChanged { chartWidthPx = it.width }
           .pointerInput(segments, reducedMotion) {
             // Scrub owns press+drag. Pan only wins after release when the
@@ -638,4 +641,22 @@ private fun fmt(totalSec: Int): String {
   val m = totalSec / 60
   val s = totalSec % 60
   return "%d:%02d".format(m, s)
+}
+
+internal fun workoutProfileSummary(segments: List<WorkoutSegment>): String {
+  val totalSec = WorkoutMath.totalDurationSec(segments)
+  val duration = if (totalSec < 60) "$totalSec seconds" else "${totalSec / 60} minutes"
+  val targetValues = segments.flatMap { segment ->
+    when (segment) {
+      is WorkoutSegment.Step -> listOf(segment.targetRange.low, segment.targetRange.high)
+      is WorkoutSegment.Ramp -> listOf(segment.startPower, segment.endPower)
+      is WorkoutSegment.FreeRide -> emptyList()
+    }
+  }
+  val targetSummary = if (targetValues.isEmpty()) {
+    "free ride"
+  } else {
+    "targets ${targetValues.minOrNull()} to ${targetValues.maxOrNull()} watts"
+  }
+  return "Workout profile: $duration, ${segments.size} intervals, $targetSummary."
 }

@@ -510,7 +510,7 @@ private fun ActionRow(
   ) {
     Icon(
       imageVector = icon,
-      contentDescription = label,
+      contentDescription = null,
       tint = MaterialTheme.colorScheme.onSurface
     )
     Spacer(modifier = Modifier.width(16.dp))
@@ -522,7 +522,7 @@ private fun ActionRow(
     )
     Icon(
       imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-      contentDescription = "Open $label",
+      contentDescription = null,
       tint = MaterialTheme.colorScheme.onSurfaceVariant
     )
   }
