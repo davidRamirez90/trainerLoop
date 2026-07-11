@@ -106,6 +106,15 @@ fun WorkoutScreen(
   val view = LocalView.current
   val context = LocalContext.current
   val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
+  val completionSoundEnabled = remember {
+    context.trainerLoopApp.profileRepository.getProfileSync().completionSoundEnabled
+  }
+  val toneGen = remember {
+    android.media.ToneGenerator(
+      android.media.AudioManager.STREAM_MUSIC,
+      android.media.ToneGenerator.MAX_VOLUME
+    )
+  }
   val darkTheme = isSystemInDarkTheme()
   val currentPowerColor = zoneColorSet(uiState.currentPowerWatts, ftp).line
   var showStopConfirm by remember { mutableStateOf(false) }
@@ -124,7 +133,12 @@ fun WorkoutScreen(
   }
 
   LaunchedEffect(uiState.isComplete) {
-    if (uiState.isComplete) Haptics.workoutComplete(view)
+    if (uiState.isComplete) {
+      Haptics.workoutComplete(view)
+      if (completionSoundEnabled) {
+        toneGen.startTone(android.media.ToneGenerator.TONE_PROP_ACK, 250)
+      }
+    }
   }
 
   DisposableEffect(uiState.isRunning) {
@@ -134,12 +148,6 @@ fun WorkoutScreen(
 
   // Audible cue when the interval changes, so you don't need to watch the
   // screen. Skips the very first segment (index 0) so it doesn't fire on open.
-  val toneGen = remember {
-    android.media.ToneGenerator(
-      android.media.AudioManager.STREAM_MUSIC,
-      android.media.ToneGenerator.MAX_VOLUME
-    )
-  }
   val tts = remember {
     var engine: android.speech.tts.TextToSpeech? = null
     engine = android.speech.tts.TextToSpeech(context) { /* status ignored; speak() no-ops if not ready */ }

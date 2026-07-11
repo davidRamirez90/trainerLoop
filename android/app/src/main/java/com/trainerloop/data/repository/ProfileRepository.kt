@@ -68,6 +68,7 @@ open class ProfileRepository(context: Context) {
       ergBiasPct = prefs.getInt(KEY_ERG_BIAS, 0),
       selectedCoachProfileId = prefs.getString(KEY_COACH_PROFILE, "default") ?: "default",
       coachEnabled = prefs.getBoolean(KEY_COACH_ENABLED, true),
+      completionSoundEnabled = prefs.getBoolean(KEY_COMPLETION_SOUND_ENABLED, false),
       intervalsIcuAthleteId = prefs.getString(KEY_INTERVALS_ATHLETE_ID, "") ?: "",
       intervalsIcuApiKey = prefs.getString(KEY_INTERVALS_API_KEY, "") ?: "",
       virtualRideEnabled = prefs.getBoolean(KEY_VIRTUAL_RIDE, true),
@@ -89,6 +90,7 @@ open class ProfileRepository(context: Context) {
       .putInt(KEY_ERG_BIAS, profile.ergBiasPct)
       .putString(KEY_COACH_PROFILE, profile.selectedCoachProfileId)
       .putBoolean(KEY_COACH_ENABLED, profile.coachEnabled)
+      .putBoolean(KEY_COMPLETION_SOUND_ENABLED, profile.completionSoundEnabled)
       .putString(KEY_INTERVALS_ATHLETE_ID, profile.intervalsIcuAthleteId)
       .putString(KEY_INTERVALS_API_KEY, profile.intervalsIcuApiKey)
       .putBoolean(KEY_VIRTUAL_RIDE, profile.virtualRideEnabled)
@@ -109,6 +111,7 @@ open class ProfileRepository(context: Context) {
     private const val KEY_ERG_BIAS = "erg_bias"
     private const val KEY_COACH_PROFILE = "coach_profile"
     private const val KEY_COACH_ENABLED = "coach_enabled"
+    private const val KEY_COMPLETION_SOUND_ENABLED = "completion_sound_enabled"
     private const val KEY_NAME = "name"
     private const val KEY_INTERVALS_ATHLETE_ID = "intervals_icu_athlete_id"
     private const val KEY_INTERVALS_API_KEY = "intervals_icu_api_key"

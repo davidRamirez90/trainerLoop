@@ -12,6 +12,7 @@ data class UserProfile(
   val selectedCoachProfileId: String = "default",
   /** Master switch for coach feedback (live cards, TTS, suggestions). */
   val coachEnabled: Boolean = true,
+  val completionSoundEnabled: Boolean = false,
   val intervalsIcuAthleteId: String = "",
   val intervalsIcuApiKey: String = "",
   /** Virtual ride simulation (route overlay + physics speed) during workouts. */

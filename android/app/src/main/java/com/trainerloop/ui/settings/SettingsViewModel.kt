@@ -21,6 +21,7 @@ data class SettingsUiState(
   val ergBias: String = "0",
   val selectedCoach: String = "default",
   val coachEnabled: Boolean = true,
+  val completionSoundEnabled: Boolean = false,
   val intervalsAthleteId: String = "",
   val intervalsApiKey: String = "",
   val virtualRideEnabled: Boolean = true,
@@ -52,6 +53,7 @@ class SettingsViewModel @JvmOverloads constructor(
       ergBias = profile.ergBiasPct.toString(),
       selectedCoach = profile.selectedCoachProfileId,
       coachEnabled = profile.coachEnabled,
+      completionSoundEnabled = profile.completionSoundEnabled,
       intervalsAthleteId = profile.intervalsIcuAthleteId,
       intervalsApiKey = profile.intervalsIcuApiKey,
       virtualRideEnabled = profile.virtualRideEnabled,
@@ -92,6 +94,10 @@ class SettingsViewModel @JvmOverloads constructor(
 
   fun updateCoachEnabled(value: Boolean) {
     _uiState.value = _uiState.value.copy(coachEnabled = value, isSaved = false)
+  }
+
+  fun updateCompletionSoundEnabled(value: Boolean) {
+    _uiState.value = _uiState.value.copy(completionSoundEnabled = value, isSaved = false)
   }
 
   fun updateSelectedCoach(value: String) {
@@ -150,6 +156,7 @@ class SettingsViewModel @JvmOverloads constructor(
           ergBiasPct = state.ergBias.toIntOrNull() ?: it.ergBiasPct,
           selectedCoachProfileId = state.selectedCoach,
           coachEnabled = state.coachEnabled,
+          completionSoundEnabled = state.completionSoundEnabled,
           intervalsIcuAthleteId = state.intervalsAthleteId.trim(),
           intervalsIcuApiKey = state.intervalsApiKey.trim(),
           virtualRideEnabled = state.virtualRideEnabled,

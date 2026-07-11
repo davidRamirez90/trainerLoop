@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
@@ -204,6 +205,17 @@ fun SettingsScreen(
           )
         },
         onClick = { activeDialog = SettingsDialog.COACH_PROFILE }
+      )
+      HorizontalDivider()
+      SettingsRow(
+        icon = Icons.Default.Notifications,
+        label = "Completion sound",
+        trailing = {
+          androidx.compose.material3.Switch(
+            checked = uiState.completionSoundEnabled,
+            onCheckedChange = viewModel::updateCompletionSoundEnabled
+          )
+        }
       )
     }
 
