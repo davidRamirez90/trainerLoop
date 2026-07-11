@@ -1,13 +1,24 @@
 package com.trainerloop.ui.devices
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,215 +33,270 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trainerloop.ble.BlePermissions
+import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.theme.Green40
+import com.trainerloop.ui.theme.LocalReducedMotion
+import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.Spacing
+import com.trainerloop.ui.theme.reducedMotionAware
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DevicesScreen(
   onBack: () -> Unit = {},
   viewModel: DevicesViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-  Column(
-    modifier = Modifier
-      .fillMaxSize()
-      .padding(horizontal = Spacing.lg)
+  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+  val permissionLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.RequestMultiplePermissions()
   ) {
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically
-    ) {
-      Text(
-        text = "Devices",
-        style = MaterialTheme.typography.headlineLarge,
-        fontWeight = FontWeight.Bold
-      )
-      TextButton(onClick = onBack) {
-        Text("Done")
-      }
-    }
-
-    Spacer(modifier = Modifier.height(8.dp))
-
-    StatusRow(label = "Bluetooth", ok = uiState.isBluetoothOn)
-    StatusRow(label = "Location", ok = uiState.isLocationOn)
-    StatusRow(label = "Permissions", ok = uiState.hasPermissions)
-
-    Spacer(modifier = Modifier.height(Spacing.xl))
-
-    val pairedDevices = connectedDevices(uiState)
-    val availableDevices = uiState.availableDevices.filter {
-      pairedDevices.none { paired ->
-        paired.device.address.equals(it.device.address, ignoreCase = true)
-      }
-    }
-
-    LazyColumn(
-      modifier = Modifier.weight(1f),
-      verticalArrangement = Arrangement.spacedBy(Spacing.md)
-    ) {
-      // Paired Devices
-      item {
-        Text(
-          text = "Paired Devices",
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold
-        )
-      }
-
-      if (pairedDevices.isEmpty()) {
-        item {
-          Text(
-            text = "No devices paired yet. Connect a trainer or HR sensor below.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
-      }
-
-      items(pairedDevices) { aggregated ->
-        PairedDeviceCard(
-          name = pairedDeviceName(aggregated),
-          capabilities = aggregated.capabilities,
-          connected = true,
-          detail = pairedDeviceDetail(aggregated, uiState),
-          onDisconnect = { viewModel.disconnectDevice(aggregated) }
-        )
-      }
-
-      item { Spacer(modifier = Modifier.height(8.dp)) }
-
-      // Available Devices
-      item {
-        Text(
-          text = "Available Devices",
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold
-        )
-      }
-
-      if (availableDevices.isNotEmpty()) {
-        items(availableDevices) { device ->
-          AvailableDeviceCard(
-            device = device,
-            isConnecting = uiState.isConnecting(device),
-            onConnect = { viewModel.connectDevice(device) }
-          )
-        }
-      }
-
-      if (availableDevices.isEmpty() && !uiState.isScanning) {
-        item {
-          Text(
-            text = "No devices found. Tap Scan to search.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
-      }
-
-      if (uiState.isScanning) {
-        item {
-          Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-          ) {
-            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-            Text(
-              text = "Scanning...",
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-          }
-        }
-      }
-    }
-
-    Spacer(modifier = Modifier.height(12.dp))
-
-    Button(
-      onClick = { viewModel.startScan() },
-      enabled = !uiState.isScanning,
-      modifier = Modifier.fillMaxWidth()
-    ) {
-      Icon(
-        imageVector = Icons.Default.Search,
-        contentDescription = null,
-        modifier = Modifier.padding(end = 8.dp)
-      )
-      Text(if (uiState.isScanning) "Scanning..." else "Scan for Devices")
-    }
-
-    if (uiState.isScanning) {
-      Spacer(modifier = Modifier.height(8.dp))
-      OutlinedButton(
-        onClick = { viewModel.stopScan() },
-        modifier = Modifier.fillMaxWidth()
-      ) {
-        Text("Stop Scan")
-      }
+    viewModel.refreshStatus()
+    if (viewModel.uiState.value.hasPermissions) {
+      viewModel.clearError()
     }
   }
 
-  uiState.error?.let { error ->
-    Snackbar(
-      modifier = Modifier.padding(Spacing.lg),
-      action = {
-        TextButton(onClick = { viewModel.clearError() }) {
-          Text("Dismiss")
+  ModalBottomSheet(
+    onDismissRequest = onBack,
+    sheetState = sheetState
+  ) {
+    Box(
+      modifier = Modifier
+        .fillMaxWidth()
+        .fillMaxHeight(0.9f)
+        .navigationBarsPadding()
+    ) {
+      Column(
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(horizontal = Spacing.lg)
+      ) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Text(
+            text = "Devices",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+          )
+          TextButton(
+            onClick = {
+              if (uiState.isScanning) viewModel.stopScan() else viewModel.startScan()
+            },
+            modifier = Modifier.pressable()
+          ) {
+            Text(if (uiState.isScanning) "Stop" else "Scan")
+          }
+        }
+
+        Spacer(modifier = Modifier.size(Spacing.sm))
+
+        AnimatedVisibility(
+          visible = !uiState.hasPermissions,
+          enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+          exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+        ) {
+          PermissionBanner(
+            onGrant = { permissionLauncher.launch(BlePermissions.REQUIRED) }
+          )
+          Spacer(modifier = Modifier.size(Spacing.md))
+        }
+
+        val pairedDevices = connectedDevices(uiState)
+        val availableDevices = uiState.availableDevices.filter { available ->
+          pairedDevices.none { paired ->
+            paired.device.address.equals(available.device.address, ignoreCase = true)
+          }
+        }
+
+        LazyColumn(
+          modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f),
+          verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        ) {
+          item {
+            Text(
+              text = "Connected devices",
+              style = MaterialTheme.typography.titleMedium,
+              fontWeight = FontWeight.SemiBold
+            )
+          }
+
+          if (pairedDevices.isEmpty()) {
+            item {
+              Text(
+                text = "No devices connected yet. Connect a trainer or HR sensor below.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+            }
+          }
+
+          items(pairedDevices, key = { it.device.address }) { aggregated ->
+            PairedDeviceCard(
+              name = pairedDeviceName(aggregated),
+              capabilities = aggregated.capabilities,
+              detail = pairedDeviceDetail(aggregated, uiState),
+              onDisconnect = { viewModel.disconnectDevice(aggregated) }
+            )
+          }
+
+          item {
+            Text(
+              text = "Available devices",
+              style = MaterialTheme.typography.titleMedium,
+              fontWeight = FontWeight.SemiBold
+            )
+          }
+
+          if (availableDevices.isNotEmpty()) {
+            items(availableDevices, key = { it.device.address }) { device ->
+              AvailableDeviceCard(
+                device = device,
+                isConnecting = uiState.isConnecting(device),
+                onConnect = { viewModel.connectDevice(device) }
+              )
+            }
+          }
+
+          if (availableDevices.isEmpty() && !uiState.isScanning) {
+            item {
+              Text(
+                text = "No devices found. Tap Scan to search.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+            }
+          }
+
+          if (uiState.isScanning) {
+            item { ScanningPlaceholder() }
+          }
         }
       }
-    ) {
-      Text(error)
+
+      uiState.error?.let { error ->
+        Snackbar(
+          modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(Spacing.lg),
+          action = {
+            TextButton(
+              onClick = { viewModel.clearError() },
+              modifier = Modifier.pressable()
+            ) {
+              Text("Dismiss")
+            }
+          }
+        ) {
+          Text(error)
+        }
+      }
     }
   }
 }
 
 @Composable
-private fun StatusRow(label: String, ok: Boolean) {
-  Row(
+private fun PermissionBanner(onGrant: () -> Unit) {
+  Card(
     modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = Arrangement.SpaceBetween
-  ) {
-    Text(
-      text = label,
-      style = MaterialTheme.typography.bodySmall
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.errorContainer
     )
-    Box(
+  ) {
+    Row(
       modifier = Modifier
-        .padding(start = 8.dp)
-        .height(12.dp)
+        .fillMaxWidth()
+        .padding(Spacing.md),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
-      Text(
-        text = if (ok) "✓" else "✗",
-        style = MaterialTheme.typography.bodySmall,
-        color = if (ok) Green40 else MaterialTheme.colorScheme.error
+      Icon(
+        imageVector = Icons.Default.BluetoothDisabled,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onErrorContainer
       )
+      Text(
+        text = "Bluetooth permissions needed",
+        modifier = Modifier.weight(1f),
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onErrorContainer
+      )
+      TextButton(
+        onClick = onGrant,
+        modifier = Modifier.pressable()
+      ) {
+        Text("Grant")
+      }
     }
   }
+}
+
+@Composable
+private fun ScanningPlaceholder() {
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(Spacing.md)
+  ) {
+    Icon(
+      imageVector = Icons.Default.Search,
+      contentDescription = null,
+      modifier = Modifier.alpha(scanningIconAlpha()),
+      tint = MaterialTheme.colorScheme.primary
+    )
+    Text(
+      text = "Scanning for devices…",
+      style = MaterialTheme.typography.bodyMedium,
+      color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+  }
+}
+
+@Composable
+private fun scanningIconAlpha(): Float {
+  if (LocalReducedMotion.current) return 0.6f
+
+  val transition = rememberInfiniteTransition(label = "device-scan-pulse")
+  val alpha by transition.animateFloat(
+    initialValue = 0.4f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      animation = tween(durationMillis = 1_200),
+      repeatMode = RepeatMode.Reverse
+    ),
+    label = "device-scan-icon-alpha"
+  )
+  return alpha
 }
 
 @Composable
 private fun PairedDeviceCard(
   name: String,
   capabilities: Set<DeviceCapability>,
-  connected: Boolean,
   detail: String,
   onDisconnect: () -> Unit
 ) {
@@ -244,31 +310,31 @@ private fun PairedDeviceCard(
       modifier = Modifier
         .fillMaxWidth()
         .padding(Spacing.lg),
-      horizontalArrangement = Arrangement.SpaceBetween,
+      horizontalArrangement = Arrangement.spacedBy(Spacing.md),
       verticalAlignment = Alignment.CenterVertically
     ) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-          imageVector = if (connected) Icons.Default.BluetoothConnected else Icons.Default.BluetoothDisabled,
-          contentDescription = if (connected) "Connected" else "Disconnected",
-          tint = if (connected) Green40 else MaterialTheme.colorScheme.onSurfaceVariant
+      Icon(
+        imageVector = Icons.Default.BluetoothConnected,
+        contentDescription = "Connected",
+        tint = Green40
+      )
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = name,
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold
         )
-        Spacer(modifier = Modifier.padding(horizontal = 12.dp))
-        Column {
-          Text(
-            text = name,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-          )
-          CapabilityBadges(capabilities)
-          Text(
-            text = detail,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
+        CapabilityBadges(capabilities)
+        Text(
+          text = detail,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
       }
-      OutlinedButton(onClick = onDisconnect) {
+      OutlinedButton(
+        onClick = onDisconnect,
+        modifier = Modifier.pressable()
+      ) {
         Text("Disconnect")
       }
     }
@@ -291,37 +357,35 @@ private fun AvailableDeviceCard(
       modifier = Modifier
         .fillMaxWidth()
         .padding(Spacing.lg),
-      horizontalArrangement = Arrangement.SpaceBetween,
+      horizontalArrangement = Arrangement.spacedBy(Spacing.md),
       verticalAlignment = Alignment.CenterVertically
     ) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-          imageVector = Icons.Default.Bluetooth,
-          contentDescription = "Bluetooth device",
-          tint = MaterialTheme.colorScheme.onSurfaceVariant
+      Icon(
+        imageVector = Icons.Default.Bluetooth,
+        contentDescription = "Bluetooth device",
+        tint = MaterialTheme.colorScheme.onSurfaceVariant
+      )
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = device.device.name ?: "Unknown",
+          style = MaterialTheme.typography.titleMedium
         )
-        Spacer(modifier = Modifier.padding(horizontal = 12.dp))
-        Column {
-          Text(
-            text = device.device.name ?: "Unknown",
-            style = MaterialTheme.typography.titleMedium
-          )
-          CapabilityBadges(device.capabilities)
-          Text(
-            text = "${device.device.address} · RSSI ${device.device.rssi}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
+        CapabilityBadges(device.capabilities)
+        Text(
+          text = "${device.device.address} · RSSI ${device.device.rssi}",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
       }
       Button(
         onClick = onConnect,
-        enabled = !isConnecting
+        enabled = !isConnecting,
+        modifier = Modifier.pressable()
       ) {
         if (isConnecting) {
           CircularProgressIndicator(
-            modifier = Modifier.size(16.dp),
-            strokeWidth = 2.dp,
+            modifier = Modifier.size(Spacing.lg),
+            strokeWidth = Spacing.xs / 2,
             color = MaterialTheme.colorScheme.onPrimary
           )
         } else {
@@ -334,14 +398,14 @@ private fun AvailableDeviceCard(
 
 @Composable
 private fun CapabilityBadges(capabilities: Set<DeviceCapability>) {
-  Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+  Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
     capabilities
       .sortedBy { it.ordinal }
       .forEach { capability ->
         AssistChip(
           onClick = {},
           enabled = false,
-          modifier = Modifier.height(28.dp),
+          modifier = Modifier,
           label = {
             Text(
               text = capability.label,
@@ -371,6 +435,9 @@ private fun pairedDeviceDetail(
     if (DeviceCapability.CONTROLLER in device.capabilities) {
       state.clickBattery?.let { add("Battery $it%") }
     }
+    add(
+      if (device.device.rssi == 0) "Signal connected" else "Signal ${device.device.rssi} dBm"
+    )
   }
-  return details.takeIf { it.isNotEmpty() }?.joinToString(" · ") ?: "Connected"
+  return details.joinToString(" · ")
 }
