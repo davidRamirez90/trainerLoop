@@ -186,6 +186,7 @@ fun WorkoutChart(
   val hrScratchPath = remember { Path() }
   val powerScratchPath = remember { Path() }
   val elevationScratchPath = remember { Path() }
+  val zoneScratchPaths = remember { Array(6) { Path() } }
   val hrMatrix = remember { Matrix() }
   val powerMatrix = remember { Matrix() }
 
@@ -422,21 +423,30 @@ fun WorkoutChart(
         }
 
         // Full-height-from-zero interval blocks over the visible window.
-        val step = (winSpan / 200f).coerceAtLeast(1f)
-        var sec = winStart
-        while (sec <= winEnd) {
-          val range = WorkoutMath.targetRangeAt(segments, sec.toInt())
-          val nextSec = (sec + step).coerceAtMost(winEnd)
-          val xStart = xForTime(sec)
-          val xEnd = xForTime(nextSec)
-          val target = (range.low + range.high) / 2
-          val yTop = yForPower(target.toFloat())
-          drawRect(
-            color = ZoneColors.forTarget(target, ftp, darkTheme).fill,
-            topLeft = Offset(xStart, yTop),
-            size = Size(xEnd - xStart, chartBottom - yTop)
+        // All bands of one zone are filled as a single Path: abutting rects
+        // inside one path cancel their shared AA edges, so no hairline seams.
+        zoneScratchPaths.forEach { it.rewind() }
+        zoneBands(
+          segments = segments,
+          ftp = ftp,
+          winStartSec = winStart,
+          winEndSec = winEnd,
+          stepSec = (winSpan / 200f).coerceAtLeast(1f)
+        ).forEach { band ->
+          val yTop = yForPower(band.targetWatts.toFloat())
+          zoneScratchPaths[band.zone - 1].addRect(
+            androidx.compose.ui.geometry.Rect(
+              left = xForTime(band.startSec),
+              top = yTop,
+              right = xForTime(band.endSec),
+              bottom = chartBottom
+            )
           )
-          sec += step
+        }
+        zoneScratchPaths.forEachIndexed { index, path ->
+          if (!path.isEmpty) {
+            drawPath(path, color = ZoneColors.forZone(index + 1, darkTheme).fill)
+          }
         }
 
         // Highlight the tapped interval.
