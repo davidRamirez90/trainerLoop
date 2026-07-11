@@ -1,10 +1,16 @@
 package com.trainerloop.ui.workout
 
 import android.view.View
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.animation.core.AnimationVector
+import androidx.compose.animation.core.TwoWayConverter
+import androidx.compose.animation.core.VectorizedAnimationSpec
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.OverscrollEffect
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
@@ -52,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -59,6 +66,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Velocity
 import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.haptics.Haptics
 import com.trainerloop.ui.theme.MotionSpec
@@ -73,6 +81,79 @@ internal val PlayerControlsSheetPeekHeight = 72.dp
 private enum class PlayerSheetAnchor {
   Peek,
   Expanded
+}
+
+private const val PlayerSheetRubberBandFactor = 0.3f
+
+/** Resolves the latest spec when an anchored settle starts without replacing the state. */
+private class CurrentAnimationSpec<T>(
+  private val currentSpec: () -> AnimationSpec<T>
+) : AnimationSpec<T> {
+  override fun <V : AnimationVector> vectorize(
+    converter: TwoWayConverter<T, V>
+  ): VectorizedAnimationSpec<V> = currentSpec().vectorize(converter)
+}
+
+/**
+ * Consumes anchored-draggable's clamped remainder and exposes a damped visual offset.
+ * The anchored state remains clamped and is still responsible for every settle.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private class PlayerSheetRubberBandEffect(
+  private val currentSettleSpec: () -> AnimationSpec<Float>
+) : OverscrollEffect {
+  private var rawOverdrag by mutableFloatStateOf(0f)
+
+  val offset: Float
+    get() = rawOverdrag * PlayerSheetRubberBandFactor
+
+  override val effectModifier: Modifier = Modifier
+
+  override fun applyToScroll(
+    delta: Offset,
+    source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+    performScroll: (Offset) -> Offset
+  ): Offset {
+    val adjustedDeltaY = if (rawOverdrag == 0f || delta.y == 0f) {
+      delta.y
+    } else {
+      val rawAfterDelta = rawOverdrag + delta.y
+      val clampedRawOverdrag = if (rawOverdrag > 0f) {
+        rawAfterDelta.coerceAtLeast(0f)
+      } else {
+        rawAfterDelta.coerceAtMost(0f)
+      }
+      rawOverdrag = clampedRawOverdrag
+      delta.y - (clampedRawOverdrag - (rawAfterDelta - delta.y))
+    }
+
+    val consumedByScroll = if (adjustedDeltaY == 0f) {
+      Offset.Zero
+    } else {
+      performScroll(Offset(delta.x, adjustedDeltaY))
+    }
+    val unconsumedY = adjustedDeltaY - consumedByScroll.y
+    if (unconsumedY != 0f) rawOverdrag += unconsumedY
+
+    return Offset(consumedByScroll.x, delta.y - unconsumedY)
+  }
+
+  override suspend fun applyToFling(
+    velocity: Velocity,
+    performFling: suspend (Velocity) -> Velocity
+  ) {
+    if (rawOverdrag != 0f) {
+      animate(
+        initialValue = rawOverdrag,
+        targetValue = 0f,
+        animationSpec = currentSettleSpec()
+      ) { value, _ -> rawOverdrag = value }
+    }
+    performFling(velocity)
+  }
+
+  override val isInProgress: Boolean
+    get() = rawOverdrag != 0f
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -101,6 +182,8 @@ fun PlayerControlsSheet(
   val view = LocalView.current
   val peekHeightPx = with(density) { PlayerControlsSheetPeekHeight.toPx() }
   val settleSpec = reducedMotionAware(MotionSpec.momentum)
+  val currentDensity by rememberUpdatedState(density)
+  val currentSettleSpec by rememberUpdatedState(settleSpec)
   val defaultSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>())
   val ergLabelAlpha by animateFloatAsState(
     targetValue = if (isErgEnabled) 1f else 0.82f,
@@ -108,16 +191,21 @@ fun PlayerControlsSheet(
     label = "ERG label alpha"
   )
   var sheetHeightPx by remember { mutableFloatStateOf(0f) }
-  val decaySpec = exponentialDecay<Float>()
+  val decaySpec = remember { exponentialDecay<Float>() }
 
-  val state: AnchoredDraggableState<PlayerSheetAnchor> = remember(settleSpec, density) {
+  // Keep this state stable so a pointer-down can cancel and take over from an
+  // in-flight settle. Its thresholds and settle spec resolve current values.
+  val state: AnchoredDraggableState<PlayerSheetAnchor> = remember {
     AnchoredDraggableState<PlayerSheetAnchor>(
       initialValue = PlayerSheetAnchor.Peek,
       positionalThreshold = { distance: Float -> distance * 0.5f },
-      velocityThreshold = { with(density) { 125.dp.toPx() } },
-      snapAnimationSpec = settleSpec,
+      velocityThreshold = { with(currentDensity) { 125.dp.toPx() } },
+      snapAnimationSpec = CurrentAnimationSpec { currentSettleSpec },
       decayAnimationSpec = decaySpec
     )
+  }
+  val rubberBandEffect = remember {
+    PlayerSheetRubberBandEffect { currentSettleSpec }
   }
   val anchors = remember(sheetHeightPx, peekHeightPx) {
     DraggableAnchors<PlayerSheetAnchor> {
@@ -139,13 +227,18 @@ fun PlayerControlsSheet(
   } else {
     sheetOffset
   }
+  val visualOffset = safeOffset + rubberBandEffect.offset
 
   Column(
     modifier = modifier
       .fillMaxWidth()
       .onSizeChanged { sheetHeightPx = it.height.toFloat() }
-      .offset { IntOffset(0, safeOffset.roundToInt()) }
-      .anchoredDraggable(state, Orientation.Vertical)
+      .offset { IntOffset(0, visualOffset.roundToInt()) }
+      .anchoredDraggable(
+        state = state,
+        orientation = Orientation.Vertical,
+        overscrollEffect = rubberBandEffect
+      )
       .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
       .background(MaterialTheme.colorScheme.surfaceContainerHigh)
       .navigationBarsPadding()
