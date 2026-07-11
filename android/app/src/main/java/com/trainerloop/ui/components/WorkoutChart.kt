@@ -702,3 +702,44 @@ internal fun workoutProfileSummary(segments: List<WorkoutSegment>): String {
   }
   return "Workout profile: $duration, ${segments.size} intervals, $targetSummary."
 }
+
+internal data class ZoneBand(
+  val zone: Int,
+  val startSec: Float,
+  val endSec: Float,
+  val targetWatts: Int
+)
+
+/**
+ * Samples the plan across [winStartSec, winEndSec] and merges equal-target
+ * runs into bands. Rendering fills all bands of a zone as ONE Path so
+ * abutting edges cannot leave anti-aliasing seams (the thin-vertical-bars
+ * regression). Free-ride stretches (target 0) produce no band.
+ */
+internal fun zoneBands(
+  segments: List<WorkoutSegment>,
+  ftp: Int,
+  winStartSec: Float,
+  winEndSec: Float,
+  stepSec: Float
+): List<ZoneBand> {
+  if (winEndSec <= winStartSec || stepSec <= 0f) return emptyList()
+  val bands = mutableListOf<ZoneBand>()
+  var sec = winStartSec
+  while (sec < winEndSec) {
+    val nextSec = (sec + stepSec).coerceAtMost(winEndSec)
+    val range = WorkoutMath.targetRangeAt(segments, sec.toInt())
+    val target = (range.low + range.high) / 2
+    if (target > 0) {
+      val zone = ZoneColors.zoneIndex(target, ftp)
+      val last = bands.lastOrNull()
+      if (last != null && last.zone == zone && last.targetWatts == target && last.endSec == sec) {
+        bands[bands.lastIndex] = last.copy(endSec = nextSec)
+      } else {
+        bands.add(ZoneBand(zone, sec, nextSec, target))
+      }
+    }
+    sec = nextSec
+  }
+  return bands
+}
