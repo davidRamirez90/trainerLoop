@@ -186,6 +186,7 @@ fun WorkoutChart(
   val hrScratchPath = remember { Path() }
   val powerScratchPath = remember { Path() }
   val elevationScratchPath = remember { Path() }
+  val elevationLineScratchPath = remember { Path() }
   val zoneScratchPaths = remember { Array(6) { Path() } }
   val hrMatrix = remember { Matrix() }
   val powerMatrix = remember { Matrix() }
@@ -193,7 +194,9 @@ fun WorkoutChart(
   val cursorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
   val hrLineColor = MaterialTheme.colorScheme.error
   val powerLineColor = MaterialTheme.colorScheme.secondary
-  val elevationColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.14f)
+  // Drawn OVER the opaque zone fills, so it needs a scrim + edge line to read.
+  val elevationFillColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.22f)
+  val elevationLineColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.50f)
 
   Column(modifier = modifier.fillMaxWidth()) {
     Row(
@@ -391,27 +394,6 @@ fun WorkoutChart(
           return chartBottom - ratio * chartHeight
         }
 
-        // Soft terrain silhouette across the bottom 30% of the chart.
-        if (elevationProfile != null && elevationProfile.isNotEmpty()) {
-          val minAlt = elevationProfile.min()
-          val altSpan = (elevationProfile.max() - minAlt).coerceAtLeast(1.0)
-          val bandHeight = chartHeight * 0.3f
-          val elevPath = elevationScratchPath
-          elevPath.rewind()
-          elevPath.moveTo(xForTime(winStart), chartBottom)
-          val elevStep = (winSpan / 200f).coerceAtLeast(1f)
-          var t = winStart
-          while (t <= winEnd) {
-            val alt = elevationProfile[t.toInt().coerceIn(0, elevationProfile.lastIndex)]
-            val y = chartBottom - ((alt - minAlt) / altSpan).toFloat() * bandHeight
-            elevPath.lineTo(xForTime(t), y)
-            t += elevStep
-          }
-          elevPath.lineTo(xForTime(winEnd), chartBottom)
-          elevPath.close()
-          drawPath(elevPath, color = elevationColor)
-        }
-
         // Gridlines at FTP and FTP/2.
         if (ftp > 0) {
           val gridColor = cursorColor.copy(alpha = 0.15f)
@@ -447,6 +429,40 @@ fun WorkoutChart(
           if (!path.isEmpty) {
             drawPath(path, color = ZoneColors.forZone(index + 1, darkTheme).fill)
           }
+        }
+
+        // Soft terrain silhouette across the bottom 30%, drawn over the zone
+        // blocks (they are opaque now) as a translucent scrim + edge line.
+        if (elevationProfile != null && elevationProfile.isNotEmpty()) {
+          // Local val: smart casts don't reliably reach into local functions.
+          val profile = elevationProfile
+          val minAlt = profile.min()
+          val altSpan = (profile.max() - minAlt).coerceAtLeast(1.0)
+          val bandHeight = chartHeight * 0.3f
+          fun yForAlt(sec: Float): Float {
+            val alt = profile[sec.toInt().coerceIn(0, profile.lastIndex)]
+            return chartBottom - ((alt - minAlt) / altSpan).toFloat() * bandHeight
+          }
+          val elevStep = (winSpan / 200f).coerceAtLeast(1f)
+          val linePath = elevationLineScratchPath
+          linePath.rewind()
+          linePath.moveTo(xForTime(winStart), yForAlt(winStart))
+          var t = winStart + elevStep
+          while (t <= winEnd) {
+            linePath.lineTo(xForTime(t), yForAlt(t))
+            t += elevStep
+          }
+          linePath.lineTo(xForTime(winEnd), yForAlt(winEnd))
+
+          val fillPath = elevationScratchPath
+          fillPath.rewind()
+          fillPath.addPath(linePath)
+          fillPath.lineTo(xForTime(winEnd), chartBottom)
+          fillPath.lineTo(xForTime(winStart), chartBottom)
+          fillPath.close()
+
+          drawPath(fillPath, color = elevationFillColor)
+          drawPath(linePath, color = elevationLineColor, style = Stroke(width = 1.5.dp.toPx()))
         }
 
         // Highlight the tapped interval.
