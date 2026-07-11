@@ -1,5 +1,6 @@
 package com.trainerloop.ui.workout
 
+import android.view.View
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -54,10 +55,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.trainerloop.ui.components.pressable
+import com.trainerloop.ui.haptics.Haptics
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.NumericMedium
 import com.trainerloop.ui.theme.Spacing
@@ -95,6 +98,7 @@ fun PlayerControlsSheet(
   onFinish: () -> Unit
 ) {
   val density = LocalDensity.current
+  val view = LocalView.current
   val peekHeightPx = with(density) { PlayerControlsSheetPeekHeight.toPx() }
   val settleSpec = reducedMotionAware(MotionSpec.momentum)
   val defaultSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>())
@@ -176,6 +180,8 @@ fun PlayerControlsSheet(
     ) {
       BiasStepButton(
         icon = { Icon(Icons.Default.Remove, contentDescription = "Decrease bias") },
+        isActive = isRunning && !isComplete,
+        view = view,
         onStep = onBiasDown
       )
       TextButton(onClick = onBiasReset, contentPadding = PaddingValues(horizontal = Spacing.sm)) {
@@ -187,6 +193,8 @@ fun PlayerControlsSheet(
       }
       BiasStepButton(
         icon = { Text("+", style = NumericMedium.copy(fontSize = 22.sp)) },
+        isActive = isRunning && !isComplete,
+        view = view,
         onStep = onBiasUp
       )
     }
@@ -212,7 +220,13 @@ fun PlayerControlsSheet(
         style = MaterialTheme.typography.bodyLarge,
         color = ergLabelColor.copy(alpha = ergLabelAlpha)
       )
-      Switch(checked = isErgEnabled, onCheckedChange = { onToggleErg() })
+      Switch(
+        checked = isErgEnabled,
+        onCheckedChange = {
+          if (isRunning && !isComplete) Haptics.ergToggle(view)
+          onToggleErg()
+        }
+      )
     }
 
     if (showRecovery) {
@@ -297,6 +311,8 @@ private fun TransportRow(
 @Composable
 private fun BiasStepButton(
   icon: @Composable () -> Unit,
+  isActive: Boolean,
+  view: View,
   onStep: () -> Unit
 ) {
   val interactionSource = remember { MutableInteractionSource() }
@@ -304,7 +320,7 @@ private fun BiasStepButton(
   val latestOnStep by rememberUpdatedState(onStep)
 
   fun step() {
-    // TODO(P4): haptic detent per step
+    if (isActive) Haptics.biasDetent(view)
     latestOnStep()
   }
 

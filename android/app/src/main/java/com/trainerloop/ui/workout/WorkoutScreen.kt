@@ -78,6 +78,7 @@ import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
 import com.trainerloop.ui.components.WorkoutChart
+import com.trainerloop.ui.haptics.Haptics
 import com.trainerloop.ui.components.AnimatedMetricValue
 import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.theme.Green40
@@ -122,6 +123,10 @@ fun WorkoutScreen(
     }
   }
 
+  LaunchedEffect(uiState.isComplete) {
+    if (uiState.isComplete) Haptics.workoutComplete(view)
+  }
+
   DisposableEffect(uiState.isRunning) {
     view.keepScreenOn = uiState.isRunning
     onDispose { view.keepScreenOn = false }
@@ -149,6 +154,7 @@ fun WorkoutScreen(
   }
   LaunchedEffect(uiState.segmentIndex) {
     if (uiState.isRunning && uiState.segmentIndex > 0) {
+      Haptics.intervalChange(view)
       toneGen.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 200)
       val seg = workout.segments.getOrNull(uiState.segmentIndex)
       val label = seg?.label ?: seg?.phase?.name?.lowercase() ?: "next interval"
@@ -156,6 +162,12 @@ fun WorkoutScreen(
       val spoken = if (target.low > 0) "$label, ${(target.low + target.high) / 2} watts" else label
       tts.speak(spoken, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "seg-${uiState.segmentIndex}")
     }
+  }
+
+  LaunchedEffect(uiState.isRunning, uiState.segmentIndex, uiState.elapsedSec) {
+    if (!uiState.isRunning) return@LaunchedEffect
+    val remainingSec = uiState.segmentEndSec - uiState.elapsedSec
+    if (remainingSec in 1..5) Haptics.countdownTick(view)
   }
 
   // Speak urgent coach feedback (safety / fatigue / sensor tiers) so it lands
