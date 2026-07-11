@@ -1,10 +1,14 @@
 package com.trainerloop.ui.components
 
 import android.graphics.Matrix
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.rememberSplineBasedDecay
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,8 +37,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.foundation.background
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.data.model.TelemetrySample
@@ -44,10 +54,16 @@ import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.reducedMotionAware
 import com.trainerloop.ui.theme.zoneColorSet
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private const val HR_AXIS_MIN = 40f
 private const val HR_AXIS_MAX = 200f
 private const val ZOOM_PAD_SEC = 20
+private const val PAN_FLING_THRESHOLD_PX_PER_SEC = 350f
+private const val PAN_RUBBER_BAND_DP = 24f
 
 @Composable
 fun WorkoutChart(
@@ -68,6 +84,10 @@ fun WorkoutChart(
 
   var zoomToCurrent by remember { mutableStateOf(false) }
   var selectedIndex by remember { mutableStateOf<Int?>(null) }
+  var tooltipX by remember { mutableStateOf(0f) }
+  var tooltipGrabOffset by remember { mutableStateOf(0f) }
+  var tooltipWidthPx by remember { mutableStateOf(0) }
+  var chartWidthPx by remember { mutableStateOf(0) }
 
   // Visible time window: whole session, or the current interval padded.
   val targetWindow = computeWorkoutChartWindow(
@@ -77,12 +97,12 @@ fun WorkoutChart(
     segments = segments,
     bounds = bounds
   )
-  val winStart by animateFloatAsState(
+  val baseWinStart by animateFloatAsState(
     targetValue = targetWindow.startSec,
     animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
     label = "Chart window start"
   )
-  val winEnd by animateFloatAsState(
+  val baseWinEnd by animateFloatAsState(
     targetValue = targetWindow.endSec,
     animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
     label = "Chart window end"
@@ -92,12 +112,43 @@ fun WorkoutChart(
     animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
     label = "Chart cursor"
   )
+  val panOffset = remember { Animatable(0f) }
+  val panScope = rememberCoroutineScope()
+  val reducedMotion = com.trainerloop.ui.theme.LocalReducedMotion.current
+  val decaySpec = rememberSplineBasedDecay<Float>()
+  val panSettleSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>())
+  val panBounds = computeWorkoutChartPanBounds(
+    windowStartSec = baseWinStart,
+    windowEndSec = baseWinEnd,
+    totalDurationSec = totalDuration
+  )
+  val maxRubberBandPx = with(LocalDensity.current) { PAN_RUBBER_BAND_DP.dp.toPx() }
+  val maxRubberBandSec = if (chartWidthPx > 0) {
+    maxRubberBandPx / chartWidthPx * (baseWinEnd - baseWinStart).coerceAtLeast(1f)
+  } else {
+    0f
+  }
+  val renderedPanOffset = if (reducedMotion) {
+    clampWorkoutChartPanOffset(panOffset.value, panBounds)
+  } else {
+    rubberBandWorkoutChartPanOffset(panOffset.value, panBounds, maxRubberBandSec)
+  }
+  val winStart = baseWinStart + renderedPanOffset
+  val winEnd = baseWinEnd + renderedPanOffset
   val winSpan = (winEnd - winStart).coerceAtLeast(1f)
+
+  androidx.compose.runtime.LaunchedEffect(zoomToCurrent) {
+    panOffset.stop()
+    panOffset.snapTo(0f)
+  }
 
   // Keep gesture hit-testing attached to the pointer input coroutine while the
   // animated window changes on every frame.
   val currentWinStart = rememberUpdatedState(winStart)
   val currentWinEnd = rememberUpdatedState(winEnd)
+  val currentZoomToCurrent = rememberUpdatedState(zoomToCurrent)
+  val currentReducedMotion = rememberUpdatedState(reducedMotion)
+  val currentPanBounds = rememberUpdatedState(panBounds)
 
   // Static across the ride (depends only on the plan), so don't rescan the plan
   // on every 1 Hz redraw.
@@ -111,6 +162,7 @@ fun WorkoutChart(
   val cachedPowerPath = remember(samples.size) { buildPowerPath(samples) }
   val hrScratchPath = remember { Path() }
   val powerScratchPath = remember { Path() }
+  val elevationScratchPath = remember { Path() }
   val hrMatrix = remember { Matrix() }
   val powerMatrix = remember { Matrix() }
 
@@ -136,14 +188,149 @@ fun WorkoutChart(
         modifier = Modifier
           .fillMaxWidth()
           .height(160.dp)
-          .pointerInput(segments) {
-            detectTapGestures { offset ->
+          .onSizeChanged { chartWidthPx = it.width }
+          .pointerInput(segments, reducedMotion) {
+            // Scrub owns press+drag. Pan only wins after release when the
+            // horizontal scrub velocity is a Focus-mode fling.
+            val config = viewConfiguration
+            var previousTapTime = Long.MIN_VALUE
+            var previousTapPosition = Offset.Zero
+            var panJob: Job? = null
+
+            fun selectAt(x: Float, initialPress: Boolean) {
+              val chartWidth = size.width.toFloat()
+              if (chartWidth <= 0f || totalDuration <= 0) return
               val currentStart = currentWinStart.value
               val currentEnd = currentWinEnd.value
               val currentSpan = (currentEnd - currentStart).coerceAtLeast(1f)
-              val sec = currentStart + (offset.x / size.width) * currentSpan
+              val clampedX = x.coerceIn(0f, chartWidth)
+              val sec = (currentStart + clampedX / chartWidth * currentSpan)
+                .coerceAtMost(totalDuration.toFloat() - 0.001f)
               val idx = bounds.indexOfFirst { sec >= it.first && sec < it.second }
-              selectedIndex = if (idx < 0 || idx == selectedIndex) null else idx
+              if (idx < 0) {
+                selectedIndex = null
+                return
+              }
+              selectedIndex = idx
+              if (initialPress) {
+                val intervalX = (bounds[idx].first - currentStart) / currentSpan * chartWidth
+                tooltipGrabOffset = clampedX - intervalX
+                tooltipX = intervalX
+              } else {
+                tooltipX = clampedX - tooltipGrabOffset
+              }
+            }
+
+            fun settlePan() {
+              val boundsNow = currentPanBounds.value
+              val target = clampWorkoutChartPanOffset(panOffset.value, boundsNow)
+              if (abs(target - panOffset.value) < 0.01f) return
+              panJob?.cancel()
+              panJob = panScope.launch {
+                if (currentReducedMotion.value) {
+                  panOffset.snapTo(target)
+                } else {
+                  panOffset.animateTo(
+                    targetValue = target,
+                    animationSpec = panSettleSpec
+                  )
+                }
+              }
+            }
+
+            fun flingPan(velocityPxPerSec: Float) {
+              val boundsNow = currentPanBounds.value
+              if (!currentZoomToCurrent.value || !boundsNow.canPan || size.width <= 0) {
+                settlePan()
+                return
+              }
+              val currentSpan = (currentWinEnd.value - currentWinStart.value).coerceAtLeast(1f)
+              val velocitySecPerSec = -velocityPxPerSec / size.width * currentSpan
+              val overshootSec = maxRubberBandPx / size.width * currentSpan
+              panJob?.cancel()
+              panJob = panScope.launch {
+                if (currentReducedMotion.value) {
+                  panOffset.snapTo(clampWorkoutChartPanOffset(panOffset.value, boundsNow))
+                  return@launch
+                }
+                panOffset.updateBounds(
+                  lowerBound = boundsNow.minOffsetSec - overshootSec,
+                  upperBound = boundsNow.maxOffsetSec + overshootSec
+                )
+                panOffset.animateDecay(
+                  initialVelocity = velocitySecPerSec,
+                  animationSpec = decaySpec
+                )
+                panOffset.animateTo(
+                  targetValue = clampWorkoutChartPanOffset(panOffset.value, boundsNow),
+                  animationSpec = panSettleSpec
+                )
+              }
+            }
+
+            awaitEachGesture {
+              panJob?.cancel()
+
+              val down = awaitFirstDown(requireUnconsumed = false)
+              down.consume()
+              selectAt(down.position.x, initialPress = true)
+
+              val tracker = VelocityTracker()
+              tracker.addPosition(down.uptimeMillis, down.position)
+              var movedHorizontally = false
+              var up: androidx.compose.ui.input.pointer.PointerInputChange? = null
+              var cancelled = false
+
+              while (true) {
+                val event = awaitPointerEvent()
+                val change = event.changes.firstOrNull { it.id == down.id }
+                if (change == null) {
+                  cancelled = true
+                  break
+                }
+                if (change.changedToUp()) {
+                  tracker.addPosition(change.uptimeMillis, change.position)
+                  up = change
+                  break
+                }
+                if (change.position != change.previousPosition) {
+                  tracker.addPosition(change.uptimeMillis, change.position)
+                  val delta = change.position - down.position
+                  if (abs(delta.x) > config.touchSlop && abs(delta.x) >= abs(delta.y)) {
+                    movedHorizontally = true
+                  }
+                  if (movedHorizontally) selectAt(change.position.x, initialPress = false)
+                  change.consume()
+                }
+              }
+
+              if (cancelled || up == null) {
+                previousTapTime = Long.MIN_VALUE
+                return@awaitEachGesture
+              }
+
+              val release = up
+              val velocityX = tracker.calculateVelocity().x
+              val isDoubleTap = !movedHorizontally &&
+                previousTapTime != Long.MIN_VALUE &&
+                release.uptimeMillis - previousTapTime <= config.doubleTapTimeoutMillis &&
+                (release.position - previousTapPosition).getDistance() <= config.touchSlop * 2f
+
+              if (isDoubleTap) {
+                zoomToCurrent = !currentZoomToCurrent.value
+                previousTapTime = Long.MIN_VALUE
+              } else if (!movedHorizontally) {
+                previousTapTime = release.uptimeMillis
+                previousTapPosition = release.position
+              } else {
+                previousTapTime = Long.MIN_VALUE
+              }
+
+              if (!isDoubleTap && movedHorizontally && abs(velocityX) > PAN_FLING_THRESHOLD_PX_PER_SEC) {
+                flingPan(velocityX)
+              } else {
+                settlePan()
+              }
             }
           }
       ) {
@@ -169,7 +356,8 @@ fun WorkoutChart(
           val minAlt = elevationProfile.min()
           val altSpan = (elevationProfile.max() - minAlt).coerceAtLeast(1.0)
           val bandHeight = chartHeight * 0.3f
-          val elevPath = Path()
+          val elevPath = elevationScratchPath
+          elevPath.rewind()
           elevPath.moveTo(xForTime(winStart), chartBottom)
           val elevStep = (winSpan / 200f).coerceAtLeast(1f)
           var t = winStart
@@ -187,10 +375,11 @@ fun WorkoutChart(
         // Gridlines at FTP and FTP/2.
         if (ftp > 0) {
           val gridColor = cursorColor.copy(alpha = 0.15f)
-          listOf(ftp, ftp / 2).forEach { watts ->
-            val y = yForPower(watts.toFloat())
-            drawLine(color = gridColor, start = Offset(0f, y), end = Offset(width, y), strokeWidth = 1.dp.toPx())
-          }
+          val gridStrokeWidth = 1.dp.toPx()
+          val ftpY = yForPower(ftp.toFloat())
+          drawLine(color = gridColor, start = Offset(0f, ftpY), end = Offset(width, ftpY), strokeWidth = gridStrokeWidth)
+          val halfFtpY = yForPower((ftp / 2).toFloat())
+          drawLine(color = gridColor, start = Offset(0f, halfFtpY), end = Offset(width, halfFtpY), strokeWidth = gridStrokeWidth)
         }
 
         // Full-height-from-zero interval blocks over the visible window.
@@ -293,6 +482,11 @@ fun WorkoutChart(
             ftp = ftp,
             modifier = Modifier
               .align(Alignment.TopStart)
+              .offset {
+                val maxX = (chartWidthPx - tooltipWidthPx).coerceAtLeast(0)
+                IntOffset(tooltipX.roundToInt().coerceIn(0, maxX), 0)
+              }
+              .onSizeChanged { tooltipWidthPx = it.width }
               .padding(8.dp)
           )
         }
@@ -324,6 +518,53 @@ internal fun computeWorkoutChartWindow(
     startSec = (start - ZOOM_PAD_SEC).coerceAtLeast(0).toFloat(),
     endSec = (end + ZOOM_PAD_SEC).coerceAtMost(totalDurationSec).toFloat()
   )
+}
+
+internal data class WorkoutChartPanBounds(
+  val minOffsetSec: Float,
+  val maxOffsetSec: Float
+) {
+  val canPan: Boolean
+    get() = maxOffsetSec - minOffsetSec > 0.001f
+}
+
+internal fun computeWorkoutChartPanBounds(
+  windowStartSec: Float,
+  windowEndSec: Float,
+  totalDurationSec: Int
+): WorkoutChartPanBounds {
+  val minOffset = -windowStartSec
+  val maxOffset = totalDurationSec.toFloat() - windowEndSec
+  return if (maxOffset >= minOffset) {
+    WorkoutChartPanBounds(minOffset, maxOffset)
+  } else {
+    val centered = (minOffset + maxOffset) / 2f
+    WorkoutChartPanBounds(centered, centered)
+  }
+}
+
+internal fun clampWorkoutChartPanOffset(
+  offsetSec: Float,
+  bounds: WorkoutChartPanBounds
+): Float = offsetSec.coerceIn(bounds.minOffsetSec, bounds.maxOffsetSec)
+
+internal fun rubberBandWorkoutChartPanOffset(
+  offsetSec: Float,
+  bounds: WorkoutChartPanBounds,
+  maxOvershootSec: Float
+): Float {
+  if (maxOvershootSec <= 0f) return clampWorkoutChartPanOffset(offsetSec, bounds)
+  return when {
+    offsetSec < bounds.minOffsetSec -> {
+      val distance = bounds.minOffsetSec - offsetSec
+      bounds.minOffsetSec - (distance * maxOvershootSec / (distance + maxOvershootSec))
+    }
+    offsetSec > bounds.maxOffsetSec -> {
+      val distance = offsetSec - bounds.maxOffsetSec
+      bounds.maxOffsetSec + (distance * maxOvershootSec / (distance + maxOvershootSec))
+    }
+    else -> offsetSec
+  }
 }
 
 private fun buildHrPath(samples: List<TelemetrySample>): Path = Path().apply {

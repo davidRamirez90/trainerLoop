@@ -5,6 +5,7 @@ import com.trainerloop.data.model.SegmentPhase
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.ui.theme.ZoneColors
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WorkoutChartTest {
@@ -89,5 +90,32 @@ class WorkoutChartTest {
 
     assertEquals(40f, window.startSec, 0f)
     assertEquals(180f, window.endSec, 0f)
+  }
+
+  @Test
+  fun `pan bounds keep an overflowing focus window inside the workout`() {
+    val bounds = computeWorkoutChartPanBounds(
+      windowStartSec = 40f,
+      windowEndSec = 140f,
+      totalDurationSec = 180
+    )
+
+    assertEquals(-40f, bounds.minOffsetSec, 0f)
+    assertEquals(40f, bounds.maxOffsetSec, 0f)
+    assertEquals(-40f, clampWorkoutChartPanOffset(-100f, bounds), 0f)
+    assertEquals(40f, clampWorkoutChartPanOffset(100f, bounds), 0f)
+  }
+
+  @Test
+  fun `rubber band limits overshoot while preserving in bounds pan`() {
+    val bounds = WorkoutChartPanBounds(minOffsetSec = -40f, maxOffsetSec = 40f)
+
+    assertEquals(12f, rubberBandWorkoutChartPanOffset(12f, bounds, 24f), 0f)
+    val lowerOvershoot = rubberBandWorkoutChartPanOffset(-1_000f, bounds, 24f)
+    val upperOvershoot = rubberBandWorkoutChartPanOffset(1_000f, bounds, 24f)
+    assertTrue(lowerOvershoot < bounds.minOffsetSec)
+    assertTrue(bounds.minOffsetSec - lowerOvershoot <= 24f)
+    assertTrue(upperOvershoot > bounds.maxOffsetSec)
+    assertTrue(upperOvershoot - bounds.maxOffsetSec <= 24f)
   }
 }
