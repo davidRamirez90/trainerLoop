@@ -83,38 +83,49 @@ fun WorkoutMiniChart(
       return chartBottom - ratio * drawHeight
     }
 
-    val step = (totalDuration / 120).coerceAtLeast(1)
-    var sec = 0
-    val path = Path()
-    var firstPoint: Offset? = null
+    val stepSec = (totalDuration / 120f).coerceAtLeast(1f)
+    val bands = zoneBands(
+      segments = workout.segments,
+      ftp = ftp,
+      winStartSec = 0f,
+      winEndSec = totalDuration.toFloat(),
+      stepSec = stepSec
+    )
 
-    while (sec <= totalDuration) {
-      val range = WorkoutMath.targetRangeAt(workout.segments, sec)
-      val power = (range.low + range.high) / 2
-      val x = xForTime(sec)
-      val y = yForPower(power)
-      val point = Offset(x, y)
-
-      if (firstPoint == null) {
-        firstPoint = point
-        path.moveTo(point.x, point.y)
-      } else {
-        path.lineTo(point.x, point.y)
-      }
-
-      drawRect(
-        color = ZoneColors.forTarget(power, ftp, darkTheme).fill,
-        topLeft = Offset(x, y),
-        size = Size(
-          width = (xForTime((sec + step).coerceAtMost(totalDuration)) - x).coerceAtLeast(1f),
-          height = chartBottom - y
-        ),
-        style = Fill
+    // Zone fills: one Path per zone, so abutting bands can't leave AA seams.
+    val zonePaths = Array(6) { Path() }
+    bands.forEach { band ->
+      val yTop = yForPower(band.targetWatts)
+      zonePaths[band.zone - 1].addRect(
+        androidx.compose.ui.geometry.Rect(
+          left = xForTime(band.startSec.toInt()),
+          top = yTop,
+          right = xForTime(band.endSec.toInt()),
+          bottom = chartBottom
+        )
       )
-
-      sec += step
+    }
+    zonePaths.forEachIndexed { index, path ->
+      if (!path.isEmpty) {
+        drawPath(path, color = ZoneColors.forZone(index + 1, darkTheme).fill, style = Fill)
+      }
     }
 
-    drawPath(path, color = lineColor, style = Stroke(width = 2.dp.toPx()))
+    // Stepped outline along the top of the profile.
+    val outline = Path()
+    var started = false
+    bands.forEach { band ->
+      val y = yForPower(band.targetWatts)
+      val xStart = xForTime(band.startSec.toInt())
+      val xEnd = xForTime(band.endSec.toInt())
+      if (!started) {
+        outline.moveTo(xStart, y)
+        started = true
+      } else {
+        outline.lineTo(xStart, y)
+      }
+      outline.lineTo(xEnd, y)
+    }
+    if (started) drawPath(outline, color = lineColor, style = Stroke(width = 2.dp.toPx()))
   }
 }
