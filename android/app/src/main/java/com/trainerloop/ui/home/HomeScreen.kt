@@ -491,6 +491,7 @@ private fun ConnectionStrip(
       .clickable(
         interactionSource = interactionSource,
         indication = null,
+        onClickLabel = "Manage devices",
         onClick = onManageDevices
       )
       .padding(horizontal = Spacing.xl, vertical = Spacing.md),
@@ -501,7 +502,7 @@ private fun ConnectionStrip(
       icon = if (trainerConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
       connected = trainerConnected,
       label = trainerName ?: "Trainer",
-      value = if (trainerConnected) trainerBattery?.let { "$it%" } ?: "—" else "—"
+      value = if (trainerConnected) trainerBattery?.let { "$it%" } ?: "Connected" else "Not paired"
     )
     Spacer(modifier = Modifier.width(Spacing.md))
     ConnectionStatus(
@@ -509,7 +510,14 @@ private fun ConnectionStrip(
       icon = if (hrConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
       connected = hrConnected,
       label = "HR",
-      value = if (hrConnected) latestHrBpm?.let { "$it bpm" } ?: "—" else "—"
+      value = if (hrConnected) latestHrBpm?.let { "$it bpm" } ?: "Connected" else "Not paired"
+    )
+    Spacer(modifier = Modifier.width(Spacing.sm))
+    Icon(
+      imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+      contentDescription = null,
+      tint = Color.White.copy(alpha = 0.8f),
+      modifier = Modifier.size(20.dp)
     )
   }
 }
