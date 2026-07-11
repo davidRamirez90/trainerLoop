@@ -71,6 +71,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
@@ -513,31 +514,58 @@ private fun InZoneProgressIndicator(
 private fun IntervalContextLine(
   label: String,
   position: String,
-  remaining: String
+  remaining: String,
+  stacked: Boolean = false
 ) {
-  Row(
-    modifier = Modifier.fillMaxWidth(),
-    verticalAlignment = Alignment.CenterVertically
-  ) {
-    Text(
-      text = label,
-      style = MaterialTheme.typography.titleMedium,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-      maxLines = 1,
-      modifier = Modifier.weight(1f)
-    )
-    Text(
-      text = " · $position · ",
-      style = MaterialTheme.typography.titleMedium,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-      maxLines = 1
-    )
-    Text(
-      text = "$remaining left",
-      style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-      maxLines = 1
-    )
+  if (stacked) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+          text = label,
+          style = MaterialTheme.typography.titleMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1,
+          modifier = Modifier.weight(1f)
+        )
+        Text(
+          text = position,
+          style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1
+        )
+      }
+      Text(
+        text = "$remaining left",
+        style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1
+      )
+    }
+  } else {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      Text(
+        text = label,
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        modifier = Modifier.weight(1f)
+      )
+      Text(
+        text = " · $position · ",
+        style = MaterialTheme.typography.titleMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1
+      )
+      Text(
+        text = "$remaining left",
+        style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1
+      )
+    }
   }
 }
 
@@ -549,7 +577,8 @@ private fun PowerHero(
   targetRange: com.trainerloop.data.model.TargetRange,
   inZoneSec: Int,
   segmentElapsedSec: Int,
-  progressColor: Color
+  progressColor: Color,
+  powerStyle: TextStyle = NumericDisplay
 ) {
   val animatedPowerColor by animateColorAsState(
     targetValue = powerColor,
@@ -565,7 +594,7 @@ private fun PowerHero(
       AnimatedMetricValue(
         value = powerWatts,
         showDashWhenZero = !sessionHasStarted,
-        style = NumericDisplay,
+        style = powerStyle,
         color = animatedPowerColor
       )
       Spacer(modifier = Modifier.width(Spacing.xs))
@@ -600,7 +629,8 @@ private fun SecondaryMetricTile(
   label: String,
   unit: String,
   value: Int,
-  modifier: Modifier = Modifier
+  modifier: Modifier = Modifier,
+  compact: Boolean = false
 ) {
   Card(
     modifier = modifier,
@@ -611,7 +641,7 @@ private fun SecondaryMetricTile(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(Spacing.md),
+        .padding(if (compact) Spacing.sm else Spacing.md),
       horizontalAlignment = Alignment.CenterHorizontally
     ) {
       Text(
@@ -623,7 +653,7 @@ private fun SecondaryMetricTile(
         AnimatedMetricValue(
           value = value,
           showDashWhenZero = true,
-          style = NumericMedium,
+          style = if (compact) NumericSmall else NumericMedium,
           color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.width(Spacing.xs))
@@ -661,37 +691,71 @@ private fun LandscapeWorkout(
     // Metric rail
     Column(
       modifier = Modifier
-        .width(132.dp)
+        .width(160.dp)
         .fillMaxHeight(),
       verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-      RailMetric(
-        label = "POWER",
-        value = uiState.currentPowerWatts.toString(),
-        unit = "W",
-        color = powerColor,
-        animatedValue = uiState.currentPowerWatts,
-        big = true
+      val currentSegment = uiState.segments.getOrNull(uiState.segmentIndex)
+      IntervalContextLine(
+        label = currentSegment?.label ?: currentSegment?.phase?.name ?: "Interval",
+        position = "${uiState.segmentIndex + 1}/${uiState.segments.size}",
+        remaining = formatDuration(
+          (uiState.segmentEndSec - uiState.elapsedSec).coerceAtLeast(0)
+        ),
+        stacked = true
       )
-      RailMetric(
-        label = "HEART",
-        value = if (uiState.currentHrBpm > 0) uiState.currentHrBpm.toString() else "—",
-        unit = "bpm",
-        animatedValue = uiState.currentHrBpm,
-        animatedShowDashWhenZero = true
+
+      PowerHero(
+        powerWatts = uiState.currentPowerWatts,
+        powerColor = powerColor,
+        sessionHasStarted = uiState.isRunning || uiState.elapsedSec > 0,
+        targetRange = uiState.targetRange,
+        inZoneSec = uiState.inZoneSec,
+        segmentElapsedSec = uiState.elapsedInSegmentSec.coerceAtLeast(1),
+        progressColor = zoneColorSet(
+          targetWatts = (uiState.targetRange.low + uiState.targetRange.high) / 2,
+          ftp = ftp
+        ).fill,
+        powerStyle = NumericLarge
       )
-      RailMetric(
-        label = "CADENCE",
-        value = if (uiState.currentCadenceRpm > 0) uiState.currentCadenceRpm.toString() else "—",
-        unit = "rpm",
-        animatedValue = uiState.currentCadenceRpm,
-        animatedShowDashWhenZero = true
-      )
-      RailMetric(
-        label = "ELAPSED",
-        value = formatDuration(uiState.elapsedSec),
-        unit = ""
-      )
+
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+      ) {
+        SecondaryMetricTile(
+          label = "HR",
+          unit = "bpm",
+          value = uiState.currentHrBpm,
+          modifier = Modifier.weight(1f),
+          compact = true
+        )
+        SecondaryMetricTile(
+          label = "Cadence",
+          unit = "rpm",
+          value = uiState.currentCadenceRpm,
+          modifier = Modifier.weight(1f),
+          compact = true
+        )
+      }
+
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Text(
+          text = "Elapsed",
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+          text = formatDuration(uiState.elapsedSec),
+          style = NumericSmall,
+          color = MaterialTheme.colorScheme.onSurface
+        )
+      }
+
       Spacer(Modifier.weight(1f))
       val playPauseInteractionSource = remember { MutableInteractionSource() }
       val stopInteractionSource = remember { MutableInteractionSource() }
@@ -733,64 +797,6 @@ private fun LandscapeWorkout(
         .weight(1f)
         .fillMaxHeight()
     )
-  }
-}
-
-@Composable
-private fun RailMetric(
-  label: String,
-  value: String,
-  unit: String,
-  color: androidx.compose.ui.graphics.Color? = null,
-  animatedValue: Int? = null,
-  animatedShowDashWhenZero: Boolean = false,
-  big: Boolean = false
-) {
-  val resolvedColor = if (color != null) {
-    val animatedColor by animateColorAsState(
-      targetValue = color,
-      animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
-      label = "Power zone color"
-    )
-    animatedColor
-  } else {
-    MaterialTheme.colorScheme.onSurface
-  }
-
-  Column {
-    Text(
-      text = label,
-      style = MaterialTheme.typography.labelSmall,
-      color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Row(verticalAlignment = Alignment.Bottom) {
-      val valueStyle = if (big) {
-        NumericLarge
-      } else {
-        MaterialTheme.typography.headlineMedium.copy(
-          fontWeight = FontWeight.Bold,
-          fontFeatureSettings = "tnum"
-        )
-      }
-      if (animatedValue != null) {
-        AnimatedMetricValue(
-          value = animatedValue,
-          showDashWhenZero = animatedShowDashWhenZero,
-          style = valueStyle,
-          color = resolvedColor
-        )
-      } else {
-        Text(text = value, style = valueStyle, color = resolvedColor)
-      }
-      if (unit.isNotEmpty()) {
-        Spacer(Modifier.width(2.dp))
-        Text(
-          text = unit,
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-      }
-    }
   }
 }
 
