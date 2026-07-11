@@ -270,44 +270,49 @@ fun SettingsScreen(
           animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>())
         )
       ) {
-        LabeledSlider(
-          label = "Bike weight",
-          valueText = "${uiState.bikeWeightKg} kg",
-          hint = null,
-          value = uiState.bikeWeightKg.toFloatOrNull() ?: 8.0f,
-          valueRange = 5f..15f,
-          steps = 19, // 0.5 kg increments
-          onValueChange = { viewModel.updateBikeWeight(fmt(it, 1)) }
-        )
-        LabeledSlider(
-          label = "Rolling resistance (Crr)",
-          valueText = uiState.crr,
-          hint = crrHint(uiState.crr.toDoubleOrNull() ?: 0.005),
-          value = uiState.crr.toFloatOrNull() ?: 0.005f,
-          valueRange = 0.002f..0.010f,
-          steps = 15, // 0.0005 increments
-          onValueChange = { viewModel.updateCrr(fmt(it, 4)) }
-        )
-        LabeledSlider(
-          label = "Aero drag (CdA)",
-          valueText = "${uiState.cda} m²",
-          hint = cdaHint(uiState.cda.toDoubleOrNull() ?: 0.32),
-          value = uiState.cda.toFloatOrNull() ?: 0.32f,
-          valueRange = 0.15f..0.60f,
-          steps = 44, // 0.01 increments
-          onValueChange = { viewModel.updateCda(fmt(it, 2)) }
-        )
-        LabeledSlider(
-          label = "Trainer difficulty",
-          valueText = "${uiState.trainerDifficultyPct} %",
-          hint = "How much of a GPX route's gradient you feel on free rides",
-          value = uiState.trainerDifficultyPct.toFloat(),
-          valueRange = 0f..100f,
-          steps = 19, // 5 % increments
-          onValueChange = { viewModel.updateTrainerDifficulty(it.toInt()) }
-        )
-        TextButton(onClick = { viewModel.resetPhysicsDefaults() }) {
-          Text("Reset to defaults")
+        Column(
+          modifier = Modifier.fillMaxWidth(),
+          verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
+          LabeledSlider(
+            label = "Bike weight",
+            valueText = "${uiState.bikeWeightKg} kg",
+            hint = null,
+            value = uiState.bikeWeightKg.toFloatOrNull() ?: 8.0f,
+            valueRange = 5f..15f,
+            steps = 19, // 0.5 kg increments
+            onValueChange = { viewModel.updateBikeWeight(fmt(it, 1)) }
+          )
+          LabeledSlider(
+            label = "Rolling resistance (Crr)",
+            valueText = uiState.crr,
+            hint = crrHint(uiState.crr.toDoubleOrNull() ?: 0.005),
+            value = uiState.crr.toFloatOrNull() ?: 0.005f,
+            valueRange = 0.002f..0.010f,
+            steps = 15, // 0.0005 increments
+            onValueChange = { viewModel.updateCrr(fmt(it, 4)) }
+          )
+          LabeledSlider(
+            label = "Aero drag (CdA)",
+            valueText = "${uiState.cda} m²",
+            hint = cdaHint(uiState.cda.toDoubleOrNull() ?: 0.32),
+            value = uiState.cda.toFloatOrNull() ?: 0.32f,
+            valueRange = 0.15f..0.60f,
+            steps = 44, // 0.01 increments
+            onValueChange = { viewModel.updateCda(fmt(it, 2)) }
+          )
+          LabeledSlider(
+            label = "Trainer difficulty",
+            valueText = "${uiState.trainerDifficultyPct} %",
+            hint = "How much of a GPX route's gradient you feel on free rides",
+            value = uiState.trainerDifficultyPct.toFloat(),
+            valueRange = 0f..100f,
+            steps = 19, // 5 % increments
+            onValueChange = { viewModel.updateTrainerDifficulty(it.toInt()) }
+          )
+          TextButton(onClick = { viewModel.resetPhysicsDefaults() }) {
+            Text("Reset to defaults")
+          }
         }
       }
     }
