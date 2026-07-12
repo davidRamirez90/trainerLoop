@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
@@ -36,7 +35,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -98,14 +96,17 @@ import com.trainerloop.ui.components.MetricTileState
 import com.trainerloop.ui.components.StatusPill
 import com.trainerloop.ui.components.StatusPillState
 import com.trainerloop.ui.components.TrainerLoopTopBar
+import com.trainerloop.ui.components.PLAN_FILL_ALPHA
+import com.trainerloop.ui.components.buildPlanProfilePaths
+import com.trainerloop.ui.components.planProfileRuns
 import com.trainerloop.ui.components.pressable
+import com.trainerloop.ui.components.zoneBands
 import androidx.compose.material.icons.filled.BluetoothDisabled
 import com.trainerloop.ui.theme.NumericDisplay
 import com.trainerloop.ui.theme.NumericLarge
 import com.trainerloop.ui.theme.NumericMedium
 import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
-import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.zoneColorSet
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.reducedMotionAware
@@ -139,7 +140,6 @@ fun WorkoutScreen(
   LaunchedEffect(uiState.liveFeedback) {
     uiState.liveFeedback?.let { displayedLiveFeedback = it }
   }
-  val darkTheme = isSystemInDarkTheme()
   val currentPowerColor = zoneColorSet(uiState.currentPowerWatts, ftp).line
   var showStopConfirm by remember { mutableStateOf(false) }
 
@@ -271,7 +271,6 @@ fun WorkoutScreen(
       uiState = uiState,
       ftp = ftp,
       powerColor = currentPowerColor,
-      dark = darkTheme,
       onPlayPause = {
         when {
           uiState.isRunning -> viewModel.pause()
@@ -754,7 +753,6 @@ private fun LandscapeWorkout(
   uiState: WorkoutUiState,
   ftp: Int,
   powerColor: Color,
-  dark: Boolean,
   onPlayPause: () -> Unit,
   onStop: () -> Unit
 ) {
@@ -888,7 +886,6 @@ private fun LandscapeWorkout(
     ImmersiveWorkoutChart(
       uiState = uiState,
       ftp = ftp,
-      dark = dark,
       modifier = Modifier
         .weight(1f)
         .fillMaxHeight()
@@ -902,7 +899,6 @@ private val ZOOM_LEVELS = listOf(1f, 2f, 4f, 8f)
 private fun ImmersiveWorkoutChart(
   uiState: WorkoutUiState,
   ftp: Int,
-  dark: Boolean,
   modifier: Modifier = Modifier
 ) {
   val segments = uiState.segments
@@ -923,6 +919,8 @@ private fun ImmersiveWorkoutChart(
   val hrLineColor = semanticColors.chartHeartRate
   val powerLineColor = semanticColors.chartPower
   val gridColor = semanticColors.chartGrid.copy(alpha = 0.15f)
+  val planOutlineColor = semanticColors.chartPlanOutline
+  val planFillColor = semanticColors.chartPlanFill.copy(alpha = PLAN_FILL_ALPHA)
 
   Box(
     modifier = modifier
@@ -983,22 +981,30 @@ private fun ImmersiveWorkoutChart(
           }
         }
 
-        // Zone blocks from zero.
-        val step = (totalDuration / 400).coerceAtLeast(1)
-        var sec = 0
-        while (sec <= totalDuration) {
-          val range = WorkoutMath.targetRangeAt(segments, sec)
-          val target = (range.low + range.high) / 2
-          val x = xForTime(sec)
-          val xEnd = xForTime((sec + step).coerceAtMost(totalDuration))
-          val yTop = yForPower(target)
-          drawRect(
-            color = ZoneColors.forTarget(target, ftp, dark).fill,
-            topLeft = Offset(x, yTop),
-            size = Size((xEnd - x).coerceAtLeast(1f), chartBottom - yTop)
+        // Monochrome plan profile: faint fill under a stepped outline.
+        val planRuns = planProfileRuns(
+          zoneBands(
+            segments = segments,
+            ftp = ftp,
+            winStartSec = 0f,
+            winEndSec = totalDuration.toFloat(),
+            stepSec = (totalDuration / 400f).coerceAtLeast(1f)
           )
-          sec += step
-        }
+        )
+        val planOutline = Path()
+        val planFill = Path()
+        buildPlanProfilePaths(
+          runs = planRuns,
+          outline = planOutline,
+          fill = planFill,
+          xForTime = { sec -> (sec / totalDuration.toFloat()) * width },
+          yForPower = { watts ->
+            chartBottom - (watts / maxPowerAxis).coerceIn(0f, 1f) * chartHeight
+          },
+          baselineY = chartBottom
+        )
+        drawPath(planFill, color = planFillColor)
+        drawPath(planOutline, color = planOutlineColor, style = Stroke(width = 2.dp.toPx()))
 
         if (samples.size >= 2) {
           var hrPath: Path? = null
