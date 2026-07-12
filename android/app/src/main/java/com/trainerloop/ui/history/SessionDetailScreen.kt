@@ -20,18 +20,12 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import android.app.Application
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
@@ -45,13 +39,18 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.domain.WorkoutSummaryMath
+import com.trainerloop.ui.components.PrimaryActionButton
 import com.trainerloop.ui.components.SampleChart
+import com.trainerloop.ui.components.SectionHeader
+import com.trainerloop.ui.components.TrainerLoopCard
+import com.trainerloop.ui.components.TrainerLoopTopBar
 import com.trainerloop.ui.theme.NumericMedium
 import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.reducedMotionAware
+import com.trainerloop.ui.theme.trainerLoopColors
 import com.trainerloop.ui.theme.zoneColorSet
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -60,7 +59,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.shape.RoundedCornerShape
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SessionDetailScreen(
   sessionId: String,
@@ -79,14 +77,10 @@ fun SessionDetailScreen(
   Scaffold(
     contentWindowInsets = WindowInsets(0),
     topBar = {
-      TopAppBar(
+      TrainerLoopTopBar(
+        title = session?.workoutName ?: "Session",
         windowInsets = WindowInsets(0),
-        title = { Text(session?.workoutName ?: "Session") },
-        navigationIcon = {
-          IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-          }
-        }
+        onBack = onBack
       )
     }
   ) { padding ->
@@ -121,7 +115,7 @@ fun SessionDetailScreen(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding)
-        .padding(horizontal = Spacing.lg)
+        .padding(horizontal = Spacing.screenMargin)
         .navigationBarsPadding()
         .verticalScroll(rememberScrollState())
     ) {
@@ -131,7 +125,7 @@ fun SessionDetailScreen(
         color = MaterialTheme.colorScheme.onSurfaceVariant
       )
 
-      Spacer(modifier = Modifier.height(Spacing.xl))
+      Spacer(modifier = Modifier.height(Spacing.sectionGap))
 
       Row(
         modifier = Modifier.fillMaxWidth(),
@@ -142,44 +136,47 @@ fun SessionDetailScreen(
         SummaryCard("NP", "$np W", npAccent, Modifier.weight(1f))
       }
 
-      Spacer(modifier = Modifier.height(Spacing.xl))
+      Spacer(modifier = Modifier.height(Spacing.sectionGap))
 
       if (samples.isNotEmpty()) {
         ZoneTimeDistribution(zoneSeconds = zoneSeconds)
-        Spacer(modifier = Modifier.height(Spacing.xl))
+        Spacer(modifier = Modifier.height(Spacing.sectionGap))
       }
 
-      Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-          containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-      ) {
-        Column(modifier = Modifier.padding(Spacing.lg)) {
-          StatRow("Duration", formatDuration(s.durationSec), neutralAccent)
-          StatRow("Avg Power", "${s.avgPower} W", powerAccent)
-          StatRow("Max Power", "${s.maxPower} W", zoneColorSet(s.maxPower, ftp).line)
-          StatRow("Avg Heart Rate", "${s.avgHr} bpm", neutralAccent)
-          StatRow("Avg Cadence", "${s.avgCadence} rpm", neutralAccent)
-          val distanceKm = WorkoutSummaryMath.totalDistanceKm(samples)
-          if (distanceKm > 0) {
-            StatRow("Distance", "%.1f km".format(distanceKm), neutralAccent)
-            StatRow("Elevation Gain", "${WorkoutSummaryMath.totalAscentM(samples)} m", neutralAccent)
-          }
+      TrainerLoopCard(modifier = Modifier.fillMaxWidth()) {
+        StatRow("Duration", formatDuration(s.durationSec), neutralAccent)
+        StatRow("Avg Power", "${s.avgPower} W", powerAccent)
+        StatRow("Max Power", "${s.maxPower} W", zoneColorSet(s.maxPower, ftp).line)
+        StatRow("Avg Heart Rate", "${s.avgHr} bpm", neutralAccent)
+        StatRow("Avg Cadence", "${s.avgCadence} rpm", neutralAccent)
+        val distanceKm = WorkoutSummaryMath.totalDistanceKm(samples)
+        if (distanceKm > 0) {
+          StatRow("Distance", "%.1f km".format(distanceKm), neutralAccent)
+          StatRow("Elevation Gain", "${WorkoutSummaryMath.totalAscentM(samples)} m", neutralAccent)
         }
       }
 
-      Spacer(modifier = Modifier.height(Spacing.xl))
+      Spacer(modifier = Modifier.height(Spacing.sectionGap))
 
       if (s.completed && state.icuConfigured) {
+        val semantic = MaterialTheme.trainerLoopColors
         s.icuSyncedAt?.let { syncedAt ->
-          Text(
-            text = "Synced to intervals.icu · ${formatDate(syncedAt)}",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary
-          )
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+              imageVector = Icons.Filled.CloudDone,
+              contentDescription = null,
+              tint = semantic.connected,
+              modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(Spacing.xs))
+            Text(
+              text = "Synced to intervals.icu · ${formatDate(syncedAt)}",
+              style = MaterialTheme.typography.bodyMedium,
+              color = semantic.connected
+            )
+          }
         } ?: run {
-          Button(
+          PrimaryActionButton(
             onClick = { viewModel.uploadToIcu() },
             enabled = !state.isUploading,
             modifier = Modifier.fillMaxWidth()
@@ -188,7 +185,7 @@ fun SessionDetailScreen(
           }
         }
         state.uploadStatus?.let {
-          Spacer(modifier = Modifier.height(8.dp))
+          Spacer(modifier = Modifier.height(Spacing.sm))
           Text(
             text = it,
             style = MaterialTheme.typography.bodyMedium,
@@ -198,26 +195,19 @@ fun SessionDetailScreen(
       }
 
       if (samples.isNotEmpty()) {
-        Spacer(modifier = Modifier.height(Spacing.xl))
-        Card(
-          modifier = Modifier.fillMaxWidth(),
-          colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        Spacer(modifier = Modifier.height(Spacing.sectionGap))
+        TrainerLoopCard(modifier = Modifier.fillMaxWidth()) {
+          Text(
+            text = "Ride Chart",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
           )
-        ) {
-          Column(modifier = Modifier.padding(Spacing.lg)) {
-            Text(
-              text = "Ride Chart",
-              style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            SampleChart(samples = samples)
-          }
+          Spacer(modifier = Modifier.height(Spacing.sm))
+          SampleChart(samples = samples)
         }
       }
 
-      Spacer(modifier = Modifier.height(Spacing.xl))
+      Spacer(modifier = Modifier.height(Spacing.sectionGap))
     }
   }
 }
@@ -229,13 +219,7 @@ private fun SummaryCard(
   accent: androidx.compose.ui.graphics.Color,
   modifier: Modifier = Modifier
 ) {
-  Card(
-    modifier = modifier,
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant
-    ),
-    shape = RoundedCornerShape(Spacing.md)
-  ) {
+  TrainerLoopCard(modifier = modifier, emphasized = true) {
     Column(
       modifier = Modifier.fillMaxWidth(),
       horizontalAlignment = Alignment.CenterHorizontally
@@ -255,8 +239,7 @@ private fun SummaryCard(
       Text(
         text = label,
         style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = Spacing.lg)
+        color = MaterialTheme.colorScheme.onSurfaceVariant
       )
     }
   }
@@ -302,63 +285,51 @@ private fun ZoneTimeDistribution(zoneSeconds: IntArray) {
   val dark = androidx.compose.foundation.isSystemInDarkTheme()
   val nonZeroZones = zoneSeconds.indices.filter { zoneSeconds[it] > 0 }
 
-  Card(
-    modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant
-    ),
-    shape = RoundedCornerShape(Spacing.md)
-  ) {
-    Column(modifier = Modifier.padding(Spacing.lg)) {
-      Text(
-        text = "Time in zones",
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface
-      )
-      Spacer(modifier = Modifier.height(Spacing.md))
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .height(12.dp)
-          .clip(RoundedCornerShape(percent = 50))
-      ) {
-        for (index in zoneSeconds.indices) {
-          val seconds by animateFloatAsState(
-            targetValue = zoneSeconds[index].toFloat(),
-            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
-            label = "Zone ${index + 1} duration"
+  TrainerLoopCard(modifier = Modifier.fillMaxWidth()) {
+    SectionHeader(title = "Time in zones")
+    Spacer(modifier = Modifier.height(Spacing.md))
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .height(12.dp)
+        .clip(RoundedCornerShape(percent = 50))
+    ) {
+      for (index in zoneSeconds.indices) {
+        val seconds by animateFloatAsState(
+          targetValue = zoneSeconds[index].toFloat(),
+          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>()),
+          label = "Zone ${index + 1} duration"
+        )
+        if (seconds > 0f) {
+          Box(
+            modifier = Modifier
+              .weight(seconds)
+              .fillMaxWidth()
+              .height(12.dp)
+              .background(ZoneColors.forZone(index + 1, dark).fill)
           )
-          if (seconds > 0f) {
-            Box(
-              modifier = Modifier
-                .weight(seconds)
-                .fillMaxWidth()
-                .height(12.dp)
-                .background(ZoneColors.forZone(index + 1, dark).fill)
-            )
-          }
         }
       }
-      Spacer(modifier = Modifier.height(Spacing.sm))
-      Row(
-        modifier = Modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.md)
-      ) {
-        nonZeroZones.forEach { index ->
-          Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-              modifier = Modifier
-                .size(8.dp)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(ZoneColors.forZone(index + 1, dark).fill)
-            )
-            Text(
-              text = "Z${index + 1} ${zoneSeconds[index] / 60}m",
-              style = NumericSmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              modifier = Modifier.padding(start = Spacing.xs)
-            )
-          }
+    }
+    Spacer(modifier = Modifier.height(Spacing.sm))
+    Row(
+      modifier = Modifier.horizontalScroll(rememberScrollState()),
+      horizontalArrangement = Arrangement.spacedBy(Spacing.md)
+    ) {
+      nonZeroZones.forEach { index ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Box(
+            modifier = Modifier
+              .size(8.dp)
+              .clip(RoundedCornerShape(percent = 50))
+              .background(ZoneColors.forZone(index + 1, dark).fill)
+          )
+          Text(
+            text = "Z${index + 1} ${zoneSeconds[index] / 60}m",
+            style = NumericSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = Spacing.xs)
+          )
         }
       }
     }

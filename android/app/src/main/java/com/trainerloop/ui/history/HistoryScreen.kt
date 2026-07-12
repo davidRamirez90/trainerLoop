@@ -1,7 +1,6 @@
 package com.trainerloop.ui.history
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -11,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,12 +23,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,17 +48,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.data.model.SessionSummary
-import com.trainerloop.ui.components.pressable
+import com.trainerloop.ui.components.EmptyState
+import com.trainerloop.ui.components.SectionHeader
+import com.trainerloop.ui.components.TrainerLoopCard
+import com.trainerloop.ui.components.TrainerLoopTopBar
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.reducedMotionAware
+import com.trainerloop.ui.theme.trainerLoopColors
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+
+private val TrailingStatusWidth = 116.dp
 
 @Composable
 fun HistoryScreen(
@@ -67,58 +74,44 @@ fun HistoryScreen(
   val sessions by viewModel.sessions.collectAsStateWithLifecycle()
   val defaultMotionSpec = reducedMotionAware(MotionSpec.default)
 
-  AnimatedContent(
-    targetState = sessions.isEmpty(),
-    transitionSpec = {
-      fadeIn(animationSpec = defaultMotionSpec) togetherWith
-        fadeOut(animationSpec = defaultMotionSpec)
-    },
-    label = "history-empty-state"
-  ) { empty ->
-    if (empty) {
-      Box(
-        modifier = Modifier
-          .fillMaxSize()
-          .padding(horizontal = Spacing.lg),
-        contentAlignment = Alignment.Center
-      ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-          Icon(
-            imageVector = Icons.Default.History,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(56.dp)
-          )
-          Spacer(modifier = Modifier.height(12.dp))
-          Text(
-            text = "No rides yet",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold
-          )
-          Spacer(modifier = Modifier.height(4.dp))
-          Text(
-            text = "Finished workouts will show up here.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+  Scaffold(
+    contentWindowInsets = WindowInsets(0),
+    topBar = { TrainerLoopTopBar(title = "History", windowInsets = WindowInsets(0)) }
+  ) { padding ->
+    AnimatedContent(
+      targetState = sessions.isEmpty(),
+      modifier = Modifier.padding(padding),
+      transitionSpec = {
+        fadeIn(animationSpec = defaultMotionSpec) togetherWith
+          fadeOut(animationSpec = defaultMotionSpec)
+      },
+      label = "history-empty-state"
+    ) { empty ->
+      if (empty) {
+        Box(
+          modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = Spacing.screenMargin),
+          contentAlignment = Alignment.Center
+        ) {
+          EmptyState(
+            icon = Icons.Default.History,
+            title = "No rides yet",
+            body = "Finished workouts will show up here."
           )
         }
-      }
-    } else {
-      LazyColumn(
-        modifier = Modifier
-          .fillMaxSize()
-          .padding(horizontal = Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xl)
-      ) {
-        item {
-          Text(
-            text = "History",
-            style = MaterialTheme.typography.headlineLarge
-          )
-        }
-        item { WeeklyLoadChart(sessions) }
-        items(sessions, key = { it.id }) { session ->
-          SessionCard(session, onClick = { onSessionClick(session.id) })
+      } else {
+        LazyColumn(
+          modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = Spacing.screenMargin),
+          verticalArrangement = Arrangement.spacedBy(Spacing.sectionGap)
+        ) {
+          item { SectionHeader(title = "Last 6 weeks") }
+          item { WeeklyLoadChart(sessions) }
+          items(sessions, key = { it.id }) { session ->
+            SessionCard(session, onClick = { onSessionClick(session.id) })
+          }
         }
       }
     }
@@ -127,51 +120,73 @@ fun HistoryScreen(
 
 @Composable
 private fun SessionCard(session: SessionSummary, onClick: () -> Unit) {
-  val interactionSource = remember { MutableInteractionSource() }
+  val semantic = MaterialTheme.trainerLoopColors
+  val uploaded = session.icuSyncedAt != null
 
-  Card(
-    onClick = onClick,
-    modifier = Modifier
-      .fillMaxWidth()
-      .pressable(interactionSource),
-    interactionSource = interactionSource,
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant
-    )
-  ) {
-    Column(modifier = Modifier.padding(Spacing.lg)) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-      ) {
+  TrainerLoopCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      Column(modifier = Modifier.weight(1f)) {
         Text(
           text = session.workoutName,
           style = MaterialTheme.typography.titleMedium,
           fontWeight = FontWeight.SemiBold,
-          modifier = Modifier
-            .weight(1f)
-            .padding(end = 8.dp),
           maxLines = 1,
           overflow = TextOverflow.Ellipsis
         )
-        if (session.icuSyncedAt != null) {
+        Spacer(modifier = Modifier.height(Spacing.xs))
+        Text(
+          text = formatSessionMeta(session),
+          style = NumericSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis
+        )
+      }
+      Row(
+        modifier = Modifier.width(TrailingStatusWidth),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        if (uploaded) {
           Icon(
             imageVector = Icons.Filled.CloudDone,
-            contentDescription = "Synced to intervals.icu",
-            tint = MaterialTheme.colorScheme.primary,
+            contentDescription = null,
+            tint = semantic.connected,
             modifier = Modifier.size(16.dp)
           )
-          Spacer(modifier = Modifier.width(6.dp))
+          Spacer(modifier = Modifier.width(Spacing.xs))
+          Text(
+            text = "Uploaded",
+            style = MaterialTheme.typography.labelSmall,
+            color = semantic.connected,
+            maxLines = 1
+          )
+        } else {
+          Icon(
+            imageVector = Icons.Filled.CloudQueue,
+            contentDescription = null,
+            tint = semantic.stale,
+            modifier = Modifier.size(16.dp)
+          )
+          Spacer(modifier = Modifier.width(Spacing.xs))
+          Text(
+            text = "Not uploaded",
+            style = MaterialTheme.typography.labelSmall,
+            color = semantic.stale,
+            maxLines = 1
+          )
         }
+        Spacer(modifier = Modifier.width(Spacing.xs))
+        Icon(
+          imageVector = Icons.Filled.ChevronRight,
+          contentDescription = null,
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.size(18.dp)
+        )
       }
-      Spacer(modifier = Modifier.height(Spacing.xs))
-      Text(
-        text = formatSessionMeta(session),
-        style = NumericSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis
-      )
     }
   }
 }
@@ -187,13 +202,7 @@ private fun WeeklyLoadChart(sessions: List<SessionSummary>) {
     if (maxSeconds > 0) animateBars = true
   }
 
-  Column {
-    Text(
-      text = "Last 6 weeks",
-      style = MaterialTheme.typography.labelMedium,
-      color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Spacer(modifier = Modifier.height(Spacing.sm))
+  TrainerLoopCard {
     Row(
       modifier = Modifier
         .fillMaxWidth()

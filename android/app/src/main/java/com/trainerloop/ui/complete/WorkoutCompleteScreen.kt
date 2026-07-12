@@ -8,8 +8,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedContent
@@ -21,14 +24,11 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsBike
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
@@ -46,11 +46,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
+import com.trainerloop.ui.components.MetricTile
+import com.trainerloop.ui.components.MetricTileState
+import com.trainerloop.ui.components.PrimaryActionButton
 import com.trainerloop.ui.components.SampleChart
-import com.trainerloop.ui.theme.NumericMedium
-import com.trainerloop.ui.theme.NumericSmall
+import com.trainerloop.ui.components.SecondaryActionButton
+import com.trainerloop.ui.components.SecondaryActionStyle
+import com.trainerloop.ui.components.TrainerLoopCard
 import com.trainerloop.ui.theme.MotionSpec
+import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.reducedMotionAware
+import com.trainerloop.ui.theme.trainerLoopColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,11 +101,13 @@ fun WorkoutCompleteScreen(
       )
     }
   ) { padding ->
+    val semantic = MaterialTheme.trainerLoopColors
+
     Column(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding)
-        .padding(horizontal = 16.dp)
+        .padding(horizontal = Spacing.screenMargin)
         .navigationBarsPadding()
         .verticalScroll(rememberScrollState())
     ) {
@@ -114,7 +122,7 @@ fun WorkoutCompleteScreen(
         color = MaterialTheme.colorScheme.onSurfaceVariant
       )
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.sectionGap))
 
       if (uiState.isRampTest) {
         RampTestResultCard(
@@ -125,99 +133,149 @@ fun WorkoutCompleteScreen(
           onPush = viewModel::pushFtpToIcu,
           onDeclinePush = viewModel::declineIcuFtpPush
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.sectionGap))
       }
 
       // Summary grid: TSS, IF, NP
       Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
       ) {
-        SummaryCard(
+        MetricTile(
           label = "TSS",
           value = uiState.tss.toString(),
+          unit = "",
           modifier = Modifier.weight(1f)
         )
-        SummaryCard(
+        MetricTile(
           label = "IF",
           value = "%.2f".format(uiState.intensityFactor),
+          unit = "",
           modifier = Modifier.weight(1f)
         )
-        SummaryCard(
+        MetricTile(
           label = "NP",
-          value = "${uiState.normalizedPower} W",
+          value = "${uiState.normalizedPower}",
+          unit = "W",
           modifier = Modifier.weight(1f)
         )
       }
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.sectionGap))
 
-      // Stats list
-      Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-          containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-      ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-          StatRow("Avg Power", "${uiState.avgPower} W")
-          StatRow("Max Power", "${uiState.maxPower} W")
-          StatRow("Avg Heart Rate", "${uiState.avgHr} bpm")
-          StatRow("Avg Cadence", "${uiState.avgCadence} rpm")
-          StatRow("Calories", "${uiState.calories} kcal")
-          StatRow("Total Work", "${uiState.totalWorkKj} kJ")
-          if (uiState.distanceKm > 0) {
-            StatRow("Distance", "%.1f km".format(uiState.distanceKm))
-            StatRow("Elevation Gain", "${uiState.ascentM} m")
+      // Stats grid
+      Column(verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
+        ) {
+          MetricTile(
+            label = "Avg Power",
+            value = "${uiState.avgPower}",
+            unit = "W",
+            modifier = Modifier.weight(1f)
+          )
+          MetricTile(
+            label = "Max Power",
+            value = "${uiState.maxPower}",
+            unit = "W",
+            modifier = Modifier.weight(1f)
+          )
+        }
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
+        ) {
+          MetricTile(
+            label = "Avg Heart Rate",
+            value = if (uiState.avgHr > 0) "${uiState.avgHr}" else "",
+            unit = "bpm",
+            state = if (uiState.avgHr > 0) MetricTileState.Available else MetricTileState.Unavailable,
+            modifier = Modifier.weight(1f)
+          )
+          MetricTile(
+            label = "Avg Cadence",
+            value = if (uiState.avgCadence > 0) "${uiState.avgCadence}" else "",
+            unit = "rpm",
+            state = if (uiState.avgCadence > 0) MetricTileState.Available else MetricTileState.Unavailable,
+            modifier = Modifier.weight(1f)
+          )
+        }
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
+        ) {
+          MetricTile(
+            label = "Calories",
+            value = "${uiState.calories}",
+            unit = "kcal",
+            modifier = Modifier.weight(1f)
+          )
+          MetricTile(
+            label = "Total Work",
+            value = "${uiState.totalWorkKj}",
+            unit = "kJ",
+            modifier = Modifier.weight(1f)
+          )
+        }
+        if (uiState.distanceKm > 0) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
+          ) {
+            MetricTile(
+              label = "Distance",
+              value = "%.1f".format(uiState.distanceKm),
+              unit = "km",
+              modifier = Modifier.weight(1f)
+            )
+            MetricTile(
+              label = "Elevation Gain",
+              value = "${uiState.ascentM}",
+              unit = "m",
+              modifier = Modifier.weight(1f)
+            )
           }
         }
       }
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.sectionGap))
 
       // Post-ride chart with tabs
       if (viewModel.samples.isNotEmpty()) {
-        Card(
-          modifier = Modifier.fillMaxWidth(),
-          colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        TrainerLoopCard(modifier = Modifier.fillMaxWidth()) {
+          Text(
+            text = "Ride Chart",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
           )
-        ) {
-          Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-              text = "Ride Chart",
-              style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            SampleChart(samples = viewModel.samples)
-          }
+          Spacer(modifier = Modifier.height(Spacing.sm))
+          SampleChart(samples = viewModel.samples)
         }
+        Spacer(modifier = Modifier.height(Spacing.sectionGap))
       }
 
       uiState.coachData?.let { coach ->
         CoachSummaryCard(coach)
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Spacing.sectionGap))
       }
 
-      Spacer(modifier = Modifier.height(8.dp))
-
-      // Actions
+      // Actions: Save (primary) / Discard (destructive)
       Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
       ) {
-        OutlinedButton(
+        androidx.compose.material3.OutlinedButton(
           onClick = { viewModel.onDiscard() },
           enabled = !uiState.isSaving,
-          modifier = Modifier.weight(1f),
+          modifier = Modifier.weight(1f).heightIn(min = 48.dp),
           colors = ButtonDefaults.outlinedButtonColors(
             contentColor = MaterialTheme.colorScheme.error
           )
         ) {
           Text("Discard")
         }
-        Button(
+        PrimaryActionButton(
           onClick = { viewModel.onSave() },
           enabled = !uiState.isSaved && !uiState.isSaving,
           modifier = Modifier.weight(1f)
@@ -229,13 +287,28 @@ fun WorkoutCompleteScreen(
                 fadeOut(animationSpec = fastMotionSpec)
             },
             label = "complete-save-label"
-          ) { saved -> Text(if (saved) "Saved" else "Save") }
+          ) { saved ->
+            if (saved) {
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                  imageVector = Icons.Filled.CheckCircle,
+                  contentDescription = null,
+                  modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(Spacing.xs))
+                Text("Saved")
+              }
+            } else {
+              Text("Save")
+            }
+          }
         }
       }
 
-      Spacer(modifier = Modifier.height(8.dp))
+      Spacer(modifier = Modifier.height(Spacing.controlGap))
 
-      Button(
+      // Share/Upload: secondary tier
+      SecondaryActionButton(
         onClick = { viewModel.onShare() },
         enabled = uiState.fitFile != null,
         modifier = Modifier.fillMaxWidth()
@@ -254,27 +327,37 @@ fun WorkoutCompleteScreen(
       ) {
         displayedUploadStatus?.let { status ->
           Column {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-              text = status,
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Spacer(modifier = Modifier.height(Spacing.controlGap))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Icon(
+                imageVector = Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = semantic.connected,
+                modifier = Modifier.size(16.dp)
+              )
+              Spacer(modifier = Modifier.width(Spacing.xs))
+              Text(
+                text = status,
+                style = MaterialTheme.typography.bodyMedium,
+                color = semantic.connected
+              )
+            }
           }
         }
       }
 
-      Spacer(modifier = Modifier.height(8.dp))
+      Spacer(modifier = Modifier.height(Spacing.controlGap))
 
-      OutlinedButton(
+      SecondaryActionButton(
         onClick = onDone,
         enabled = uiState.isSaved || uiState.isDiscarded || viewModel.samples.isEmpty(),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        style = SecondaryActionStyle.Outlined
       ) {
         Text("Done")
       }
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(Spacing.sectionGap))
     }
 
     // Error snackbar
@@ -310,19 +393,14 @@ private fun RampTestResultCard(
 ) {
   val defaultMotionSpec = reducedMotionAware(MotionSpec.default)
   val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
-  Card(
-    modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.secondaryContainer
-    )
-  ) {
-    Column(modifier = Modifier.padding(16.dp)) {
+  TrainerLoopCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
+    Column {
       Text(
         text = "FTP Test Result",
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold
       )
-      Spacer(modifier = Modifier.height(8.dp))
+      Spacer(modifier = Modifier.height(Spacing.sm))
 
       val newFtp = uiState.rampTestNewFtp
       AnimatedContent(
@@ -352,7 +430,7 @@ private fun RampTestResultCard(
             text = "${if (delta >= 0) "up" else "down"} ${kotlin.math.abs(delta)} W " +
               "(${if (delta >= 0) "+" else ""}$pct%) from $prev W",
             style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-            color = MaterialTheme.colorScheme.onSecondaryContainer
+            color = MaterialTheme.colorScheme.onSurfaceVariant
           )
           Spacer(modifier = Modifier.height(12.dp))
 
@@ -367,12 +445,18 @@ private fun RampTestResultCard(
             when {
               !actionState.first -> Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
               ) {
-                OutlinedButton(onClick = onDiscard, modifier = Modifier.weight(1f)) {
+                androidx.compose.material3.OutlinedButton(
+                  onClick = onDiscard,
+                  modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                  colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                  )
+                ) {
                   Text("Discard FTP")
                 }
-                Button(onClick = onAccept, modifier = Modifier.weight(1f)) {
+                PrimaryActionButton(onClick = onAccept, modifier = Modifier.weight(1f)) {
                   Text("Accept FTP")
                 }
               }
@@ -381,15 +465,19 @@ private fun RampTestResultCard(
                   text = "FTP saved. Set FTP on intervals.icu now?",
                   style = MaterialTheme.typography.bodyMedium
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(Spacing.sm))
                 Row(
                   modifier = Modifier.fillMaxWidth(),
-                  horizontalArrangement = Arrangement.spacedBy(12.dp)
+                  horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
                 ) {
-                  OutlinedButton(onClick = onDeclinePush, modifier = Modifier.weight(1f)) {
+                  SecondaryActionButton(
+                    onClick = onDeclinePush,
+                    modifier = Modifier.weight(1f),
+                    style = SecondaryActionStyle.Outlined
+                  ) {
                     Text("Later")
                   }
-                  Button(onClick = onPush, modifier = Modifier.weight(1f)) {
+                  PrimaryActionButton(onClick = onPush, modifier = Modifier.weight(1f)) {
                     Text("Yes")
                   }
                 }
@@ -397,7 +485,7 @@ private fun RampTestResultCard(
               else -> Text(
                 text = if (actionState.third) "New FTP saved to your profile" else "FTP discarded",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
+                color = MaterialTheme.colorScheme.onSurfaceVariant
               )
             }
           }
@@ -419,64 +507,12 @@ private fun RampTestResultCard(
             Text(
               text = status,
               style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSecondaryContainer
+              color = MaterialTheme.colorScheme.onSurfaceVariant
             )
           }
         }
       }
     }
-  }
-}
-
-@Composable
-private fun SummaryCard(
-  label: String,
-  value: String,
-  modifier: Modifier = Modifier
-) {
-  Card(
-    modifier = modifier,
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.primaryContainer
-    )
-  ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(16.dp),
-      horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-      Text(
-        text = value,
-        style = NumericMedium,
-        color = MaterialTheme.colorScheme.onPrimaryContainer
-      )
-      Text(
-        text = label,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onPrimaryContainer
-      )
-    }
-  }
-}
-
-@Composable
-private fun StatRow(label: String, value: String) {
-  Row(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(vertical = 4.dp),
-    horizontalArrangement = Arrangement.SpaceBetween
-  ) {
-    Text(
-      text = label,
-      style = MaterialTheme.typography.bodyLarge,
-      color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Text(
-      text = value,
-      style = NumericSmall.copy(fontWeight = FontWeight.Bold)
-    )
   }
 }
 
