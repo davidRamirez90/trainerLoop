@@ -62,6 +62,7 @@ import com.trainerloop.domain.WorkoutMath
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.reducedMotionAware
+import com.trainerloop.ui.theme.trainerLoopColors
 import com.trainerloop.ui.theme.zoneColorSet
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -191,12 +192,14 @@ fun WorkoutChart(
   val hrMatrix = remember { Matrix() }
   val powerMatrix = remember { Matrix() }
 
-  val cursorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-  val hrLineColor = MaterialTheme.colorScheme.error
-  val powerLineColor = MaterialTheme.colorScheme.secondary
+  val semanticColors = MaterialTheme.trainerLoopColors
+  val cursorColor = semanticColors.chartCursor.copy(alpha = 0.7f)
+  val gridColor = semanticColors.chartGrid.copy(alpha = 0.15f)
+  val hrLineColor = semanticColors.chartHeartRate
+  val powerLineColor = semanticColors.chartPower
   // Drawn OVER the opaque zone fills, so it needs a scrim + edge line to read.
-  val elevationFillColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.22f)
-  val elevationLineColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.50f)
+  val elevationFillColor = semanticColors.chartElevation.copy(alpha = 0.22f)
+  val elevationLineColor = semanticColors.chartElevation.copy(alpha = 0.50f)
 
   Column(modifier = modifier.fillMaxWidth()) {
     Row(
@@ -396,7 +399,6 @@ fun WorkoutChart(
 
         // Gridlines at FTP and FTP/2.
         if (ftp > 0) {
-          val gridColor = cursorColor.copy(alpha = 0.15f)
           val gridStrokeWidth = 1.dp.toPx()
           val ftpY = yForPower(ftp.toFloat())
           drawLine(color = gridColor, start = Offset(0f, ftpY), end = Offset(width, ftpY), strokeWidth = gridStrokeWidth)

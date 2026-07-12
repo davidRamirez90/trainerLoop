@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.TelemetrySample
+import com.trainerloop.ui.theme.trainerLoopColors
 import kotlinx.coroutines.launch
 
 /** Post-ride telemetry chart with Power / HR / Cadence pager pages. */
@@ -49,13 +50,14 @@ private fun ChartPage(
   samples: List<TelemetrySample>,
   selectedTab: Int
 ) {
+  val semanticColors = MaterialTheme.trainerLoopColors
   val (values, color, unit) = when (selectedTab) {
-    0 -> Triple(samples.map { it.powerWatts }, MaterialTheme.colorScheme.secondary, "W")
-    1 -> Triple(samples.map { it.hrBpm }, MaterialTheme.colorScheme.error, "bpm")
-    else -> Triple(samples.map { it.cadenceRpm }, MaterialTheme.colorScheme.primary, "rpm")
+    0 -> Triple(samples.map { it.powerWatts }, semanticColors.chartPower, "W")
+    1 -> Triple(samples.map { it.hrBpm }, semanticColors.chartHeartRate, "bpm")
+    else -> Triple(samples.map { it.cadenceRpm }, semanticColors.chartCadence, "rpm")
   }
 
-  val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+  val gridColor = semanticColors.chartGrid.copy(alpha = 0.3f)
   val maxValue = values.maxOrNull()?.coerceAtLeast(1) ?: 1
   val minValue = values.minOrNull() ?: 0
   val totalDuration = samples.lastOrNull()?.timeSec?.coerceAtLeast(1) ?: 1

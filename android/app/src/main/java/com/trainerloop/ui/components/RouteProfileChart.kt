@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.RoutePoint
+import com.trainerloop.ui.theme.trainerLoopColors
 import java.util.Locale
 
 /** Elevation-vs-distance silhouette with an optional rider position marker. */
@@ -22,9 +23,10 @@ fun RouteProfileChart(
   modifier: Modifier = Modifier
 ) {
   if (points.size < 2) return
-  val fillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)
-  val lineColor = MaterialTheme.colorScheme.primary
-  val markerColor = MaterialTheme.colorScheme.error
+  val semanticColors = MaterialTheme.trainerLoopColors
+  val fillColor = semanticColors.chartElevation.copy(alpha = 0.25f)
+  val lineColor = semanticColors.chartElevation
+  val markerColor = semanticColors.chartCursor
   val totalDistanceM = points.last().distanceM
   val minElevationM = points.minOf { it.elevationM }
   val maxElevationM = points.maxOf { it.elevationM }

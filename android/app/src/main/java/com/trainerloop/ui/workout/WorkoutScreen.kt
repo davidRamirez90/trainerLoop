@@ -46,7 +46,6 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.FilledIconButton
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
@@ -59,12 +58,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -96,7 +93,13 @@ import com.trainerloop.ui.components.WorkoutChart
 import com.trainerloop.ui.components.workoutProfileSummary
 import com.trainerloop.ui.haptics.Haptics
 import com.trainerloop.ui.components.AnimatedMetricValue
+import com.trainerloop.ui.components.MetricTile
+import com.trainerloop.ui.components.MetricTileState
+import com.trainerloop.ui.components.StatusPill
+import com.trainerloop.ui.components.StatusPillState
+import com.trainerloop.ui.components.TrainerLoopTopBar
 import com.trainerloop.ui.components.pressable
+import androidx.compose.material.icons.filled.BluetoothDisabled
 import com.trainerloop.ui.theme.NumericDisplay
 import com.trainerloop.ui.theme.NumericLarge
 import com.trainerloop.ui.theme.NumericMedium
@@ -290,15 +293,10 @@ fun WorkoutScreen(
   Scaffold(
     contentWindowInsets = WindowInsets(0),
     topBar = {
-      TopAppBar(
-        windowInsets = WindowInsets(0),
-        title = { Text(workout.name) },
-        navigationIcon = {
-          IconButton(onClick = { requestStop() }) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-          }
-        },
-        actions = {}
+      TrainerLoopTopBar(
+        title = workout.name,
+        onBack = { requestStop() },
+        windowInsets = WindowInsets(0)
       )
     }
   ) { padding ->
@@ -312,6 +310,7 @@ fun WorkoutScreen(
       ) {
       // Reading hierarchy: interval context, dominant power, then secondary metrics.
       val currentSegment = uiState.segments.getOrNull(uiState.segmentIndex)
+      val sessionHasStarted = uiState.isRunning || uiState.elapsedSec > 0
       IntervalContextLine(
         label = currentSegment?.label ?: currentSegment?.phase?.name ?: "Interval",
         position = "${uiState.segmentIndex + 1}/${uiState.segments.size}",
@@ -320,9 +319,13 @@ fun WorkoutScreen(
         )
       )
 
+      ConnectionStatusRow(
+        visible = sessionHasStarted && uiState.sensorDropout,
+        modifier = Modifier.padding(top = Spacing.xs)
+      )
+
       Spacer(modifier = Modifier.height(Spacing.lg))
 
-      val sessionHasStarted = uiState.isRunning || uiState.elapsedSec > 0
       PowerHero(
         powerWatts = uiState.currentPowerWatts,
         powerColor = currentPowerColor,
@@ -342,16 +345,18 @@ fun WorkoutScreen(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
       ) {
-        SecondaryMetricTile(
+        MetricTile(
           label = "HR",
+          value = uiState.currentHrBpm.toString(),
           unit = "bpm",
-          value = uiState.currentHrBpm,
+          state = telemetryTileState(uiState.currentHrBpm, uiState.sensorDropout),
           modifier = Modifier.weight(1f)
         )
-        SecondaryMetricTile(
+        MetricTile(
           label = "Cadence",
+          value = uiState.currentCadenceRpm.toString(),
           unit = "rpm",
-          value = uiState.currentCadenceRpm,
+          state = telemetryTileState(uiState.currentCadenceRpm, uiState.sensorDropout),
           modifier = Modifier.weight(1f)
         )
       }
@@ -362,19 +367,19 @@ fun WorkoutScreen(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          BigMetric(
+          MetricTile(
             label = "Speed",
             value = "%.1f".format(speedKph),
             unit = "km/h",
             modifier = Modifier.weight(1f)
           )
-          BigMetric(
+          MetricTile(
             label = "Grade",
             value = "%.1f".format(uiState.currentGradePercent ?: 0.0),
             unit = "%",
             modifier = Modifier.weight(1f)
           )
-          BigMetric(
+          MetricTile(
             label = "Distance",
             value = "%.1f".format((uiState.virtualDistanceM ?: 0.0) / 1000.0),
             unit = "km",
@@ -602,6 +607,34 @@ private fun IntervalContextLine(
   }
 }
 
+/** Sensor state → tile presentation. Zero readings are treated as unavailable, never a plausible zero. */
+private fun telemetryTileState(value: Int, sensorDropout: Boolean): MetricTileState = when {
+  value <= 0 -> MetricTileState.Unavailable
+  sensorDropout -> MetricTileState.Stale
+  else -> MetricTileState.Available
+}
+
+/**
+ * In-ride connection banner: hidden while sensors report cleanly, surfaces on
+ * dropout so the rider isn't left guessing whether a stalled telemetry value
+ * is real or a lost connection. Reuses the shared StatusPill warning role.
+ */
+@Composable
+private fun ConnectionStatusRow(visible: Boolean, modifier: Modifier = Modifier) {
+  AnimatedVisibility(
+    visible = visible,
+    enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
+    exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
+  ) {
+    StatusPill(
+      state = StatusPillState.Reconnecting,
+      label = "Reconnecting",
+      icon = Icons.Default.BluetoothDisabled,
+      modifier = modifier
+    )
+  }
+}
+
 @Composable
 private fun PowerHero(
   powerWatts: Int,
@@ -668,11 +701,15 @@ private fun SecondaryMetricTile(
   unit: String,
   value: Int,
   modifier: Modifier = Modifier,
-  compact: Boolean = false
+  compact: Boolean = false,
+  isStale: Boolean = false
 ) {
+  val staleColor = MaterialTheme.trainerLoopColors.stale
+  val valueColor = if (isStale && value > 0) staleColor else MaterialTheme.colorScheme.onSurface
   Card(
     modifier = modifier.clearAndSetSemantics {
-      contentDescription = liveMetricDescription(label, value, unit, zeroIsUnavailable = true)
+      contentDescription = liveMetricDescription(label, value, unit, zeroIsUnavailable = true) +
+        if (isStale && value > 0) ", reconnecting" else ""
     },
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceContainer
@@ -694,7 +731,7 @@ private fun SecondaryMetricTile(
           value = value,
           showDashWhenZero = true,
           style = if (compact) NumericSmall else NumericMedium,
-          color = MaterialTheme.colorScheme.onSurface
+          color = valueColor
         )
         Spacer(modifier = Modifier.width(Spacing.xs))
         Text(
@@ -746,10 +783,13 @@ private fun LandscapeWorkout(
         stacked = true
       )
 
+      val landscapeSessionHasStarted = uiState.isRunning || uiState.elapsedSec > 0
+      ConnectionStatusRow(visible = landscapeSessionHasStarted && uiState.sensorDropout)
+
       PowerHero(
         powerWatts = uiState.currentPowerWatts,
         powerColor = powerColor,
-        sessionHasStarted = uiState.isRunning || uiState.elapsedSec > 0,
+        sessionHasStarted = landscapeSessionHasStarted,
         targetRange = uiState.targetRange,
         inZoneSec = uiState.inZoneSec,
         segmentElapsedSec = uiState.elapsedInSegmentSec.coerceAtLeast(1),
@@ -769,14 +809,16 @@ private fun LandscapeWorkout(
           unit = "bpm",
           value = uiState.currentHrBpm,
           modifier = Modifier.weight(1f),
-          compact = true
+          compact = true,
+          isStale = uiState.sensorDropout
         )
         SecondaryMetricTile(
           label = "Cadence",
           unit = "rpm",
           value = uiState.currentCadenceRpm,
           modifier = Modifier.weight(1f),
-          compact = true
+          compact = true,
+          isStale = uiState.sensorDropout
         )
       }
 
@@ -805,6 +847,7 @@ private fun LandscapeWorkout(
         FilledIconButton(
           onClick = onPlayPause,
           modifier = Modifier
+            .heightIn(min = 56.dp)
             .pressable(playPauseInteractionSource)
             .weight(1f),
           interactionSource = playPauseInteractionSource
@@ -823,15 +866,18 @@ private fun LandscapeWorkout(
             )
           }
         }
+        // Destructive red is reserved for the confirm step; the always-visible
+        // landscape Stop stays tonal, matching the portrait transport row.
         FilledIconButton(
           onClick = onStop,
           modifier = Modifier
+            .heightIn(min = 48.dp)
             .pressable(stopInteractionSource)
             .weight(1f),
           interactionSource = stopInteractionSource,
           colors = androidx.compose.material3.IconButtonDefaults.filledIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.error,
-            contentColor = MaterialTheme.colorScheme.onError
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
           )
         ) {
           Icon(Icons.Default.Stop, contentDescription = "Stop")
@@ -872,10 +918,11 @@ private fun ImmersiveWorkoutChart(
   // the "Live" button re-engages it.
   var followEnabled by remember { mutableStateOf(true) }
 
-  val cursorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-  val hrLineColor = MaterialTheme.colorScheme.error
-  val powerLineColor = MaterialTheme.colorScheme.secondary
-  val gridColor = cursorColor.copy(alpha = 0.15f)
+  val semanticColors = MaterialTheme.trainerLoopColors
+  val cursorColor = semanticColors.chartCursor.copy(alpha = 0.8f)
+  val hrLineColor = semanticColors.chartHeartRate
+  val powerLineColor = semanticColors.chartPower
+  val gridColor = semanticColors.chartGrid.copy(alpha = 0.15f)
 
   Box(
     modifier = modifier
@@ -1020,84 +1067,6 @@ private fun ImmersiveWorkoutChart(
         enabled = zoomIdx < ZOOM_LEVELS.lastIndex,
         modifier = Modifier.size(48.dp)
       ) { Icon(Icons.Default.Add, contentDescription = "Zoom in") }
-    }
-  }
-}
-
-@Composable
-private fun BigMetric(
-  label: String,
-  value: String,
-  unit: String,
-  modifier: Modifier = Modifier,
-  highlight: Boolean = false,
-  valueColor: androidx.compose.ui.graphics.Color? = null,
-  animatedValue: Int? = null,
-  animatedShowDashWhenZero: Boolean = false
-) {
-  val defaultValueColor = if (highlight) {
-    MaterialTheme.colorScheme.onSecondaryContainer
-  } else {
-    MaterialTheme.colorScheme.onSurface
-  }
-  val resolvedValueColor = if (valueColor != null) {
-    val animatedColor by animateColorAsState(
-      targetValue = valueColor,
-      animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
-      label = "Power zone color"
-    )
-    animatedColor
-  } else {
-    defaultValueColor
-  }
-
-  Card(
-    modifier = modifier.clearAndSetSemantics {
-      contentDescription = liveMetricDescription(
-        label,
-        value,
-        unit,
-        zeroIsUnavailable = animatedShowDashWhenZero
-      )
-    },
-    colors = CardDefaults.cardColors(
-      containerColor = if (highlight) MaterialTheme.colorScheme.secondaryContainer
-      else MaterialTheme.colorScheme.surfaceVariant
-    )
-  ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(12.dp),
-      horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-      Text(
-        text = label,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
-      Row(verticalAlignment = Alignment.Bottom) {
-        val valueStyle = MaterialTheme.typography.displaySmall.copy(
-          fontWeight = FontWeight.Bold,
-          fontFeatureSettings = "tnum"
-        )
-        if (animatedValue != null) {
-          AnimatedMetricValue(
-            value = animatedValue,
-            showDashWhenZero = animatedShowDashWhenZero,
-            style = valueStyle,
-            color = resolvedValueColor
-          )
-        } else {
-          Text(text = value, style = valueStyle, color = resolvedValueColor)
-        }
-        Spacer(modifier = Modifier.width(2.dp))
-        Text(
-          text = unit,
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-      }
     }
   }
 }

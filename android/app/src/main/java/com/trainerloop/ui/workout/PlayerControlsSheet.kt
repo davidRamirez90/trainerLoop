@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -87,6 +88,12 @@ import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 internal val PlayerControlsSheetPeekHeight = 72.dp
+
+/** Frequent in-ride controls (Start/Pause, bias step) get the larger, easier-to-hit target. */
+private val FrequentControlSize = 56.dp
+
+/** Less-frequent transport controls (Skip, Stop) keep the standard minimum target. */
+private val SecondaryControlSize = 48.dp
 
 private enum class PlayerSheetAnchor {
   Peek,
@@ -395,6 +402,7 @@ private fun TransportRow(
     Button(
       onClick = onPlayPause,
       modifier = Modifier
+        .heightIn(min = FrequentControlSize)
         .pressable(playPauseInteractionSource)
         .weight(1f),
       interactionSource = playPauseInteractionSource
@@ -430,7 +438,9 @@ private fun TransportRow(
     FilledTonalButton(
       onClick = onSkip,
       enabled = skipEnabled,
-      modifier = Modifier.pressable(skipInteractionSource),
+      modifier = Modifier
+        .heightIn(min = SecondaryControlSize)
+        .pressable(skipInteractionSource),
       interactionSource = skipInteractionSource
     ) {
       Icon(Icons.Default.SkipNext, contentDescription = "Skip")
@@ -442,7 +452,9 @@ private fun TransportRow(
     // the always-visible transport Stop stays tonal.
     FilledTonalButton(
       onClick = onStop,
-      modifier = Modifier.pressable(stopInteractionSource),
+      modifier = Modifier
+        .heightIn(min = SecondaryControlSize)
+        .pressable(stopInteractionSource),
       interactionSource = stopInteractionSource
     ) {
       Icon(Icons.Default.Stop, contentDescription = "Stop")
@@ -479,7 +491,7 @@ private fun BiasStepButton(
   FilledTonalButton(
     onClick = ::step,
     modifier = Modifier
-      .size(52.dp)
+      .size(FrequentControlSize)
       .clearAndSetSemantics { contentDescription = description }
       .pressable(interactionSource),
     interactionSource = interactionSource,

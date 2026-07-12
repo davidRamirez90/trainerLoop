@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
@@ -48,15 +49,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.ui.components.RouteProfileChart
-import com.trainerloop.ui.components.AnimatedMetricValue
+import com.trainerloop.ui.components.MetricTile
+import com.trainerloop.ui.components.MetricTileState
 import com.trainerloop.ui.workout.WorkoutFinishData
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.reducedMotionAware
@@ -143,12 +143,15 @@ fun FreeRideScreen(
       title = { Text("End ride?") },
       text = { Text("The ride so far will be saved.") },
       confirmButton = {
-        TextButton(onClick = {
-          showStopConfirm = false
-          val hadSamples = uiState.samples.isNotEmpty()
-          viewModel.stop()
-          if (!hadSamples) onExit()
-        }) { Text("End ride") }
+        TextButton(
+          onClick = {
+            showStopConfirm = false
+            val hadSamples = uiState.samples.isNotEmpty()
+            viewModel.stop()
+            if (!hadSamples) onExit()
+          },
+          colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+        ) { Text("End ride") }
       },
       dismissButton = {
         TextButton(onClick = { showStopConfirm = false }) { Text("Keep riding") }
@@ -225,29 +228,53 @@ fun FreeRideScreen(
     }
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      RideMetric("Speed", "%.1f".format(uiState.speedKph), "km/h", Modifier.weight(1f))
-      RideMetric("Grade", "%.1f".format(uiState.gradePercent), "%", Modifier.weight(1f))
-      RideMetric("To go", "%.1f".format(uiState.remainingM / 1000.0), "km", Modifier.weight(1f))
+      MetricTile(
+        label = "Speed",
+        value = "%.1f".format(uiState.speedKph),
+        unit = "km/h",
+        modifier = Modifier.weight(1f)
+      )
+      MetricTile(
+        label = "Grade",
+        value = "%.1f".format(uiState.gradePercent),
+        unit = "%",
+        modifier = Modifier.weight(1f)
+      )
+      MetricTile(
+        label = "To go",
+        value = "%.1f".format(uiState.remainingM / 1000.0),
+        unit = "km",
+        modifier = Modifier.weight(1f)
+      )
     }
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      RideMetric(
+      MetricTile(
         label = "Power",
-        value = "${uiState.currentPowerWatts}",
+        value = uiState.currentPowerWatts.toString(),
         unit = "W",
-        modifier = Modifier.weight(1f),
-        animatedValue = uiState.currentPowerWatts
+        modifier = Modifier.weight(1f)
       )
-      RideMetric("Target", "${uiState.targetPowerWatts}", "W", Modifier.weight(1f))
-      RideMetric(
-        "HR",
-        if (uiState.currentHrBpm > 0) "${uiState.currentHrBpm}" else "--",
-        "bpm",
-        Modifier.weight(1f),
-        animatedValue = uiState.currentHrBpm,
-        animatedShowDashWhenZero = true
+      MetricTile(
+        label = "Target",
+        value = uiState.targetPowerWatts.toString(),
+        unit = "W",
+        state = if (uiState.targetPowerWatts <= 0) MetricTileState.Unavailable else MetricTileState.Available,
+        modifier = Modifier.weight(1f)
+      )
+      MetricTile(
+        label = "HR",
+        value = uiState.currentHrBpm.toString(),
+        unit = "bpm",
+        state = if (uiState.currentHrBpm <= 0) MetricTileState.Unavailable else MetricTileState.Available,
+        modifier = Modifier.weight(1f)
       )
     }
-    RideMetric("Time", formatTime(uiState.elapsedSec), "", Modifier.fillMaxWidth())
+    MetricTile(
+      label = "Time",
+      value = formatTime(uiState.elapsedSec),
+      unit = "",
+      modifier = Modifier.fillMaxWidth()
+    )
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       val resumable = uiState.elapsedSec > 0
@@ -256,7 +283,7 @@ fun FreeRideScreen(
           if (uiState.isRunning) viewModel.pause()
           else if (resumable) viewModel.resume() else viewModel.start()
         },
-        modifier = Modifier.weight(1f)
+        modifier = Modifier.heightIn(min = 56.dp).weight(1f)
       ) {
         AnimatedContent(
           targetState = uiState.isRunning to resumable,
@@ -276,66 +303,15 @@ fun FreeRideScreen(
           }
         }
       }
-      Button(
+      // Destructive red is reserved for the confirm step; the always-visible
+      // transport Stop stays tonal, matching the structured player.
+      FilledTonalButton(
         onClick = { if (uiState.elapsedSec == 0) onExit() else showStopConfirm = true },
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+        modifier = Modifier.heightIn(min = 48.dp)
       ) {
         Icon(Icons.Default.Stop, contentDescription = null)
         Spacer(modifier = Modifier.width(4.dp))
         Text("Stop")
-      }
-    }
-  }
-}
-
-@Composable
-private fun RideMetric(
-  label: String,
-  value: String,
-  unit: String,
-  modifier: Modifier = Modifier,
-  animatedValue: Int? = null,
-  animatedShowDashWhenZero: Boolean = false
-) {
-  val valueColor = MaterialTheme.colorScheme.onSurface
-  Card(
-    modifier = modifier.clearAndSetSemantics {
-      val spokenValue = if (animatedShowDashWhenZero && value == "0") {
-        "not available"
-      } else {
-        value
-      }
-      contentDescription = listOf(label, spokenValue, unit)
-        .filter { it.isNotBlank() }
-        .joinToString(" ")
-    }
-  ) {
-    Column(
-      modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-      horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-      Text(label, style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant)
-      Row(verticalAlignment = Alignment.Bottom) {
-        val valueStyle = MaterialTheme.typography.headlineSmall.copy(
-          fontWeight = FontWeight.Bold,
-          fontFeatureSettings = "tnum"
-        )
-        if (animatedValue != null) {
-          AnimatedMetricValue(
-            value = animatedValue,
-            showDashWhenZero = animatedShowDashWhenZero,
-            style = valueStyle,
-            color = valueColor
-          )
-        } else {
-          Text(value, style = valueStyle, color = valueColor)
-        }
-        if (unit.isNotEmpty()) {
-          Spacer(modifier = Modifier.width(2.dp))
-          Text(unit, style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
       }
     }
   }
