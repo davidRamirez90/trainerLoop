@@ -99,6 +99,57 @@ Room, kotlinx-serialization. `minSdk 30`, `targetSdk 35`, JVM 17, Gradle 8.7.
 
 ---
 
+## Theme architecture
+
+Colors are a **two-layer system**, both in `ui/theme/`:
+
+1. **Foundation ramps** (`Color.kt`) — raw hue/step values (`Sun80`, `Coral40`,
+   `Sky60`, `Ocean40`, `Sand90`, `Kelp40`, `Amber40`, `Red40`, plus warm-neutral
+   and independent dark-elevation steps). These are implementation detail and
+   are only ever referenced from `Theme.kt` and `TrainerLoopColors.kt`.
+2. **Semantic roles**, built from the ramps and exposed two ways:
+   - **Material roles** (`MaterialTheme.colorScheme.*`) — `LightColorScheme` /
+     `DarkColorScheme` in `Theme.kt` give full coverage of the Material 3 role
+     set (primary, surface, error, outline, the `surfaceContainer*` ladder,
+     etc.) so nothing falls back to the Material baseline palette.
+   - **`TrainerLoopColors` semantic roles** (`MaterialTheme.trainerLoopColors`,
+     defined in `TrainerLoopColors.kt`) — app-specific roles with a single
+     responsibility each (readiness, coaching, connection state, warnings,
+     staleness, hero actions, chart series). Read via the
+     `MaterialTheme.trainerLoopColors` extension, backed by
+     `LocalTrainerLoopColors` and swapped light/dark by `TrainerLoopTheme`.
+
+**Rule: screens never reference foundation colors (`Sun80`, `Coral40`, …) or
+hex literals directly.** Only `Theme.kt` and `TrainerLoopColors.kt` may import
+from `Color.kt`. Screens and shared primitives (`ui/components/`) consume
+`MaterialTheme.colorScheme.*` or `MaterialTheme.trainerLoopColors.*` exclusively.
+
+**Zone colors are an independent system.** `ZoneColors.kt` maps power-zone
+index (1–6, from `%FTP` via `PowerZoneMath`) to a light/dark `ZoneColorSet`
+(fill / onFill / line). This is chart/telemetry data coloring, not part of the
+semantic role system above, and is looked up via `zoneColorSet(targetWatts, ftp)`
+or `ZoneColors.forZone/forTarget`, never by hand-picking a hex value.
+
+See
+[`docs/app-redesign/2026-07-12-token-usage-spec.md`](docs/app-redesign/2026-07-12-token-usage-spec.md)
+for the full role-by-role table (light/dark hex + responsibility) and the
+component inventory.
+
+**Validate theme changes:**
+
+```bash
+# Unit tests, including WCAG contrast tests for every role pairing
+./gradlew testDebugUnitTest --tests "com.trainerloop.ui.theme.*"
+
+# Full unit test suite
+./gradlew testDebugUnitTest
+
+# Lint (catches hardcoded colors / other resource issues)
+./gradlew lint
+```
+
+---
+
 ## Getting started
 
 ### Prerequisites
@@ -175,6 +226,15 @@ and the ViewModels (via Turbine + MockK + coroutines-test).
 
 ```bash
 ./gradlew testDebugUnitTest
+```
+
+Compose UI tests live under [`app/src/androidTest/`](app/src/androidTest) and
+cover the shared primitives in `ui/components/` and the bottom navigation bar
+(semantics: labels, selection state, stateDescription). They require a device
+or emulator to run; compile-check them with:
+
+```bash
+./gradlew compileDebugAndroidTestKotlin
 ```
 
 ---
