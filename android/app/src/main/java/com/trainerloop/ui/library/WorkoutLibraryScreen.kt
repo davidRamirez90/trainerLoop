@@ -2,33 +2,32 @@ package com.trainerloop.ui.library
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MoreVert
@@ -38,27 +37,24 @@ import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.UploadFile
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,27 +62,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.Workout
-import com.trainerloop.ui.components.pressable
+import com.trainerloop.ui.components.TrainerLoopCard
+import com.trainerloop.ui.components.TrainerLoopTopBar
 import com.trainerloop.ui.components.WorkoutMiniChart
+import com.trainerloop.ui.components.pressable
+import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
-import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.reducedMotionAware
-import androidx.compose.ui.unit.IntSize
+import com.trainerloop.ui.theme.trainerLoopColors
 import java.util.Locale
 
-/** Momentum-class flourish for the favorite toggle; reduced motion resolves this to a snap. */
 private val StarBounceSpec = spring<Float>(dampingRatio = 0.7f, stiffness = 300f)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutLibraryScreen(
   onWorkoutSelected: (Workout) -> Unit,
@@ -94,38 +90,53 @@ fun WorkoutLibraryScreen(
   viewModel: WorkoutLibraryViewModel = viewModel()
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-  val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
   val context = LocalContext.current
   val snackbarHostState = remember { SnackbarHostState() }
+  val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
 
   LaunchedEffect(uiState.error) {
-    uiState.error?.let { message ->
-      snackbarHostState.showSnackbar(message)
+    uiState.error?.let {
+      snackbarHostState.showSnackbar(it)
       viewModel.clearError()
     }
   }
-
   LaunchedEffect(uiState.snackbarMessage) {
-    uiState.snackbarMessage?.let { message ->
-      snackbarHostState.showSnackbar(message)
+    uiState.snackbarMessage?.let {
+      snackbarHostState.showSnackbar(it)
       viewModel.clearSnackbarMessage()
     }
   }
+  LaunchedEffect(Unit) { viewModel.refresh() }
 
-  // Pick up workouts saved by the builder while this ViewModel was alive
-  androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refresh() }
-  val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
-
-  val importLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.OpenDocument()
-  ) { uri ->
-    if (uri != null) {
-      viewModel.importWorkout(uri)
-    }
+  val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    uri?.let(viewModel::importWorkout)
   }
 
   Scaffold(
     contentWindowInsets = WindowInsets(0),
+    topBar = {
+      TrainerLoopTopBar(
+        title = "Workouts",
+        windowInsets = WindowInsets(0),
+        firstAction = {
+          if (uiState.canSync) {
+            SyncPill(
+              syncing = uiState.isSyncing,
+              enabled = !uiState.isSyncing,
+              onClick = viewModel::sync
+            )
+          }
+        },
+        secondAction = {
+          IconButton(
+            onClick = { importLauncher.launch(arrayOf("*/*")) },
+            modifier = Modifier.size(48.dp)
+          ) {
+            Icon(Icons.Outlined.UploadFile, contentDescription = "Import workout file")
+          }
+        }
+      )
+    },
     snackbarHost = {
       AnimatedVisibility(
         visible = snackbarHostState.currentSnackbarData != null,
@@ -140,62 +151,9 @@ fun WorkoutLibraryScreen(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding)
-        .padding(horizontal = Spacing.lg)
+        .padding(horizontal = Spacing.screenMargin),
+      verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-      Text(
-        text = "Workouts",
-        style = MaterialTheme.typography.headlineLarge
-      )
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (uiState.canSync) {
-          Button(onClick = { viewModel.sync() }, enabled = !uiState.isSyncing) {
-            AnimatedContent(
-              targetState = uiState.isSyncing,
-              transitionSpec = {
-                fadeIn(animationSpec = fastMotionSpec) togetherWith
-                  fadeOut(animationSpec = fastMotionSpec)
-              },
-              label = "workout-sync-icon"
-            ) { syncing ->
-              if (syncing) {
-                CircularProgressIndicator(
-                  modifier = Modifier.size(16.dp),
-                  color = MaterialTheme.colorScheme.onPrimary,
-                  strokeWidth = 2.dp
-                )
-              } else {
-                Icon(Icons.Outlined.Sync, contentDescription = null)
-              }
-            }
-            Spacer(modifier = Modifier.width(Spacing.sm))
-            AnimatedContent(
-              targetState = uiState.isSyncing,
-              transitionSpec = {
-                fadeIn(animationSpec = fastMotionSpec) togetherWith
-                  fadeOut(animationSpec = fastMotionSpec)
-              },
-              label = "workout-sync-label"
-            ) { syncing -> Text(if (syncing) "Syncing…" else "Sync") }
-          }
-        }
-        IconButton(onClick = {
-          importLauncher.launch(arrayOf("*/*"))
-        }) {
-          Icon(
-            imageVector = Icons.Outlined.UploadFile,
-            contentDescription = "Import workout file"
-          )
-        }
-      }
-    }
-
-      Spacer(modifier = Modifier.height(12.dp))
-
       OutlinedTextField(
         value = uiState.searchQuery,
         onValueChange = viewModel::onSearchQueryChange,
@@ -205,47 +163,34 @@ fun WorkoutLibraryScreen(
         singleLine = true
       )
 
-      Spacer(modifier = Modifier.height(12.dp))
-
       Row(
         modifier = Modifier
           .fillMaxWidth()
           .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
       ) {
         uiState.categories.forEach { category ->
           val selected = uiState.selectedCategory == category
-          val containerColor by animateColorAsState(
-            targetValue = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
-            label = "category-chip-color-${category.label}"
-          )
           FilterChip(
             selected = selected,
             onClick = { viewModel.onCategorySelected(category) },
             label = { Text(category.label, maxLines = 1, softWrap = false) },
             colors = FilterChipDefaults.filterChipColors(
-              containerColor = containerColor,
-              selectedContainerColor = containerColor
+              containerColor = MaterialTheme.colorScheme.surface,
+              selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+              selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
             )
           )
         }
       }
 
-      Spacer(modifier = Modifier.height(Spacing.xl))
-
-      AnimatedVisibility(
-        visible = uiState.isLoading,
-        enter = expandVertically(
-          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
-        ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
-        exit = shrinkVertically(
-          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
-        ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
-      ) { CircularProgressIndicator() }
+      AnimatedVisibility(visible = uiState.isLoading) {
+        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+      }
 
       LazyColumn(
         modifier = Modifier.weight(1f),
+        contentPadding = PaddingValues(top = Spacing.md, bottom = Spacing.sectionGap),
         verticalArrangement = Arrangement.spacedBy(Spacing.md)
       ) {
         item(key = "ftp-ramp-test-card") {
@@ -269,48 +214,79 @@ fun WorkoutLibraryScreen(
 }
 
 @Composable
+private fun SyncPill(syncing: Boolean, enabled: Boolean, onClick: () -> Unit) {
+  val interactionSource = remember { MutableInteractionSource() }
+  Surface(
+    onClick = onClick,
+    modifier = Modifier
+      .heightIn(min = 48.dp)
+      .pressable(interactionSource),
+    enabled = enabled,
+    shape = CircleShape,
+    color = MaterialTheme.colorScheme.primaryContainer,
+    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+    interactionSource = interactionSource
+  ) {
+    Row(
+      modifier = Modifier.padding(horizontal = Spacing.md),
+      horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap),
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      if (syncing) {
+        CircularProgressIndicator(
+          modifier = Modifier.size(16.dp),
+          color = MaterialTheme.colorScheme.onPrimaryContainer,
+          strokeWidth = 2.dp
+        )
+      } else {
+        Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
+      }
+      Text(if (syncing) "Syncing…" else "Sync", style = MaterialTheme.typography.labelLarge)
+    }
+  }
+}
+
+@Composable
 private fun RampTestCard(onClick: () -> Unit) {
   val interactionSource = remember { MutableInteractionSource() }
-
-  OutlinedCard(
+  val semantic = MaterialTheme.trainerLoopColors
+  Card(
     onClick = onClick,
     modifier = Modifier
       .fillMaxWidth()
+      .heightIn(min = 48.dp)
       .pressable(interactionSource),
     interactionSource = interactionSource,
+    shape = RoundedCornerShape(16.dp),
+    colors = CardDefaults.cardColors(containerColor = semantic.coach)
   ) {
     Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(Spacing.lg),
+      modifier = Modifier.padding(Spacing.cardPadding),
       verticalAlignment = Alignment.CenterVertically
     ) {
       Icon(
-        imageVector = Icons.Outlined.MonitorHeart,
+        Icons.Outlined.MonitorHeart,
         contentDescription = null,
-        tint = MaterialTheme.colorScheme.primary,
+        tint = semantic.onCoach,
         modifier = Modifier.size(28.dp)
       )
       Spacer(modifier = Modifier.width(Spacing.md))
       Column(modifier = Modifier.weight(1f)) {
         Text(
-          text = "FTP Ramp Test",
+          "FTP Ramp Test",
           style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold
+          fontWeight = FontWeight.SemiBold,
+          color = semantic.onCoach
         )
         Text(
-          text = "Ramp to exhaustion to estimate your FTP",
+          "Assessment · Estimate your FTP",
           style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          color = semantic.onCoach,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis
         )
       }
-      Icon(
-        imageVector = Icons.Default.ChevronRight,
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant
-      )
+      Icon(Icons.Default.ChevronRight, contentDescription = null, tint = semantic.onCoach)
     }
   }
 }
@@ -329,108 +305,93 @@ private fun WorkoutCard(
   val workout = item.workout
   val stats = item.stats
   var menuOpen by remember { mutableStateOf(false) }
-  val interactionSource = remember { MutableInteractionSource() }
   val starScale by animateFloatAsState(
     targetValue = if (isFavorite) 1.08f else 1f,
     animationSpec = reducedMotionAware(StarBounceSpec),
     label = "favorite-star-bounce"
   )
-  val starTint by animateColorAsState(
-    targetValue = if (isFavorite) MaterialTheme.colorScheme.primary
-    else MaterialTheme.colorScheme.onSurfaceVariant,
-    animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
-    label = "favorite-star-color"
-  )
 
-  Card(
-    onClick = onClick,
-    modifier = Modifier
-      .fillMaxWidth()
-      .pressable(interactionSource),
-    interactionSource = interactionSource,
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant
+  TrainerLoopCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
+    WorkoutMiniChart(
+      workout = workout,
+      ftp = ftp,
+      modifier = Modifier.fillMaxWidth(),
+      chartHeight = 64.dp
     )
-  ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(Spacing.lg)
-    ) {
-      WorkoutMiniChart(
-        workout = workout,
-        ftp = ftp,
-        modifier = Modifier.fillMaxWidth(),
-        chartHeight = 60.dp
+    Spacer(modifier = Modifier.height(Spacing.controlGap))
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text(
+        workout.name,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.weight(1f),
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis
       )
-
-      Spacer(modifier = Modifier.height(8.dp))
-
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-          text = workout.name,
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold,
-          modifier = Modifier.weight(1f)
-        )
-        IconButton(
-          onClick = onToggleFavorite,
-          modifier = Modifier.graphicsLayer {
+      IconButton(
+        onClick = onToggleFavorite,
+        modifier = Modifier
+          .size(48.dp)
+          .graphicsLayer {
             scaleX = starScale
             scaleY = starScale
           }
-        ) {
-          Icon(
-            imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-            contentDescription = if (isFavorite) "Unfavorite" else "Favorite",
-            tint = starTint
-          )
-        }
-        Box {
-          IconButton(onClick = { menuOpen = true }) {
-            Icon(Icons.Default.MoreVert, contentDescription = "More")
-          }
-          DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(
-              text = { Text("Duplicate") },
-              onClick = { menuOpen = false; onDuplicate() }
-            )
-            if (canDelete) {
-              DropdownMenuItem(
-                text = { Text("Delete") },
-                onClick = { menuOpen = false; onDelete() }
-              )
-            }
-          }
-        }
-      }
-      if (workout.description != null) {
-        Text(
-          text = workout.description,
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
+      ) {
+        Icon(
+          if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+          contentDescription = if (isFavorite) "Unfavorite" else "Favorite",
+          tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
         )
       }
-      val meta = buildList {
-        add(formatDuration(stats.durationSec))
-        stats.plannedIntensityFactor?.let { intensityFactor ->
-          add("IF ${String.format(Locale.ROOT, "%.2f", intensityFactor)}")
+      Box {
+        IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(48.dp)) {
+          Icon(Icons.Default.MoreVert, contentDescription = "More")
         }
-        stats.plannedTss?.let { tss -> add("TSS $tss") }
-      }.joinToString(" · ")
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+          DropdownMenuItem(
+            text = { Text("Duplicate") },
+            onClick = {
+              menuOpen = false
+              onDuplicate()
+            }
+          )
+          if (canDelete) {
+            DropdownMenuItem(
+              text = { Text("Delete") },
+              onClick = {
+                menuOpen = false
+                onDelete()
+              }
+            )
+          }
+        }
+      }
+    }
+    workout.description?.let { description ->
       Text(
-        text = meta,
-        style = NumericSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
-        maxLines = 1,
-        softWrap = false,
+        description,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 2,
         overflow = TextOverflow.Ellipsis
       )
     }
+    val meta = buildList {
+      add(formatDuration(stats.durationSec))
+      stats.plannedIntensityFactor?.let { add("IF ${String.format(Locale.ROOT, "%.2f", it)}") }
+      stats.plannedTss?.let { add("TSS $it") }
+    }.joinToString(" · ")
+    Text(
+      meta,
+      style = NumericSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis
+    )
   }
 }
 
 private fun formatDuration(totalSec: Int): String {
-  val h = totalSec / 3600
-  val m = (totalSec % 3600) / 60
-  return if (h > 0) "${h}h ${m}m" else "${m}m"
+  val hours = totalSec / 3600
+  val minutes = (totalSec % 3600) / 60
+  return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }
