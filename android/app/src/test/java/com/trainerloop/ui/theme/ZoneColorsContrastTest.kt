@@ -8,9 +8,9 @@ import kotlin.math.pow
 
 class ZoneColorsContrastTest {
 
-  private val darkBackground = Color(0xFF0F1410)
-  private val darkCard = Color(0xFF1A211B)
-  private val lightBackground = Color(0xFFFBFDF9)
+  private val darkBackground = DarkColorScheme.background
+  private val darkCard = DarkColorScheme.surface
+  private val lightCard = LightColorScheme.surface
 
   @Test
   fun `all zone tokens meet contrast requirements`() {
@@ -25,8 +25,8 @@ class ZoneColorsContrastTest {
       assertEquals(1f, dark.onFill.alpha)
 
       val light = ZoneColors.forZone(zone, dark = false)
-      assertContrastAtLeast(light.fill, lightBackground, 3.0, "light Z$zone fill/background")
-      assertContrastAtLeast(light.line, lightBackground, 3.0, "light Z$zone line/background")
+      assertContrastAtLeast(light.fill, lightCard, 3.0, "light Z$zone fill/card")
+      assertContrastAtLeast(light.line, lightCard, 3.0, "light Z$zone line/card")
       assertContrastAtLeast(light.onFill, light.fill, 4.5, "light Z$zone onFill/fill")
       assertEquals(1f, light.fill.alpha)
       assertEquals(1f, light.line.alpha)

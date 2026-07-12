@@ -9,52 +9,85 @@ import kotlin.math.pow
 class ThemeContrastTest {
 
   @Test
-  fun `light and dark scheme roles meet WCAG contrast`() {
+  fun `all light and dark Material content roles meet WCAG contrast`() {
     assertSchemeContrast("light", LightColorScheme)
     assertSchemeContrast("dark", DarkColorScheme)
   }
 
   @Test
-  fun `dark scheme uses the intended surface ladder`() {
-    val backgroundLuminance = relativeLuminance(DarkColorScheme.background)
-    val cardLuminance = relativeLuminance(DarkColorScheme.surfaceVariant)
-    val containerLuminance = relativeLuminance(DarkColorScheme.surfaceContainer)
-    val highLuminance = relativeLuminance(DarkColorScheme.surfaceContainerHigh)
+  fun `all light and dark semantic content roles meet WCAG contrast`() {
+    assertSemanticContrast("light", LightTrainerLoopColors)
+    assertSemanticContrast("dark", DarkTrainerLoopColors)
+  }
 
-    assertTrue(
-      "dark background must be darker than standard cards",
-      backgroundLuminance < cardLuminance
+  @Test
+  fun `dark elevation ladder rises monotonically`() {
+    val ladder = listOf(
+      "background" to DarkColorScheme.background,
+      "card" to DarkColorScheme.surface,
+      "grouped" to DarkColorScheme.surfaceContainer,
+      "raised" to DarkColorScheme.surfaceContainerHigh
     )
-    assertTrue(
-      "dark surfaceContainer must be darker than elevated surfaces",
-      containerLuminance < highLuminance
-    )
+
+    ladder.zipWithNext().forEach { (lower, higher) ->
+      assertTrue(
+        "dark ${lower.first} must be darker than ${higher.first}",
+        relativeLuminance(lower.second) < relativeLuminance(higher.second)
+      )
+    }
   }
 
   private fun assertSchemeContrast(name: String, scheme: ColorScheme) {
-    assertContrastAtLeast(scheme.onPrimary, scheme.primary, "$name onPrimary/primary")
-    assertContrastAtLeast(
-      scheme.onPrimaryContainer,
-      scheme.primaryContainer,
-      "$name onPrimaryContainer/primaryContainer"
+    val pairs = listOf(
+      "onPrimary/primary" to (scheme.onPrimary to scheme.primary),
+      "onPrimaryContainer/primaryContainer" to
+        (scheme.onPrimaryContainer to scheme.primaryContainer),
+      "onSecondary/secondary" to (scheme.onSecondary to scheme.secondary),
+      "onSecondaryContainer/secondaryContainer" to
+        (scheme.onSecondaryContainer to scheme.secondaryContainer),
+      "onTertiary/tertiary" to (scheme.onTertiary to scheme.tertiary),
+      "onTertiaryContainer/tertiaryContainer" to
+        (scheme.onTertiaryContainer to scheme.tertiaryContainer),
+      "onBackground/background" to (scheme.onBackground to scheme.background),
+      "onSurface/surface" to (scheme.onSurface to scheme.surface),
+      "onSurface/surfaceBright" to (scheme.onSurface to scheme.surfaceBright),
+      "onSurface/surfaceDim" to (scheme.onSurface to scheme.surfaceDim),
+      "onSurface/surfaceContainerLowest" to
+        (scheme.onSurface to scheme.surfaceContainerLowest),
+      "onSurface/surfaceContainerLow" to
+        (scheme.onSurface to scheme.surfaceContainerLow),
+      "onSurface/surfaceContainer" to (scheme.onSurface to scheme.surfaceContainer),
+      "onSurface/surfaceContainerHigh" to
+        (scheme.onSurface to scheme.surfaceContainerHigh),
+      "onSurface/surfaceContainerHighest" to
+        (scheme.onSurface to scheme.surfaceContainerHighest),
+      "onSurfaceVariant/surfaceVariant" to
+        (scheme.onSurfaceVariant to scheme.surfaceVariant),
+      "inverseOnSurface/inverseSurface" to
+        (scheme.inverseOnSurface to scheme.inverseSurface),
+      "onError/error" to (scheme.onError to scheme.error),
+      "onErrorContainer/errorContainer" to
+        (scheme.onErrorContainer to scheme.errorContainer)
     )
-    assertContrastAtLeast(
-      scheme.onSecondaryContainer,
-      scheme.secondaryContainer,
-      "$name onSecondaryContainer/secondaryContainer"
+
+    pairs.forEach { (label, pair) ->
+      assertContrastAtLeast(pair.first, pair.second, "$name $label")
+    }
+  }
+
+  private fun assertSemanticContrast(name: String, colors: TrainerLoopColors) {
+    val pairs = listOf(
+      "onReady/ready" to (colors.onReady to colors.ready),
+      "onCoach/coach" to (colors.onCoach to colors.coach),
+      "onConnected/connected" to (colors.onConnected to colors.connected),
+      "onWarning/warning" to (colors.onWarning to colors.warning),
+      "onStale/stale" to (colors.onStale to colors.stale),
+      "onHeroAction/heroAction" to (colors.onHeroAction to colors.heroAction)
     )
-    assertContrastAtLeast(scheme.onBackground, scheme.background, "$name onBackground/background")
-    assertContrastAtLeast(
-      scheme.onSurfaceVariant,
-      scheme.surfaceVariant,
-      "$name onSurfaceVariant/surfaceVariant"
-    )
-    assertContrastAtLeast(
-      scheme.onTertiaryContainer,
-      scheme.tertiaryContainer,
-      "$name onTertiaryContainer/tertiaryContainer"
-    )
-    assertContrastAtLeast(scheme.onError, scheme.error, "$name onError/error")
+
+    pairs.forEach { (label, pair) ->
+      assertContrastAtLeast(pair.first, pair.second, "$name $label")
+    }
   }
 
   private fun assertContrastAtLeast(foreground: Color, background: Color, label: String) {

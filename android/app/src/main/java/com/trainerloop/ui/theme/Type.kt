@@ -33,6 +33,26 @@ val NumericSmall = TextStyle(
   fontFeatureSettings = "tnum"
 )
 
+val labelCompact = TextStyle(
+  fontWeight = FontWeight.Medium,
+  fontSize = 12.sp,
+  lineHeight = 16.sp,
+  letterSpacing = 0.4.sp
+)
+
+val bodyCompact = TextStyle(
+  fontWeight = FontWeight.Normal,
+  fontSize = 14.sp,
+  lineHeight = 18.sp,
+  letterSpacing = 0.1.sp
+)
+
+val titleCompact = TextStyle(
+  fontWeight = FontWeight.SemiBold,
+  fontSize = 16.sp,
+  lineHeight = 20.sp
+)
+
 val Typography = Typography(
   displayLarge = TextStyle(
     fontWeight = FontWeight.ExtraBold,

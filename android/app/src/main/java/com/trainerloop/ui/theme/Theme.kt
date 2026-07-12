@@ -10,74 +10,86 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 
-// Full role coverage so nothing falls back to the purple Material baseline.
+// Full role coverage so no color falls back to the Material baseline palette.
 internal val LightColorScheme = lightColorScheme(
-  primary = Green40,
-  onPrimary = Neutral99,
-  primaryContainer = Green95,
-  onPrimaryContainer = Green10,
-  secondary = Blue40,
-  onSecondary = Neutral99,
-  // Green pills for selected chips / nav indicator (brand over baseline blue)
-  secondaryContainer = Green95,
-  onSecondaryContainer = Green10,
-  tertiary = Amber40,
-  onTertiary = Neutral99,
-  tertiaryContainer = Amber90,
-  onTertiaryContainer = Amber20,
-  background = Neutral95,
-  onBackground = Neutral10,
-  surface = Neutral95,
-  onSurface = Neutral10,
-  // White cards on the soft gray background for depth
-  surfaceVariant = Neutral99,
+  primary = Ocean40,
+  onPrimary = Foam,
+  primaryContainer = Sky80,
+  onPrimaryContainer = DarkBackground,
+  inversePrimary = Sky80,
+  secondary = Sand40,
+  onSecondary = Foam,
+  secondaryContainer = Sky80,
+  onSecondaryContainer = DarkBackground,
+  tertiary = Coral40,
+  onTertiary = Foam,
+  tertiaryContainer = Coral90,
+  onTertiaryContainer = DarkBackground,
+  background = WarmOffWhite,
+  onBackground = DarkBackground,
+  surface = Foam,
+  onSurface = DarkBackground,
+  surfaceVariant = PaleSand,
   onSurfaceVariant = Neutral30,
-  surfaceContainerLowest = Neutral99,
-  surfaceContainerLow = Neutral99,
-  surfaceContainer = Neutral99,
-  surfaceContainerHigh = Neutral90,
-  surfaceContainerHighest = Neutral90,
-  outline = Neutral40,
-  outlineVariant = Neutral85,
+  surfaceTint = Ocean40,
+  inverseSurface = DarkRaised,
+  inverseOnSurface = Foam,
   error = Red40,
-  onError = Neutral99,
+  onError = Foam,
   errorContainer = Red90,
-  onErrorContainer = Red20
+  onErrorContainer = Red20,
+  outline = Neutral40,
+  outlineVariant = Sand60,
+  scrim = DarkBackground,
+  surfaceBright = Foam,
+  surfaceContainer = PaleSand,
+  surfaceContainerHigh = Sand80,
+  surfaceContainerHighest = Sand60,
+  surfaceContainerLow = Sand95,
+  surfaceContainerLowest = Foam,
+  surfaceDim = Sand90
 )
 
 internal val DarkColorScheme = darkColorScheme(
-  primary = Green60,
-  onPrimary = Neutral10,
-  primaryContainer = Green20,
-  onPrimaryContainer = Green95,
-  secondary = Blue80,
-  onSecondary = Neutral10,
-  secondaryContainer = Green20,
-  onSecondaryContainer = Green95,
-  tertiary = Amber80,
-  onTertiary = Neutral10,
-  tertiaryContainer = Amber20,
-  onTertiaryContainer = Amber90,
-  background = Neutral10,
-  onBackground = Neutral95,
-  surface = Neutral10,
-  onSurface = Neutral95,
-  surfaceVariant = Neutral15,
-  onSurfaceVariant = Neutral90,
-  surfaceContainerLowest = Neutral10,
-  surfaceContainerLow = Neutral15,
-  surfaceContainer = Neutral15,
-  surfaceContainerHigh = Neutral20,
-  surfaceContainerHighest = Neutral20,
-  outline = Neutral40,
-  outlineVariant = Neutral30,
+  primary = Sky80,
+  onPrimary = DarkBackground,
+  primaryContainer = Ocean20,
+  onPrimaryContainer = Foam,
+  inversePrimary = Ocean40,
+  secondary = Sand80,
+  onSecondary = DarkBackground,
+  secondaryContainer = Sky80,
+  onSecondaryContainer = DarkBackground,
+  tertiary = Coral80,
+  onTertiary = DarkBackground,
+  tertiaryContainer = Coral20,
+  onTertiaryContainer = Foam,
+  background = DarkBackground,
+  onBackground = Foam,
+  surface = DarkCard,
+  onSurface = Foam,
+  surfaceVariant = DarkGrouped,
+  onSurfaceVariant = Neutral80,
+  surfaceTint = Sky80,
+  inverseSurface = Foam,
+  inverseOnSurface = DarkBackground,
   error = Red80,
-  onError = Neutral10,
+  onError = DarkBackground,
   errorContainer = Red20,
-  onErrorContainer = Red90
+  onErrorContainer = Red90,
+  outline = Neutral60,
+  outlineVariant = Neutral40,
+  scrim = DarkBackground,
+  surfaceBright = DarkRaisedHigh,
+  surfaceContainer = DarkGrouped,
+  surfaceContainerHigh = DarkRaised,
+  surfaceContainerHighest = DarkRaisedHigh,
+  surfaceContainerLow = DarkCard,
+  surfaceContainerLowest = DarkBackground,
+  surfaceDim = DarkBackground
 )
 
 private val TrainerLoopShapes = Shapes(
@@ -94,6 +106,7 @@ fun TrainerLoopTheme(
   content: @Composable () -> Unit
 ) {
   val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+  val trainerLoopColors = if (darkTheme) DarkTrainerLoopColors else LightTrainerLoopColors
   val context = LocalContext.current
   val reducedMotion = remember(context) {
     Settings.Global.getFloat(
@@ -103,7 +116,10 @@ fun TrainerLoopTheme(
     ) == 0f
   }
 
-  CompositionLocalProvider(LocalReducedMotion provides reducedMotion) {
+  CompositionLocalProvider(
+    LocalReducedMotion provides reducedMotion,
+    LocalTrainerLoopColors provides trainerLoopColors
+  ) {
     MaterialTheme(
       colorScheme = colorScheme,
       typography = Typography,
