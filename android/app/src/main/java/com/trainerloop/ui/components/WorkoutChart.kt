@@ -12,7 +12,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -85,7 +84,6 @@ fun WorkoutChart(
   modifier: Modifier = Modifier,
   elevationProfile: DoubleArray? = null
 ) {
-  val darkTheme = isSystemInDarkTheme()
   val totalDuration = remember(segments) { WorkoutMath.totalDurationSec(segments) }
   // Segment bounds (startSec, endSec) for tap hit-testing.
   val bounds = remember(segments) {
@@ -188,7 +186,8 @@ fun WorkoutChart(
   val powerScratchPath = remember { Path() }
   val elevationScratchPath = remember { Path() }
   val elevationLineScratchPath = remember { Path() }
-  val zoneScratchPaths = remember { Array(6) { Path() } }
+  val planOutlineScratchPath = remember { Path() }
+  val planFillScratchPath = remember { Path() }
   val hrMatrix = remember { Matrix() }
   val powerMatrix = remember { Matrix() }
 
@@ -197,9 +196,12 @@ fun WorkoutChart(
   val gridColor = semanticColors.chartGrid.copy(alpha = 0.15f)
   val hrLineColor = semanticColors.chartHeartRate
   val powerLineColor = semanticColors.chartPower
-  // Drawn OVER the opaque zone fills, so it needs a scrim + edge line to read.
-  val elevationFillColor = semanticColors.chartElevation.copy(alpha = 0.22f)
-  val elevationLineColor = semanticColors.chartElevation.copy(alpha = 0.50f)
+  val planOutlineColor = semanticColors.chartPlanOutline
+  val planFillColor = semanticColors.chartPlanFill.copy(alpha = PLAN_FILL_ALPHA)
+  // With the opaque zone blocks gone, the terrain no longer needs to fight
+  // for legibility; these alphas are tuned against the bare card surface.
+  val elevationFillColor = semanticColors.chartElevation.copy(alpha = 0.30f)
+  val elevationLineColor = semanticColors.chartElevation.copy(alpha = 0.65f)
 
   Column(modifier = modifier.fillMaxWidth()) {
     Row(
@@ -397,7 +399,51 @@ fun WorkoutChart(
           return chartBottom - ratio * chartHeight
         }
 
-        // Gridlines at FTP and FTP/2.
+        // 1) Faint plan fill — the quiet backdrop everything sits on.
+        val planRuns = planProfileRuns(
+          zoneBands(
+            segments = segments,
+            ftp = ftp,
+            winStartSec = winStart,
+            winEndSec = winEnd,
+            stepSec = (winSpan / 200f).coerceAtLeast(1f)
+          )
+        )
+        buildPlanProfilePaths(
+          runs = planRuns,
+          outline = planOutlineScratchPath,
+          fill = planFillScratchPath,
+          xForTime = ::xForTime,
+          yForPower = ::yForPower,
+          baselineY = chartBottom
+        )
+        drawPath(planFillScratchPath, color = planFillColor)
+
+        // 2) Selected-interval highlight: wash + edge strokes. The wash alone
+        // was calibrated against opaque zone fills and is too faint over the
+        // bare surface, so the boundaries get explicit lines.
+        selectedIndex?.let { idx ->
+          bounds.getOrNull(idx)?.let { (s, e, _) ->
+            val xs = xForTime(s.toFloat()).coerceIn(0f, width)
+            val xe = xForTime(e.toFloat()).coerceIn(0f, width)
+            drawRect(
+              color = cursorColor.copy(alpha = selectedHighlightAlpha),
+              topLeft = Offset(xs, 0f),
+              size = Size(xe - xs, heightPx)
+            )
+            val edgeAlpha = (selectedHighlightAlpha * 3f).coerceAtMost(0.6f)
+            listOf(xs, xe).forEach { x ->
+              drawLine(
+                color = cursorColor.copy(alpha = edgeAlpha),
+                start = Offset(x, 0f),
+                end = Offset(x, heightPx),
+                strokeWidth = 1.dp.toPx()
+              )
+            }
+          }
+        }
+
+        // 3) Gridlines at FTP and FTP/2, above the fill so they stay legible.
         if (ftp > 0) {
           val gridStrokeWidth = 1.dp.toPx()
           val ftpY = yForPower(ftp.toFloat())
@@ -406,35 +452,8 @@ fun WorkoutChart(
           drawLine(color = gridColor, start = Offset(0f, halfFtpY), end = Offset(width, halfFtpY), strokeWidth = gridStrokeWidth)
         }
 
-        // Full-height-from-zero interval blocks over the visible window.
-        // All bands of one zone are filled as a single Path: abutting rects
-        // inside one path cancel their shared AA edges, so no hairline seams.
-        zoneScratchPaths.forEach { it.rewind() }
-        zoneBands(
-          segments = segments,
-          ftp = ftp,
-          winStartSec = winStart,
-          winEndSec = winEnd,
-          stepSec = (winSpan / 200f).coerceAtLeast(1f)
-        ).forEach { band ->
-          val yTop = yForPower(band.targetWatts.toFloat())
-          zoneScratchPaths[band.zone - 1].addRect(
-            androidx.compose.ui.geometry.Rect(
-              left = xForTime(band.startSec),
-              top = yTop,
-              right = xForTime(band.endSec),
-              bottom = chartBottom
-            )
-          )
-        }
-        zoneScratchPaths.forEachIndexed { index, path ->
-          if (!path.isEmpty) {
-            drawPath(path, color = ZoneColors.forZone(index + 1, darkTheme).fill)
-          }
-        }
-
-        // Soft terrain silhouette across the bottom 30%, drawn over the zone
-        // blocks (they are opaque now) as a translucent scrim + edge line.
+        // Soft terrain silhouette across the bottom 30%, drawn over the plan
+        // fill as a translucent scrim + edge line.
         if (elevationProfile != null && elevationProfile.isNotEmpty()) {
           // Local val: smart casts don't reliably reach into local functions.
           val profile = elevationProfile
@@ -467,18 +486,9 @@ fun WorkoutChart(
           drawPath(linePath, color = elevationLineColor, style = Stroke(width = 1.5.dp.toPx()))
         }
 
-        // Highlight the tapped interval.
-        selectedIndex?.let { idx ->
-          bounds.getOrNull(idx)?.let { (s, e, _) ->
-            val xs = xForTime(s.toFloat()).coerceIn(0f, width)
-            val xe = xForTime(e.toFloat()).coerceIn(0f, width)
-            drawRect(
-              color = cursorColor.copy(alpha = selectedHighlightAlpha),
-              topLeft = Offset(xs, 0f),
-              size = Size(xe - xs, heightPx)
-            )
-          }
-        }
+        // 5) Plan outline above the terrain so low recovery targets are not
+        // hidden behind the elevation silhouette.
+        drawPath(planOutlineScratchPath, color = planOutlineColor, style = Stroke(width = 2.dp.toPx()))
 
         // Cached paths are stored in time/value coordinates. Transform their
         // geometry into screen coordinates so the stroke is not scaled.
