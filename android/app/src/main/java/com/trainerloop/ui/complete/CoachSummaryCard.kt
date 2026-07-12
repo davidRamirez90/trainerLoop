@@ -24,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Path
@@ -38,6 +37,7 @@ import com.trainerloop.domain.coach.executionScore
 import kotlin.math.roundToInt
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.reducedMotionAware
+import com.trainerloop.ui.theme.trainerLoopColors
 import androidx.compose.ui.unit.IntSize
 
 /** Post-ride coach summary (§11): execution score, fatigue curve, feedback timeline. */
@@ -192,7 +192,7 @@ private fun SummaryStat(label: String, value: String, modifier: Modifier = Modif
 @Composable
 private fun FatigueSparkline(curve: List<Double>) {
   val color = MaterialTheme.colorScheme.primary
-  val bandColor = Color(0xFFE57373) // elevated-fatigue reference line at 60
+  val bandColor = MaterialTheme.trainerLoopColors.chartHeartRate
   Canvas(
     modifier = Modifier
       .fillMaxWidth()

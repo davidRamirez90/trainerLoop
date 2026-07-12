@@ -17,7 +17,7 @@ enum class WorkoutCategory(val label: String) {
 }
 
 data class IntervalRow(
-  val color: androidx.compose.ui.graphics.Color,
+  val color: androidx.compose.ui.graphics.Color?,
   val name: String,
   val durationSec: Int,
   val targetFtpPct: String
@@ -55,14 +55,15 @@ class WorkoutDetailViewModel(
     )
   }
 
-  private fun phaseColor(segment: WorkoutSegment): androidx.compose.ui.graphics.Color = when (segment.phase) {
+  private fun phaseColor(segment: WorkoutSegment): androidx.compose.ui.graphics.Color? = when (segment.phase) {
     SegmentPhase.WARMUP -> com.trainerloop.ui.theme.Amber80
     SegmentPhase.WORK -> ZoneColors.forTarget(
       targetWatts = segmentTargetPower(segment),
       ftp = ftp,
       dark = true
     ).line
-    SegmentPhase.RECOVERY -> com.trainerloop.ui.theme.Blue80
+    // Recovery is an interaction/brand cue resolved from MaterialTheme in the composable.
+    SegmentPhase.RECOVERY -> null
     SegmentPhase.COOLDOWN -> com.trainerloop.ui.theme.Amber80
   }
 

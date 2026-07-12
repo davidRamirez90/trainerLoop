@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.BluetoothDisabled
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -61,11 +62,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.ble.BlePermissions
 import com.trainerloop.ui.components.pressable
-import com.trainerloop.ui.theme.Green40
 import com.trainerloop.ui.theme.LocalReducedMotion
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.reducedMotionAware
+import com.trainerloop.ui.theme.trainerLoopColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -250,6 +251,9 @@ fun DevicesScreen(
         displayedError?.let { error ->
           Snackbar(
             modifier = Modifier.padding(Spacing.lg),
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            actionContentColor = MaterialTheme.colorScheme.onErrorContainer,
             action = {
               TextButton(
                 onClick = { viewModel.clearError() },
@@ -259,7 +263,13 @@ fun DevicesScreen(
               }
             }
           ) {
-            Text(error)
+            Row(
+              horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(imageVector = Icons.Default.Error, contentDescription = null)
+              Text("Connection failed: $error")
+            }
           }
         }
       }
@@ -365,7 +375,7 @@ private fun PairedDeviceCard(
       Icon(
         imageVector = Icons.Default.BluetoothConnected,
         contentDescription = "Connected",
-        tint = Green40
+        tint = MaterialTheme.trainerLoopColors.connected
       )
       Column(modifier = Modifier.weight(1f)) {
         Text(

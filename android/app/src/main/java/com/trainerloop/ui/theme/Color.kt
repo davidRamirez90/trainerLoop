@@ -79,20 +79,6 @@ val Red20 = Color(0xFF601410)
 val Orange80 = Color(0xFFFDBA74)
 val Orange40 = Color(0xFFEA580C)
 
-// legacy — removed in Phase 2
-val Green95 = Color(0xFFDCFCE7)
-val Green80 = Color(0xFF86EFAC)
-val Green60 = Color(0xFF4ADE80)
-val Green40 = Color(0xFF15803D)
-val Green20 = Color(0xFF166534)
-val Green10 = Color(0xFF14532D)
-
-// legacy — removed in Phase 2
-val Blue90 = Color(0xFFDBEAFE)
-val Blue80 = Color(0xFF93C5FD)
-val Blue40 = Color(0xFF2563EB)
-val Blue20 = Color(0xFF1E3A8A)
-
 // Legacy neutral aliases retained while screens migrate to semantic roles.
 val Neutral99 = Foam
 val Neutral95 = WarmOffWhite

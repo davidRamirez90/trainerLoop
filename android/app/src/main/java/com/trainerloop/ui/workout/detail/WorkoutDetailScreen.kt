@@ -217,7 +217,7 @@ private fun IntervalRowItem(interval: IntervalRow) {
           modifier = Modifier
             .size(12.dp)
             .clip(CircleShape)
-            .background(interval.color)
+            .background(interval.color ?: MaterialTheme.colorScheme.primary)
         )
         Spacer(modifier = Modifier.width(12.dp))
         Column {

@@ -1,12 +1,12 @@
 package com.trainerloop.ui
 
+import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -21,18 +21,23 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.view.WindowCompat
 import androidx.navigation.NavHostController
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
@@ -63,8 +68,6 @@ import com.trainerloop.ui.navigation.sharedAxisXPopExit
 import com.trainerloop.ui.navigation.tabFadeThrough
 import com.trainerloop.ui.settings.SettingsScreen
 import com.trainerloop.ui.theme.LocalReducedMotion
-import com.trainerloop.ui.theme.MotionSpec
-import com.trainerloop.ui.theme.reducedMotionAware
 import com.trainerloop.ui.workout.detail.WorkoutDetailScreen
 import com.trainerloop.ui.complete.WorkoutCompleteScreen
 import com.trainerloop.ui.complete.WorkoutCompleteViewModelFactory
@@ -82,6 +85,15 @@ fun TrainerLoopApp(
   val currentRoute = currentBackStackEntry?.destination?.route
   val reducedMotion = LocalReducedMotion.current
   val tabTransitions = tabFadeThrough(reducedMotion)
+  val showBottomBar = currentRoute in Screen.bottomTabs.map { it.route }
+  SystemBarIconAppearance(
+    statusBarSurface = MaterialTheme.colorScheme.background,
+    navigationBarSurface = if (showBottomBar) {
+      MaterialTheme.colorScheme.surface
+    } else {
+      MaterialTheme.colorScheme.background
+    }
+  )
 
   Scaffold(
     containerColor = MaterialTheme.colorScheme.background,
@@ -89,15 +101,13 @@ fun TrainerLoopApp(
     // and the bottom bar owns the navigation-bar inset through NavigationBar.
     contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Top),
     bottomBar = {
-      if (currentRoute in Screen.bottomTabs.map { it.route }) {
-        NavigationBar {
+      if (showBottomBar) {
+        NavigationBar(
+          containerColor = MaterialTheme.colorScheme.surface,
+          contentColor = MaterialTheme.colorScheme.onSurface
+        ) {
           Screen.bottomTabs.forEach { screen ->
             val selected = currentRoute == screen.route
-            val iconScale by animateFloatAsState(
-              targetValue = if (selected && !reducedMotion) 1.06f else 1f,
-              animationSpec = reducedMotionAware(MotionSpec.momentum),
-              label = "bottom-tab-icon-scale"
-            )
             NavigationBarItem(
               selected = selected,
               onClick = {
@@ -110,16 +120,17 @@ fun TrainerLoopApp(
                 }
               },
               icon = {
-                Box(
-                  modifier = Modifier.graphicsLayer {
-                    scaleX = iconScale
-                    scaleY = iconScale
-                  }
-                ) {
-                  Icon(imageVector = screen.icon, contentDescription = screen.label)
-                }
+                Icon(imageVector = screen.icon, contentDescription = screen.label)
               },
-              label = { Text(screen.label) }
+              label = { Text(screen.label) },
+              alwaysShowLabel = true,
+              colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+              )
             )
           }
         }
@@ -473,6 +484,27 @@ fun TrainerLoopApp(
       }
     }
   }
+}
+
+@Composable
+private fun SystemBarIconAppearance(
+  statusBarSurface: Color,
+  navigationBarSurface: Color
+) {
+  val view = LocalView.current
+  val activity = view.context.findActivity() ?: return
+  SideEffect {
+    WindowCompat.getInsetsController(activity.window, view).apply {
+      isAppearanceLightStatusBars = statusBarSurface.luminance() > 0.5f
+      isAppearanceLightNavigationBars = navigationBarSurface.luminance() > 0.5f
+    }
+  }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+  is Activity -> this
+  is ContextWrapper -> baseContext.findActivity()
+  else -> null
 }
 
 private const val FINISH_SAMPLES_KEY = "finish_samples"

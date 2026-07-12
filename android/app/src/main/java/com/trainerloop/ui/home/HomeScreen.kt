@@ -53,7 +53,6 @@ import android.annotation.SuppressLint
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,13 +67,12 @@ import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.components.WorkoutMiniChart
 import com.trainerloop.domain.WorkoutResolver
 import com.trainerloop.ui.library.ImportedWorkoutStore
-import com.trainerloop.ui.theme.Green20
-import com.trainerloop.ui.theme.Green40
 import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.reducedMotionAware
 import com.trainerloop.ui.theme.zoneColorSet
+import com.trainerloop.ui.theme.trainerLoopColors
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -275,15 +273,25 @@ private fun StartRideHero(
   onManageDevices: () -> Unit
 ) {
   val interactionSource = remember { MutableInteractionSource() }
+  val semantic = MaterialTheme.trainerLoopColors
+  val heroContainer = if (trainerConnected) {
+    semantic.ready
+  } else {
+    MaterialTheme.colorScheme.surfaceVariant
+  }
+  val heroContent = if (trainerConnected) {
+    semantic.onReady
+  } else {
+    MaterialTheme.colorScheme.onSurfaceVariant
+  }
 
   Card(
     modifier = Modifier.fillMaxWidth(),
-    shape = RoundedCornerShape(24.dp)
+    shape = RoundedCornerShape(24.dp),
+    colors = CardDefaults.cardColors(containerColor = heroContainer)
   ) {
     Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .background(Brush.linearGradient(listOf(Green20, Green40)))
+      modifier = Modifier.fillMaxWidth()
     ) {
       Column(
         modifier = Modifier
@@ -294,12 +302,12 @@ private fun StartRideHero(
           text = "Ready to ride?",
           style = MaterialTheme.typography.headlineSmall,
           fontWeight = FontWeight.Bold,
-          color = Color.White
+          color = heroContent
         )
         Text(
           text = "Jump on the trainer and go",
           style = MaterialTheme.typography.bodyMedium,
-          color = Color.White.copy(alpha = 0.8f)
+          color = heroContent.copy(alpha = 0.8f)
         )
         Spacer(modifier = Modifier.height(Spacing.lg))
         Button(
@@ -309,8 +317,8 @@ private fun StartRideHero(
             .fillMaxWidth(),
           interactionSource = interactionSource,
           colors = ButtonDefaults.buttonColors(
-            containerColor = Color.White,
-            contentColor = Green20
+            containerColor = semantic.heroAction,
+            contentColor = semantic.onHeroAction
           )
         ) {
           Icon(
@@ -358,7 +366,7 @@ private fun PlannedWorkoutCard(
           modifier = Modifier
             .size(8.dp)
             .clip(CircleShape)
-            .background(Green40)
+            .background(MaterialTheme.trainerLoopColors.connected)
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
@@ -482,11 +490,17 @@ private fun ConnectionStrip(
   onManageDevices: () -> Unit
 ) {
   val interactionSource = remember { MutableInteractionSource() }
+  val semantic = MaterialTheme.trainerLoopColors
+  val contentColor = if (trainerConnected) {
+    semantic.onReady
+  } else {
+    MaterialTheme.colorScheme.onSurfaceVariant
+  }
 
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .background(Color.Black.copy(alpha = 0.12f))
+      .background(contentColor.copy(alpha = 0.08f))
       .pressable(interactionSource)
       .clickable(
         interactionSource = interactionSource,
@@ -502,7 +516,8 @@ private fun ConnectionStrip(
       icon = if (trainerConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
       connected = trainerConnected,
       label = trainerName ?: "Trainer",
-      value = if (trainerConnected) trainerBattery?.let { "$it%" } ?: "Connected" else "Not paired"
+      value = if (trainerConnected) trainerBattery?.let { "$it%" } ?: "Connected" else "Not paired",
+      contentColor = contentColor
     )
     Spacer(modifier = Modifier.width(Spacing.md))
     ConnectionStatus(
@@ -510,13 +525,14 @@ private fun ConnectionStrip(
       icon = if (hrConnected) Icons.Default.BluetoothConnected else Icons.Default.Bluetooth,
       connected = hrConnected,
       label = "HR",
-      value = if (hrConnected) latestHrBpm?.let { "$it bpm" } ?: "Connected" else "Not paired"
+      value = if (hrConnected) latestHrBpm?.let { "$it bpm" } ?: "Connected" else "Not paired",
+      contentColor = contentColor
     )
     Spacer(modifier = Modifier.width(Spacing.sm))
     Icon(
       imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
       contentDescription = null,
-      tint = Color.White.copy(alpha = 0.8f),
+      tint = contentColor.copy(alpha = 0.8f),
       modifier = Modifier.size(20.dp)
     )
   }
@@ -528,16 +544,17 @@ private fun ConnectionStatus(
   icon: androidx.compose.ui.graphics.vector.ImageVector,
   connected: Boolean,
   label: String,
-  value: String
+  value: String,
+  contentColor: Color
 ) {
   val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
   val iconTint by animateColorAsState(
-    targetValue = Color.White.copy(alpha = if (connected) 1f else 0.65f),
+    targetValue = contentColor.copy(alpha = if (connected) 1f else 0.65f),
     animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
     label = "connection-icon-color"
   )
   val textColor by animateColorAsState(
-    targetValue = Color.White.copy(alpha = if (connected) 1f else 0.75f),
+    targetValue = contentColor.copy(alpha = if (connected) 1f else 0.75f),
     animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Color>()),
     label = "connection-text-color"
   )

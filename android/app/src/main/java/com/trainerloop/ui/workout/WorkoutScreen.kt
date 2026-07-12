@@ -97,7 +97,6 @@ import com.trainerloop.ui.components.workoutProfileSummary
 import com.trainerloop.ui.haptics.Haptics
 import com.trainerloop.ui.components.AnimatedMetricValue
 import com.trainerloop.ui.components.pressable
-import com.trainerloop.ui.theme.Green40
 import com.trainerloop.ui.theme.NumericDisplay
 import com.trainerloop.ui.theme.NumericLarge
 import com.trainerloop.ui.theme.NumericMedium
@@ -107,6 +106,7 @@ import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.zoneColorSet
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.reducedMotionAware
+import com.trainerloop.ui.theme.trainerLoopColors
 import com.trainerloop.ui.workout.WorkoutStatsPager
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -999,7 +999,7 @@ private fun ImmersiveWorkoutChart(
             modifier = Modifier
               .size(8.dp)
               .clip(androidx.compose.foundation.shape.CircleShape)
-              .background(Green40)
+              .background(MaterialTheme.trainerLoopColors.connected)
           )
           Spacer(Modifier.width(6.dp))
           Text("Live", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
@@ -1036,7 +1036,7 @@ private fun BigMetric(
   animatedShowDashWhenZero: Boolean = false
 ) {
   val defaultValueColor = if (highlight) {
-    MaterialTheme.colorScheme.onPrimaryContainer
+    MaterialTheme.colorScheme.onSecondaryContainer
   } else {
     MaterialTheme.colorScheme.onSurface
   }
@@ -1061,7 +1061,7 @@ private fun BigMetric(
       )
     },
     colors = CardDefaults.cardColors(
-      containerColor = if (highlight) MaterialTheme.colorScheme.primaryContainer
+      containerColor = if (highlight) MaterialTheme.colorScheme.secondaryContainer
       else MaterialTheme.colorScheme.surfaceVariant
     )
   ) {
