@@ -105,7 +105,9 @@ fun ThemeCatalogScreen() {
     CatalogColor("chartCadence", semantic.chartCadence),
     CatalogColor("chartElevation", semantic.chartElevation),
     CatalogColor("chartGrid", semantic.chartGrid),
-    CatalogColor("chartCursor", semantic.chartCursor)
+    CatalogColor("chartCursor", semantic.chartCursor),
+    CatalogColor("chartPlanOutline", semantic.chartPlanOutline),
+    CatalogColor("chartPlanFill", semantic.chartPlanFill)
   )
 
   Surface(modifier = Modifier.fillMaxSize(), color = scheme.background) {

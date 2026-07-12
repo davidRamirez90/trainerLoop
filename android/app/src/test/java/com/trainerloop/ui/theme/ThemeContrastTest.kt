@@ -37,6 +37,20 @@ class ThemeContrastTest {
     }
   }
 
+  @Test
+  fun `plan profile outline reads against chart surfaces in both modes`() {
+    listOf(
+      Triple("light", LightTrainerLoopColors.chartPlanOutline, LightColorScheme.surface),
+      Triple("dark", DarkTrainerLoopColors.chartPlanOutline, DarkColorScheme.surface)
+    ).forEach { (mode, outline, surface) ->
+      val ratio = contrastRatio(outline, surface)
+      assertTrue(
+        "$mode chartPlanOutline must reach 3:1 non-text contrast on surface (was $ratio)",
+        ratio >= 3.0
+      )
+    }
+  }
+
   private fun assertSchemeContrast(name: String, scheme: ColorScheme) {
     val pairs = listOf(
       "onPrimary/primary" to (scheme.onPrimary to scheme.primary),

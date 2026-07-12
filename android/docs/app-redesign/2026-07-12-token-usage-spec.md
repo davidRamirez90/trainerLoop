@@ -90,6 +90,8 @@ Each role has exactly **one** responsibility; do not reuse a role for a second p
 | `chartElevation` | `#9B3F3B` (Coral40) | `#F88379` (Coral80) | Elevation-profile series only. |
 | `chartGrid` | `#C6B398` (Sand60) | `#59666A` (Neutral40) | Chart gridlines/axes. |
 | `chartCursor` | `#081417` (DarkBackground) | `#FFFCF8` (Foam) | Chart scrub cursor. |
+| `chartPlanOutline` | `#786956` (Sand40) | `#A9A197` (Neutral60) | Stepped outline of the planned-effort profile in workout charts. Monochrome — zone colors are never used for plan geometry. |
+| `chartPlanFill` | `#C6B398` (Sand60) | `#59666A` (Neutral40) | Faint tint under the plan outline; renderers apply ~8% alpha. |
 
 **Never-rules enforced by usage (see `WCAG` contrast tests in
 `app/src/test/java/com/trainerloop/ui/theme/ThemeContrastTest.kt`):**

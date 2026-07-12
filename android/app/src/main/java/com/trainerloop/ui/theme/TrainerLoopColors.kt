@@ -26,7 +26,9 @@ data class TrainerLoopColors(
   val chartCadence: Color,
   val chartElevation: Color,
   val chartGrid: Color,
-  val chartCursor: Color
+  val chartCursor: Color,
+  val chartPlanOutline: Color,
+  val chartPlanFill: Color
 )
 
 internal val LightTrainerLoopColors = TrainerLoopColors(
@@ -47,7 +49,9 @@ internal val LightTrainerLoopColors = TrainerLoopColors(
   chartCadence = Kelp40,
   chartElevation = Coral40,
   chartGrid = Sand60,
-  chartCursor = DarkBackground
+  chartCursor = DarkBackground,
+  chartPlanOutline = Sand40,
+  chartPlanFill = Sand60
 )
 
 internal val DarkTrainerLoopColors = TrainerLoopColors(
@@ -68,7 +72,9 @@ internal val DarkTrainerLoopColors = TrainerLoopColors(
   chartCadence = Kelp80,
   chartElevation = Coral80,
   chartGrid = Neutral40,
-  chartCursor = Foam
+  chartCursor = Foam,
+  chartPlanOutline = Neutral60,
+  chartPlanFill = Neutral40
 )
 
 val LocalTrainerLoopColors = staticCompositionLocalOf { LightTrainerLoopColors }
