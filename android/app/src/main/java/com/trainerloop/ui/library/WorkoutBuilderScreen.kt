@@ -7,7 +7,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
@@ -17,28 +20,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,17 +46,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
+import com.trainerloop.ui.components.InlineMessage
+import com.trainerloop.ui.components.MessageSeverity
+import com.trainerloop.ui.components.PrimaryActionButton
+import com.trainerloop.ui.components.SecondaryActionButton
+import com.trainerloop.ui.components.SecondaryActionStyle
+import com.trainerloop.ui.components.TrainerLoopCard
+import com.trainerloop.ui.components.TrainerLoopTopBar
 import com.trainerloop.ui.components.WorkoutMiniChart
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.NumericSmall
 import com.trainerloop.ui.theme.Spacing
+import com.trainerloop.ui.theme.ZoneColors
 import com.trainerloop.ui.theme.reducedMotionAware
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,14 +89,10 @@ fun WorkoutBuilderScreen(
   Scaffold(
     contentWindowInsets = WindowInsets(0),
     topBar = {
-      TopAppBar(
+      TrainerLoopTopBar(
+        title = "Workout Builder",
         windowInsets = WindowInsets(0),
-        title = { Text("Workout Builder") },
-        navigationIcon = {
-          IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-          }
-        }
+        onBack = onBack
       )
     }
   ) { padding ->
@@ -95,7 +100,7 @@ fun WorkoutBuilderScreen(
       modifier = Modifier
         .fillMaxSize()
         .padding(padding)
-        .padding(Spacing.lg)
+        .padding(Spacing.screenMargin)
         .navigationBarsPadding()
     ) {
       OutlinedTextField(
@@ -106,54 +111,48 @@ fun WorkoutBuilderScreen(
         modifier = Modifier.fillMaxWidth()
       )
 
-      Spacer(modifier = Modifier.height(Spacing.md))
+      Spacer(modifier = Modifier.height(Spacing.controlGap))
 
-      Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-          containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
-      ) {
-        Column(modifier = Modifier.padding(Spacing.md)) {
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            Text("Live preview", style = MaterialTheme.typography.titleSmall)
-            Text(
-              text = "${previewWorkout.segments.sumOf { it.durationSec } / 60} min",
-              style = NumericSmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-          }
-          AnimatedContent(
-            targetState = previewWorkout,
-            transitionSpec = {
-              fadeIn(animationSpec = previewMotionSpec) togetherWith
-                fadeOut(animationSpec = previewMotionSpec)
-            },
-            label = "workout builder preview"
-          ) { workout ->
-            WorkoutMiniChart(
-              workout = workout,
-              ftp = ftp,
-              modifier = Modifier.padding(top = Spacing.sm)
-            )
-          }
+      TrainerLoopCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Text("Live preview", style = MaterialTheme.typography.titleSmall)
+          Text(
+            text = "${previewWorkout.segments.sumOf { it.durationSec } / 60} min",
+            style = NumericSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+          )
+        }
+        AnimatedContent(
+          targetState = previewWorkout,
+          transitionSpec = {
+            fadeIn(animationSpec = previewMotionSpec) togetherWith
+              fadeOut(animationSpec = previewMotionSpec)
+          },
+          label = "workout builder preview"
+        ) { workout ->
+          WorkoutMiniChart(
+            workout = workout,
+            ftp = ftp,
+            modifier = Modifier.padding(top = Spacing.controlGap)
+          )
         }
       }
 
-      Spacer(modifier = Modifier.height(Spacing.md))
+      Spacer(modifier = Modifier.height(Spacing.controlGap))
 
       LazyColumn(
         modifier = Modifier.weight(1f),
-        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)
       ) {
         itemsIndexed(uiState.steps) { index, step ->
           StepCard(
             index = index,
             step = step,
+            ftp = ftp,
             canMoveUp = index > 0,
             canMoveDown = index < uiState.steps.lastIndex,
             onMoveUp = { viewModel.moveStep(index, index - 1) },
@@ -165,8 +164,9 @@ fun WorkoutBuilderScreen(
           )
         }
         item {
-          OutlinedButton(
+          SecondaryActionButton(
             onClick = viewModel::addStep,
+            style = SecondaryActionStyle.Outlined,
             modifier = Modifier.fillMaxWidth()
           ) {
             Icon(Icons.Default.Add, contentDescription = null)
@@ -176,9 +176,9 @@ fun WorkoutBuilderScreen(
         }
       }
 
-      Spacer(modifier = Modifier.height(Spacing.md))
+      Spacer(modifier = Modifier.height(Spacing.controlGap))
 
-      Button(
+      PrimaryActionButton(
         onClick = {
           val workout = uiState.toWorkout(id = "custom_${System.currentTimeMillis()}")
           ImportedWorkoutStore.add(context, workout)
@@ -199,10 +199,9 @@ fun WorkoutBuilderScreen(
         ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
       ) {
         displayedSaveReason?.let { reason ->
-          Text(
+          InlineMessage(
+            severity = MessageSeverity.Error,
             text = reason,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.error,
             modifier = Modifier.padding(top = Spacing.xs)
           )
         }
@@ -215,6 +214,7 @@ fun WorkoutBuilderScreen(
 private fun StepCard(
   index: Int,
   step: BuilderStepDraft,
+  ftp: Int,
   canMoveUp: Boolean,
   canMoveDown: Boolean,
   onMoveUp: () -> Unit,
@@ -224,49 +224,55 @@ private fun StepCard(
   onLowWChange: (String) -> Unit,
   onHighWChange: (String) -> Unit
 ) {
-  Card(
-    modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant
-    )
-  ) {
-    Column(modifier = Modifier.padding(Spacing.md)) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
+  val darkTheme = isSystemInDarkTheme()
+  val avgWatts = ((step.lowW.toIntOrNull() ?: 0) + (step.highW.toIntOrNull() ?: 0)) / 2
+  val zoneAccent = ZoneColors.forTarget(avgWatts, ftp, dark = darkTheme).line
+
+  TrainerLoopCard(modifier = Modifier.fillMaxWidth()) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+          modifier = Modifier
+            .size(8.dp)
+            .clip(CircleShape)
+            .background(zoneAccent)
+        )
+        Spacer(modifier = Modifier.width(Spacing.xs))
         Text(
           text = "Interval ${index + 1}",
           style = MaterialTheme.typography.titleSmall
         )
-        Row {
-          IconButton(onClick = onMoveUp, enabled = canMoveUp) {
-            Icon(
-              Icons.Default.KeyboardArrowUp,
-              contentDescription = "Move interval ${index + 1} up"
-            )
-          }
-          IconButton(onClick = onMoveDown, enabled = canMoveDown) {
-            Icon(
-              Icons.Default.KeyboardArrowDown,
-              contentDescription = "Move interval ${index + 1} down"
-            )
-          }
-          IconButton(onClick = onDelete) {
-            Icon(
-              Icons.Default.Delete,
-              contentDescription = "Delete interval ${index + 1}",
-              tint = MaterialTheme.colorScheme.error
-            )
-          }
+      }
+      Row {
+        IconButton(onClick = onMoveUp, enabled = canMoveUp) {
+          Icon(
+            Icons.Default.KeyboardArrowUp,
+            contentDescription = "Move interval ${index + 1} up"
+          )
+        }
+        IconButton(onClick = onMoveDown, enabled = canMoveDown) {
+          Icon(
+            Icons.Default.KeyboardArrowDown,
+            contentDescription = "Move interval ${index + 1} down"
+          )
+        }
+        IconButton(onClick = onDelete) {
+          Icon(
+            Icons.Default.Delete,
+            contentDescription = "Delete interval ${index + 1}",
+            tint = MaterialTheme.colorScheme.error
+          )
         }
       }
-      Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        NumberField(step.minutes, "Minutes", Modifier.weight(1f), onMinutesChange)
-        NumberField(step.lowW, "Low W", Modifier.weight(1f), onLowWChange)
-        NumberField(step.highW, "High W", Modifier.weight(1f), onHighWChange)
-      }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)) {
+      NumberField(step.minutes, "Minutes", Modifier.weight(1f), onMinutesChange)
+      NumberField(step.lowW, "Low W", Modifier.weight(1f), onLowWChange)
+      NumberField(step.highW, "High W", Modifier.weight(1f), onHighWChange)
     }
   }
 }

@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,22 +13,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,8 +45,9 @@ import com.trainerloop.data.model.Route
 import com.trainerloop.data.model.RoutePoint
 import com.trainerloop.data.repository.RouteRepository
 import com.trainerloop.data.source.local.AppDatabase
-import com.trainerloop.ui.components.pressable
-import com.trainerloop.ui.theme.NumericMedium
+import com.trainerloop.ui.components.MetricTile
+import com.trainerloop.ui.components.PrimaryActionButton
+import com.trainerloop.ui.components.TrainerLoopTopBar
 import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.ZoneColors
 import java.util.Locale
@@ -74,8 +69,7 @@ fun RouteDetailScreen(
   Scaffold(
     contentWindowInsets = WindowInsets(0),
     topBar = {
-      TopAppBar(
-        windowInsets = WindowInsets(0),
+      TrainerLoopTopBar(
         title = {
           Text(
             text = route?.name ?: "Route",
@@ -83,11 +77,8 @@ fun RouteDetailScreen(
             overflow = TextOverflow.Ellipsis
           )
         },
-        navigationIcon = {
-          IconButton(onClick = onBack, modifier = Modifier.pressable()) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-          }
-        }
+        windowInsets = WindowInsets(0),
+        onBack = onBack
       )
     }
   ) { padding ->
@@ -115,7 +106,7 @@ fun RouteDetailScreen(
         Column(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.lg)
+            .padding(horizontal = Spacing.screenMargin)
         ) {
           RouteStatsRow(route = loadedRoute)
           Spacer(modifier = Modifier.height(Spacing.xxl + 72.dp))
@@ -130,12 +121,11 @@ fun RouteDetailScreen(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 3.dp
       ) {
-        Button(
+        PrimaryActionButton(
           onClick = { onStartRide(routeId) },
           modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.sm)
-            .pressable()
+            .padding(horizontal = Spacing.screenMargin, vertical = Spacing.controlGap)
         ) {
           Icon(Icons.Default.PlayArrow, contentDescription = null)
           Text("Start Ride")
@@ -226,35 +216,26 @@ private fun ElevationHero(points: List<RoutePoint>) {
 private fun RouteStatsRow(route: Route) {
   val maxGrade = route.points.maxOf { abs(it.gradePercent) }
   Row(
-    modifier = Modifier.fillMaxWidth().padding(top = Spacing.lg),
-    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+    modifier = Modifier.fillMaxWidth().padding(top = Spacing.screenMargin),
+    horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
   ) {
-    RouteStat(
+    MetricTile(
       label = "Distance",
-      value = String.format(Locale.US, "%.1f km", route.totalDistanceM / 1000.0)
+      value = String.format(Locale.US, "%.1f", route.totalDistanceM / 1000.0),
+      unit = "km",
+      modifier = Modifier.weight(1f)
     )
-    RouteStat(label = "Ascent", value = "${route.totalAscentM} m")
-    RouteStat(
+    MetricTile(
+      label = "Ascent",
+      value = "${route.totalAscentM}",
+      unit = "m",
+      modifier = Modifier.weight(1f)
+    )
+    MetricTile(
       label = "Max grade",
-      value = String.format(Locale.US, "%.1f%%", maxGrade)
+      value = String.format(Locale.US, "%.1f", maxGrade),
+      unit = "%",
+      modifier = Modifier.weight(1f)
     )
-  }
-}
-
-@Composable
-private fun RowScope.RouteStat(label: String, value: String) {
-  Surface(
-    modifier = Modifier.weight(1f),
-    shape = RoundedCornerShape(Spacing.sm),
-    color = MaterialTheme.colorScheme.surfaceVariant
-  ) {
-    Column(modifier = Modifier.padding(Spacing.md)) {
-      Text(text = value, style = NumericMedium)
-      Text(
-        text = label,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
-    }
   }
 }

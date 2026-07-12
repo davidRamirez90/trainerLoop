@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,8 +34,6 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -61,9 +60,13 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trainerloop.ui.components.PrimaryActionButton
+import com.trainerloop.ui.components.SectionHeader
+import com.trainerloop.ui.components.TrainerLoopCard
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.reducedMotionAware
+import com.trainerloop.ui.theme.trainerLoopColors
 import kotlinx.coroutines.delay
 
 @Composable
@@ -114,217 +117,243 @@ fun SettingsScreen(
     modifier = Modifier
       .fillMaxSize()
       .verticalScroll(rememberScrollState())
-      .padding(horizontal = Spacing.lg),
-    verticalArrangement = Arrangement.spacedBy(Spacing.xl)
+      .padding(horizontal = Spacing.screenMargin),
+    verticalArrangement = Arrangement.spacedBy(Spacing.sectionGap)
   ) {
     Text(
       text = "Profile",
-      style = MaterialTheme.typography.headlineLarge
+      style = MaterialTheme.typography.headlineLarge,
+      modifier = Modifier.padding(top = Spacing.controlGap)
     )
 
-    RiderProfileHeader(
-      name = uiState.name,
-      onNameChange = viewModel::updateName
-    )
-
-    ProfileFieldCard(
-      title = "Key Metrics",
-      fields = listOf(
-        ProfileField(
-          label = "FTP",
-          value = uiState.ftp,
-          suffix = "W",
-          onValueChange = viewModel::updateFtp
-        ),
-        ProfileField(
-          label = "Weight",
-          value = uiState.weightKg,
-          suffix = "kg",
-          keyboardType = KeyboardType.Decimal,
-          onValueChange = viewModel::updateWeight
+    // Athlete: identity + the metrics every other section derives from.
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)) {
+      SectionHeader(title = "Athlete")
+      RiderProfileHeader(
+        name = uiState.name,
+        onNameChange = viewModel::updateName
+      )
+      ProfileFieldCard(
+        title = "Key Metrics",
+        fields = listOf(
+          ProfileField(
+            label = "FTP",
+            value = uiState.ftp,
+            suffix = "W",
+            onValueChange = viewModel::updateFtp
+          ),
+          ProfileField(
+            label = "Weight",
+            value = uiState.weightKg,
+            suffix = "kg",
+            keyboardType = KeyboardType.Decimal,
+            onValueChange = viewModel::updateWeight
+          )
         )
       )
-    )
-
-    ProfileFieldCard(
-      title = "Heart Rate",
-      fields = listOf(
-        ProfileField(
-          label = "Max HR",
-          value = uiState.maxHr,
-          suffix = "bpm",
-          onValueChange = viewModel::updateMaxHr
-        ),
-        ProfileField(
-          label = "Resting HR",
-          value = uiState.restingHr,
-          suffix = "bpm",
-          onValueChange = viewModel::updateRestingHr
-        ),
-        ProfileField(
-          label = "LTHR (optional)",
-          value = uiState.lthr,
-          suffix = "bpm",
-          onValueChange = viewModel::updateLthr
-        )
-      )
-    )
-
-    SettingsGroupCard(title = "Preferences") {
-      SettingsRow(
-        icon = Icons.Default.Power,
-        label = "ERG Bias",
-        trailing = {
-          CompactNumberField(
-            value = uiState.ergBias,
-            suffix = "%",
-            onValueChange = viewModel::updateErgBias
-          )
-        }
-      )
-      HorizontalDivider()
-      SettingsRow(
-        icon = Icons.Default.Person,
-        label = "Coach",
-        trailing = {
-          androidx.compose.material3.Switch(
-            checked = uiState.coachEnabled,
-            onCheckedChange = viewModel::updateCoachEnabled
-          )
-        }
-      )
-      HorizontalDivider()
-      SettingsRow(
-        icon = Icons.Default.Person,
-        label = "Coach Profile",
-        trailing = {
-          Text(
-            text = uiState.selectedCoach,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        },
-        onClick = { activeDialog = SettingsDialog.COACH_PROFILE }
-      )
-      HorizontalDivider()
-      SettingsRow(
-        icon = Icons.Default.Notifications,
-        label = "Completion sound",
-        trailing = {
-          androidx.compose.material3.Switch(
-            checked = uiState.completionSoundEnabled,
-            onCheckedChange = viewModel::updateCompletionSoundEnabled
-          )
-        }
-      )
-    }
-
-    SettingsGroupCard(title = "Zones") {
-      SettingsRow(
-        icon = Icons.Default.Power,
-        label = "Power Zones",
-        onClick = { activeDialog = SettingsDialog.POWER_ZONES }
-      )
-      HorizontalDivider()
-      SettingsRow(
-        icon = Icons.Default.Favorite,
-        label = "Heart Rate Zones",
-        onClick = { activeDialog = SettingsDialog.HR_ZONES }
-      )
-    }
-
-    SettingsGroupCard(title = "Virtual Ride") {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Column(modifier = Modifier.weight(1f)) {
-          Text("Simulated route + speed", style = MaterialTheme.typography.bodyMedium)
-          Text(
-            "Terrain overlay and physics-based speed during workouts",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
-        androidx.compose.material3.Switch(
-          checked = uiState.virtualRideEnabled,
-          onCheckedChange = viewModel::updateVirtualRideEnabled
+      SettingsGroupCard {
+        SettingsRow(
+          icon = Icons.Default.Power,
+          label = "Power Zones",
+          onClick = { activeDialog = SettingsDialog.POWER_ZONES }
         )
       }
+    }
 
-      var advancedExpanded by remember { mutableStateOf(false) }
-      TextButton(onClick = { advancedExpanded = !advancedExpanded }) {
-        Text(if (advancedExpanded) "Hide advanced" else "Advanced")
-      }
-      AnimatedVisibility(
-        visible = advancedExpanded,
-        enter = expandVertically(
-          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
-        ) + fadeIn(
-          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>())
-        ),
-        exit = shrinkVertically(
-          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
-        ) + fadeOut(
-          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>())
+    // Heart Rate: HR-derived metrics and the zone table they feed.
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)) {
+      SectionHeader(title = "Heart Rate")
+      ProfileFieldCard(
+        title = "Heart Rate Metrics",
+        fields = listOf(
+          ProfileField(
+            label = "Max HR",
+            value = uiState.maxHr,
+            suffix = "bpm",
+            onValueChange = viewModel::updateMaxHr
+          ),
+          ProfileField(
+            label = "Resting HR",
+            value = uiState.restingHr,
+            suffix = "bpm",
+            onValueChange = viewModel::updateRestingHr
+          ),
+          ProfileField(
+            label = "LTHR (optional)",
+            value = uiState.lthr,
+            suffix = "bpm",
+            onValueChange = viewModel::updateLthr
+          )
         )
-      ) {
-        Column(
+      )
+      SettingsGroupCard {
+        SettingsRow(
+          icon = Icons.Default.Favorite,
+          label = "Heart Rate Zones",
+          onClick = { activeDialog = SettingsDialog.HR_ZONES }
+        )
+      }
+    }
+
+    // Ride Preferences: how a normal ride behaves.
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)) {
+      SectionHeader(title = "Ride Preferences")
+      SettingsGroupCard {
+        SettingsRow(
+          icon = Icons.Default.Power,
+          label = "ERG Bias",
+          trailing = {
+            CompactNumberField(
+              value = uiState.ergBias,
+              suffix = "%",
+              onValueChange = viewModel::updateErgBias
+            )
+          }
+        )
+        HorizontalDivider()
+        SettingsRow(
+          icon = Icons.Default.Notifications,
+          label = "Completion sound",
+          trailing = {
+            androidx.compose.material3.Switch(
+              checked = uiState.completionSoundEnabled,
+              onCheckedChange = viewModel::updateCompletionSoundEnabled
+            )
+          }
+        )
+      }
+    }
+
+    // Coaching: the coral-accented section — coral never appears on a toggle.
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)) {
+      SectionHeader(title = "Coaching")
+      SettingsGroupCard {
+        SettingsRow(
+          icon = Icons.Default.Person,
+          label = "Coach",
+          iconTint = MaterialTheme.trainerLoopColors.coach,
+          trailing = {
+            androidx.compose.material3.Switch(
+              checked = uiState.coachEnabled,
+              onCheckedChange = viewModel::updateCoachEnabled
+            )
+          }
+        )
+        HorizontalDivider()
+        SettingsRow(
+          icon = Icons.Default.Person,
+          label = "Coach Profile",
+          iconTint = MaterialTheme.trainerLoopColors.coach,
+          trailing = {
+            Text(
+              text = uiState.selectedCoach,
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+          },
+          onClick = { activeDialog = SettingsDialog.COACH_PROFILE }
+        )
+      }
+    }
+
+    // Simulation: virtual-ride terrain + advanced physics, collapsed by default.
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)) {
+      SectionHeader(title = "Simulation")
+      SettingsGroupCard {
+        Row(
           modifier = Modifier.fillMaxWidth(),
-          verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically
         ) {
-          LabeledSlider(
-            label = "Bike weight",
-            valueText = "${uiState.bikeWeightKg} kg",
-            hint = null,
-            value = uiState.bikeWeightKg.toFloatOrNull() ?: 8.0f,
-            valueRange = 5f..15f,
-            steps = 19, // 0.5 kg increments
-            onValueChange = { viewModel.updateBikeWeight(fmt(it, 1)) }
+          Column(modifier = Modifier.weight(1f)) {
+            Text("Simulated route + speed", style = MaterialTheme.typography.bodyMedium)
+            Text(
+              "Terrain overlay and physics-based speed during workouts",
+              style = MaterialTheme.typography.bodySmall,
+              color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+          }
+          androidx.compose.material3.Switch(
+            checked = uiState.virtualRideEnabled,
+            onCheckedChange = viewModel::updateVirtualRideEnabled
           )
-          LabeledSlider(
-            label = "Rolling resistance (Crr)",
-            valueText = uiState.crr,
-            hint = crrHint(uiState.crr.toDoubleOrNull() ?: 0.005),
-            value = uiState.crr.toFloatOrNull() ?: 0.005f,
-            valueRange = 0.002f..0.010f,
-            steps = 15, // 0.0005 increments
-            onValueChange = { viewModel.updateCrr(fmt(it, 4)) }
+        }
+
+        var advancedExpanded by remember { mutableStateOf(false) }
+        TextButton(onClick = { advancedExpanded = !advancedExpanded }) {
+          Text(if (advancedExpanded) "Hide advanced" else "Advanced")
+        }
+        AnimatedVisibility(
+          visible = advancedExpanded,
+          enter = expandVertically(
+            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+          ) + fadeIn(
+            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>())
+          ),
+          exit = shrinkVertically(
+            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
+          ) + fadeOut(
+            animationSpec = reducedMotionAware(MotionSpec.defaultSpring<Float>())
           )
-          LabeledSlider(
-            label = "Aero drag (CdA)",
-            valueText = "${uiState.cda} m²",
-            hint = cdaHint(uiState.cda.toDoubleOrNull() ?: 0.32),
-            value = uiState.cda.toFloatOrNull() ?: 0.32f,
-            valueRange = 0.15f..0.60f,
-            steps = 44, // 0.01 increments
-            onValueChange = { viewModel.updateCda(fmt(it, 2)) }
-          )
-          LabeledSlider(
-            label = "Trainer difficulty",
-            valueText = "${uiState.trainerDifficultyPct} %",
-            hint = "How much of a GPX route's gradient you feel on free rides",
-            value = uiState.trainerDifficultyPct.toFloat(),
-            valueRange = 0f..100f,
-            steps = 19, // 5 % increments
-            onValueChange = { viewModel.updateTrainerDifficulty(it.toInt()) }
-          )
-          TextButton(onClick = { viewModel.resetPhysicsDefaults() }) {
-            Text("Reset to defaults")
+        ) {
+          Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)
+          ) {
+            LabeledSlider(
+              label = "Bike weight",
+              valueText = "${uiState.bikeWeightKg} kg",
+              hint = null,
+              value = uiState.bikeWeightKg.toFloatOrNull() ?: 8.0f,
+              valueRange = 5f..15f,
+              steps = 19, // 0.5 kg increments
+              onValueChange = { viewModel.updateBikeWeight(fmt(it, 1)) }
+            )
+            LabeledSlider(
+              label = "Rolling resistance (Crr)",
+              valueText = uiState.crr,
+              hint = crrHint(uiState.crr.toDoubleOrNull() ?: 0.005),
+              value = uiState.crr.toFloatOrNull() ?: 0.005f,
+              valueRange = 0.002f..0.010f,
+              steps = 15, // 0.0005 increments
+              onValueChange = { viewModel.updateCrr(fmt(it, 4)) }
+            )
+            LabeledSlider(
+              label = "Aero drag (CdA)",
+              valueText = "${uiState.cda} m²",
+              hint = cdaHint(uiState.cda.toDoubleOrNull() ?: 0.32),
+              value = uiState.cda.toFloatOrNull() ?: 0.32f,
+              valueRange = 0.15f..0.60f,
+              steps = 44, // 0.01 increments
+              onValueChange = { viewModel.updateCda(fmt(it, 2)) }
+            )
+            LabeledSlider(
+              label = "Trainer difficulty",
+              valueText = "${uiState.trainerDifficultyPct} %",
+              hint = "How much of a GPX route's gradient you feel on free rides",
+              value = uiState.trainerDifficultyPct.toFloat(),
+              valueRange = 0f..100f,
+              steps = 19, // 5 % increments
+              onValueChange = { viewModel.updateTrainerDifficulty(it.toInt()) }
+            )
+            TextButton(onClick = { viewModel.resetPhysicsDefaults() }) {
+              Text("Reset to defaults")
+            }
           }
         }
       }
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
-      Column(modifier = Modifier.padding(Spacing.lg)) {
+    // Connections: third-party sync — API credentials stay masked with reveal.
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)) {
+      SectionHeader(title = "Connections")
+      TrainerLoopCard(modifier = Modifier.fillMaxWidth()) {
         Text(
           text = "intervals.icu",
           style = MaterialTheme.typography.titleMedium,
           fontWeight = FontWeight.SemiBold
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.controlGap))
         OutlinedTextField(
           value = uiState.intervalsAthleteId,
           onValueChange = viewModel::updateIntervalsAthleteId,
@@ -332,7 +361,7 @@ fun SettingsScreen(
           singleLine = true,
           modifier = Modifier.fillMaxWidth()
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(Spacing.sm))
         OutlinedTextField(
           value = uiState.intervalsApiKey,
           onValueChange = viewModel::updateIntervalsApiKey,
@@ -356,16 +385,20 @@ fun SettingsScreen(
       }
     }
 
-    SettingsGroupCard(title = "Support") {
-      SettingsRow(
-        icon = Icons.Default.Info,
-        label = "About",
-        onClick = { activeDialog = SettingsDialog.ABOUT }
-      )
+    // App: about / support.
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)) {
+      SectionHeader(title = "App")
+      SettingsGroupCard {
+        SettingsRow(
+          icon = Icons.Default.Info,
+          label = "About",
+          onClick = { activeDialog = SettingsDialog.ABOUT }
+        )
+      }
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-      Button(
+      PrimaryActionButton(
         onClick = { viewModel.save() },
         modifier = Modifier.fillMaxWidth()
       ) {
@@ -383,7 +416,7 @@ fun SettingsScreen(
         Text(
           text = "Saved ✓",
           style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.primary,
+          color = MaterialTheme.trainerLoopColors.connected,
           modifier = Modifier.padding(top = Spacing.sm)
         )
       }
@@ -580,34 +613,32 @@ private fun ProfileFieldCard(
   title: String,
   fields: List<ProfileField>
 ) {
-  Card(modifier = Modifier.fillMaxWidth()) {
-      Column(modifier = Modifier.padding(Spacing.lg)) {
-      Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold
-      )
-      Spacer(modifier = Modifier.height(12.dp))
-      fields.forEachIndexed { index, field ->
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Text(
-            text = field.label,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f)
-          )
-          CompactNumberField(
-            value = field.value,
-            suffix = field.suffix,
-            keyboardType = field.keyboardType,
-            onValueChange = field.onValueChange
-          )
-        }
-        if (index < fields.lastIndex) {
-          Spacer(modifier = Modifier.height(8.dp))
-        }
+  TrainerLoopCard(modifier = Modifier.fillMaxWidth()) {
+    Text(
+      text = title,
+      style = MaterialTheme.typography.titleMedium,
+      fontWeight = FontWeight.SemiBold
+    )
+    Spacer(modifier = Modifier.height(Spacing.controlGap))
+    fields.forEachIndexed { index, field ->
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Text(
+          text = field.label,
+          style = MaterialTheme.typography.bodyLarge,
+          modifier = Modifier.weight(1f)
+        )
+        CompactNumberField(
+          value = field.value,
+          suffix = field.suffix,
+          keyboardType = field.keyboardType,
+          onValueChange = field.onValueChange
+        )
+      }
+      if (index < fields.lastIndex) {
+        Spacer(modifier = Modifier.height(Spacing.sm))
       }
     }
   }
@@ -635,19 +666,19 @@ private fun CompactNumberField(
 
 @Composable
 private fun SettingsGroupCard(
-  title: String,
+  title: String? = null,
   content: @Composable () -> Unit
 ) {
-  Card(modifier = Modifier.fillMaxWidth()) {
-    Column(modifier = Modifier.padding(Spacing.lg)) {
+  TrainerLoopCard(modifier = Modifier.fillMaxWidth()) {
+    if (title != null) {
       Text(
         text = title,
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.SemiBold
       )
-      Spacer(modifier = Modifier.height(8.dp))
-      content()
+      Spacer(modifier = Modifier.height(Spacing.sm))
     }
+    content()
   }
 }
 
@@ -708,13 +739,15 @@ private fun SettingsRow(
   icon: ImageVector,
   label: String,
   onClick: (() -> Unit)? = null,
+  iconTint: androidx.compose.ui.graphics.Color? = null,
   trailing: @Composable (() -> Unit)? = null
 ) {
   Row(
     modifier = Modifier
       .fillMaxWidth()
       .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-      .padding(vertical = 12.dp),
+      .heightIn(min = 48.dp)
+      .padding(vertical = Spacing.sm),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.SpaceBetween
   ) {
@@ -722,7 +755,7 @@ private fun SettingsRow(
       Icon(
         imageVector = icon,
         contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant
+        tint = iconTint ?: MaterialTheme.colorScheme.onSurfaceVariant
       )
       Spacer(modifier = Modifier.width(16.dp))
       Text(

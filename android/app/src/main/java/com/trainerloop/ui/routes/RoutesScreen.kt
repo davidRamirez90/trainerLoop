@@ -19,38 +19,44 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.trainerloop.data.model.Route
+import com.trainerloop.data.repository.RouteRepository
 import com.trainerloop.data.repository.RouteSummary
+import com.trainerloop.data.source.local.AppDatabase
+import com.trainerloop.ui.components.EmptyState
+import com.trainerloop.ui.components.MessageSeverity
+import com.trainerloop.ui.components.InlineMessage
+import com.trainerloop.ui.components.PrimaryActionButton
+import com.trainerloop.ui.components.RouteProfileChart
+import com.trainerloop.ui.components.TrainerLoopCard
+import com.trainerloop.ui.components.TrainerLoopTopBar
 import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.reducedMotionAware
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RoutesScreen(
   onRouteClick: (String) -> Unit,
@@ -78,15 +84,11 @@ fun RoutesScreen(
   Scaffold(
     contentWindowInsets = WindowInsets(0),
     topBar = {
-      TopAppBar(
+      TrainerLoopTopBar(
+        title = "GPX Routes",
         windowInsets = WindowInsets(0),
-        title = { Text("GPX Routes") },
-        navigationIcon = {
-          IconButton(onClick = onBack, modifier = Modifier.pressable()) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-          }
-        },
-        actions = {
+        onBack = onBack,
+        firstAction = {
           AnimatedVisibility(
             visible = hasRoutes,
             enter = fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
@@ -102,8 +104,8 @@ fun RoutesScreen(
   ) { padding ->
     LazyColumn(
       modifier = Modifier.fillMaxSize().padding(padding),
-      contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.lg),
-      verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+      contentPadding = PaddingValues(horizontal = Spacing.screenMargin, vertical = Spacing.screenMargin),
+      verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)
     ) {
       item(key = "route-empty-state") {
         AnimatedVisibility(
@@ -115,17 +117,20 @@ fun RoutesScreen(
             animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
           ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
         ) {
-          Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Button(onClick = importGpx, modifier = Modifier.fillMaxWidth().pressable()) {
-              Icon(Icons.Default.Add, contentDescription = null)
-              Text("Import GPX")
+          EmptyState(
+            icon = Icons.Default.Map,
+            title = "No routes yet",
+            body = "Import a GPX file to ride it.",
+            action = {
+              PrimaryActionButton(
+                onClick = importGpx,
+                modifier = Modifier.fillMaxWidth().padding(top = Spacing.controlGap)
+              ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Text("Import GPX")
+              }
             }
-            Text(
-              "No routes yet — import a GPX file to ride it.",
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-          }
+          )
         }
       }
 
@@ -136,11 +141,7 @@ fun RoutesScreen(
           exit = fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
         ) {
           displayedImportError?.let {
-            Text(
-              text = it,
-              color = MaterialTheme.colorScheme.error,
-              style = MaterialTheme.typography.bodyMedium
-            )
+            InlineMessage(severity = MessageSeverity.Error, text = it)
           }
         }
       }
@@ -155,7 +156,7 @@ fun RoutesScreen(
             animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
           ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
         ) {
-          Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+          Column(verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)) {
             routes.forEach { route ->
               RouteRow(
                 route = route,
@@ -172,12 +173,23 @@ fun RoutesScreen(
 
 @Composable
 private fun RouteRow(route: RouteSummary, onClick: () -> Unit, onDelete: () -> Unit) {
-  Card(
-    onClick = onClick,
-    modifier = Modifier.fillMaxWidth().pressable()
+  val context = LocalContext.current
+  var fullRoute by remember(route.id) { mutableStateOf<Route?>(null) }
+  LaunchedEffect(route.id) {
+    fullRoute = RouteRepository.create(AppDatabase.getInstance(context)).getById(route.id)
+  }
+
+  TrainerLoopCard(
+    modifier = Modifier.fillMaxWidth(),
+    onClick = onClick
   ) {
+    val loadedRoute = fullRoute
+    if (loadedRoute != null && loadedRoute.points.size >= 2) {
+      RouteProfileChart(points = loadedRoute.points, positionM = null)
+      Spacer(modifier = Modifier.height(Spacing.controlGap))
+    }
     Row(
-      modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+      modifier = Modifier.fillMaxWidth(),
       verticalAlignment = Alignment.CenterVertically
     ) {
       Column(modifier = Modifier.weight(1f)) {

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,15 +35,11 @@ import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,15 +55,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.ble.BlePermissions
+import com.trainerloop.ui.components.PrimaryActionButton
+import com.trainerloop.ui.components.SecondaryActionButton
+import com.trainerloop.ui.components.SecondaryActionStyle
+import com.trainerloop.ui.components.SectionHeader
+import com.trainerloop.ui.components.StatusPill
+import com.trainerloop.ui.components.StatusPillState
+import com.trainerloop.ui.components.TrainerLoopCard
 import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.theme.LocalReducedMotion
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.Spacing
 import com.trainerloop.ui.theme.reducedMotionAware
-import com.trainerloop.ui.theme.trainerLoopColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -103,7 +107,7 @@ fun DevicesScreen(
       Column(
         modifier = Modifier
           .fillMaxSize()
-          .padding(horizontal = Spacing.lg)
+          .padding(horizontal = Spacing.screenMargin)
       ) {
         Row(
           modifier = Modifier.fillMaxWidth(),
@@ -115,11 +119,11 @@ fun DevicesScreen(
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
           )
-          TextButton(
+          SecondaryActionButton(
             onClick = {
               if (uiState.isScanning) viewModel.stopScan() else viewModel.startScan()
             },
-            modifier = Modifier.pressable()
+            style = SecondaryActionStyle.Tonal
           ) {
             Text(if (uiState.isScanning) "Stop" else "Scan")
           }
@@ -155,14 +159,10 @@ fun DevicesScreen(
           modifier = Modifier
             .fillMaxWidth()
             .weight(1f),
-          verticalArrangement = Arrangement.spacedBy(Spacing.md)
+          verticalArrangement = Arrangement.spacedBy(Spacing.controlGap)
         ) {
           item {
-            Text(
-              text = "Connected devices",
-              style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.SemiBold
-            )
+            SectionHeader(title = "Connected devices")
           }
 
           item {
@@ -193,10 +193,9 @@ fun DevicesScreen(
           }
 
           item {
-            Text(
-              text = "Available devices",
-              style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.SemiBold
+            SectionHeader(
+              title = "Available devices",
+              modifier = Modifier.padding(top = Spacing.sectionGap - Spacing.controlGap)
             )
           }
 
@@ -250,7 +249,7 @@ fun DevicesScreen(
       ) {
         displayedError?.let { error ->
           Snackbar(
-            modifier = Modifier.padding(Spacing.lg),
+            modifier = Modifier.padding(Spacing.screenMargin),
             containerColor = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
             actionContentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -279,18 +278,17 @@ fun DevicesScreen(
 
 @Composable
 private fun PermissionBanner(onGrant: () -> Unit) {
-  Card(
+  androidx.compose.material3.Surface(
     modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.errorContainer
-    )
+    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+    color = MaterialTheme.colorScheme.errorContainer
   ) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(Spacing.md),
+        .padding(Spacing.cardPadding),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(Spacing.md)
+      horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
     ) {
       Icon(
         imageVector = Icons.Default.BluetoothDisabled,
@@ -306,7 +304,7 @@ private fun PermissionBanner(onGrant: () -> Unit) {
       )
       TextButton(
         onClick = onGrant,
-        modifier = Modifier.pressable()
+        modifier = Modifier.pressable().heightIn(min = 48.dp)
       ) {
         Text("Grant")
       }
@@ -359,30 +357,29 @@ private fun PairedDeviceCard(
   detail: String,
   onDisconnect: () -> Unit
 ) {
-  Card(
-    modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.primaryContainer
-    )
-  ) {
+  TrainerLoopCard(modifier = Modifier.fillMaxWidth()) {
     Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(Spacing.lg),
-      horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap),
       verticalAlignment = Alignment.CenterVertically
     ) {
-      Icon(
-        imageVector = Icons.Default.BluetoothConnected,
-        contentDescription = "Connected",
-        tint = MaterialTheme.trainerLoopColors.connected
-      )
       Column(modifier = Modifier.weight(1f)) {
         Text(
           text = name,
           style = MaterialTheme.typography.titleMedium,
           fontWeight = FontWeight.SemiBold
         )
+        Spacer(modifier = Modifier.size(Spacing.xs))
+        Row(
+          horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          StatusPill(
+            state = StatusPillState.Connected,
+            label = "Connected",
+            icon = Icons.Default.BluetoothConnected
+          )
+        }
         CapabilityBadges(capabilities)
         Text(
           text = detail,
@@ -390,9 +387,9 @@ private fun PairedDeviceCard(
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
       }
-      OutlinedButton(
+      SecondaryActionButton(
         onClick = onDisconnect,
-        modifier = Modifier.pressable()
+        style = SecondaryActionStyle.Outlined
       ) {
         Text("Disconnect")
       }
@@ -407,17 +404,10 @@ private fun AvailableDeviceCard(
   onConnect: () -> Unit
 ) {
   val fastMotionSpec = reducedMotionAware(MotionSpec.fast)
-  Card(
-    modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant
-    )
-  ) {
+  TrainerLoopCard(modifier = Modifier.fillMaxWidth(), emphasized = true) {
     Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(Spacing.lg),
-      horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+      modifier = Modifier.fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap),
       verticalAlignment = Alignment.CenterVertically
     ) {
       Icon(
@@ -433,14 +423,13 @@ private fun AvailableDeviceCard(
         CapabilityBadges(device.capabilities)
         Text(
           text = "${device.device.address} · RSSI ${device.device.rssi}",
-          style = MaterialTheme.typography.bodySmall,
+          style = MaterialTheme.typography.labelSmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
       }
-      Button(
+      PrimaryActionButton(
         onClick = onConnect,
-        enabled = !isConnecting,
-        modifier = Modifier.pressable()
+        enabled = !isConnecting
       ) {
         AnimatedContent(
           targetState = isConnecting,
@@ -451,11 +440,17 @@ private fun AvailableDeviceCard(
           label = "device-connect-content"
         ) { connecting ->
           if (connecting) {
-            CircularProgressIndicator(
-              modifier = Modifier.size(Spacing.lg),
-              strokeWidth = Spacing.xs / 2,
-              color = MaterialTheme.colorScheme.onPrimary
-            )
+            Row(
+              horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              CircularProgressIndicator(
+                modifier = Modifier.size(Spacing.lg),
+                strokeWidth = Spacing.xs / 2,
+                color = MaterialTheme.colorScheme.onPrimary
+              )
+              Text("Connecting…")
+            }
           } else {
             Text("Connect")
           }
