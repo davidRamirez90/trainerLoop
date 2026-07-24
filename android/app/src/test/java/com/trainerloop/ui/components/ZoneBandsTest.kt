@@ -11,13 +11,18 @@ class ZoneBandsTest {
 
   private val ftp = 200
 
-  private fun step(id: String, durationSec: Int, watts: Int) = WorkoutSegment.Step(
+  private fun step(
+    id: String,
+    durationSec: Int,
+    lowWatts: Int,
+    highWatts: Int = lowWatts
+  ) = WorkoutSegment.Step(
     id = id,
     durationSec = durationSec,
     label = null,
     phase = SegmentPhase.WORK,
     isWork = true,
-    targetRange = TargetRange(watts, watts)
+    targetRange = TargetRange(lowWatts, highWatts)
   )
 
   @Test
@@ -27,8 +32,23 @@ class ZoneBandsTest {
     assertEquals(1, bands.size)
     assertEquals(3, bands[0].zone)
     assertEquals(150, bands[0].targetWatts)
+    assertEquals(150, bands[0].lowWatts)
+    assertEquals(150, bands[0].highWatts)
     assertEquals(0f, bands[0].startSec)
     assertEquals(600f, bands[0].endSec)
+  }
+
+  @Test
+  fun `constant target range preserves bounds and midpoint`() {
+    val bands = zoneBands(
+      listOf(step("a", 600, 176, 190)),
+      ftp, winStartSec = 0f, winEndSec = 600f, stepSec = 3f
+    )
+
+    assertEquals(1, bands.size)
+    assertEquals(176, bands[0].lowWatts)
+    assertEquals(190, bands[0].highWatts)
+    assertEquals(183, bands[0].targetWatts)
   }
 
   @Test
@@ -61,6 +81,7 @@ class ZoneBandsTest {
     // Monotonic targets and zones.
     assertTrue(bands.first().targetWatts < bands.last().targetWatts)
     assertTrue(bands.first().zone < bands.last().zone)
+    assertTrue(bands.all { it.lowWatts == it.highWatts })
     // Full coverage of the window.
     assertEquals(0f, bands.first().startSec)
     assertEquals(300f, bands.last().endSec)

@@ -198,6 +198,9 @@ fun WorkoutChart(
   val powerLineColor = semanticColors.chartPower
   val planOutlineColor = semanticColors.chartPlanOutline
   val planFillColor = semanticColors.chartPlanFill.copy(alpha = PLAN_FILL_ALPHA)
+  val planRangeFillColor = semanticColors.chartPlanFill.copy(alpha = PLAN_RANGE_FILL_ALPHA)
+  val planSplineColor = planOutlineColor.copy(alpha = PLAN_SPLINE_ALPHA)
+  val planReferenceColor = planOutlineColor.copy(alpha = PLAN_REFERENCE_ALPHA)
   // With the opaque zone blocks gone, the terrain no longer needs to fight
   // for legibility; these alphas are tuned against the bare card surface.
   val elevationFillColor = semanticColors.chartElevation.copy(alpha = 0.30f)
@@ -400,14 +403,19 @@ fun WorkoutChart(
         }
 
         // 1) Faint plan fill — the quiet backdrop everything sits on.
-        val planRuns = planProfileRuns(
-          zoneBands(
-            segments = segments,
-            ftp = ftp,
-            winStartSec = winStart,
-            winEndSec = winEnd,
-            stepSec = (winSpan / 200f).coerceAtLeast(1f)
-          )
+        val planBands = zoneBands(
+          segments = segments,
+          ftp = ftp,
+          winStartSec = winStart,
+          winEndSec = winEnd,
+          stepSec = (winSpan / 200f).coerceAtLeast(1f)
+        )
+        val planRuns = planProfileRuns(planBands)
+        drawPlanRangeFills(
+          bands = planBands,
+          xForTime = ::xForTime,
+          yForPower = ::yForPower,
+          color = planRangeFillColor
         )
         buildPlanProfilePaths(
           runs = planRuns,
@@ -488,7 +496,21 @@ fun WorkoutChart(
 
         // 5) Plan outline above the terrain so low recovery targets are not
         // hidden behind the elevation silhouette.
-        drawPath(planOutlineScratchPath, color = planOutlineColor, style = Stroke(width = 2.dp.toPx()))
+        drawPlanRangeOutlines(
+          bands = planBands,
+          xForTime = ::xForTime,
+          yForPower = ::yForPower,
+          color = planSplineColor,
+          strokeWidth = 2.dp.toPx()
+        )
+        drawPath(planOutlineScratchPath, color = planSplineColor, style = Stroke(width = 2.dp.toPx()))
+        drawPlanRangeReferences(
+          bands = planBands,
+          xForTime = ::xForTime,
+          yForPower = ::yForPower,
+          color = planReferenceColor,
+          strokeWidth = 2.dp.toPx()
+        )
 
         // Cached paths are stored in time/value coordinates. Transform their
         // geometry into screen coordinates so the stroke is not scaled.
@@ -745,6 +767,8 @@ internal data class ZoneBand(
   val zone: Int,
   val startSec: Float,
   val endSec: Float,
+  val lowWatts: Int,
+  val highWatts: Int,
   val targetWatts: Int
 )
 
@@ -771,10 +795,16 @@ internal fun zoneBands(
     if (target > 0) {
       val zone = ZoneColors.zoneIndex(target, ftp)
       val last = bands.lastOrNull()
-      if (last != null && last.zone == zone && last.targetWatts == target && last.endSec == sec) {
+      if (last != null &&
+        last.zone == zone &&
+        last.lowWatts == range.low &&
+        last.highWatts == range.high &&
+        last.targetWatts == target &&
+        last.endSec == sec
+      ) {
         bands[bands.lastIndex] = last.copy(endSec = nextSec)
       } else {
-        bands.add(ZoneBand(zone, sec, nextSec, target))
+        bands.add(ZoneBand(zone, sec, nextSec, range.low, range.high, target))
       }
     }
     sec = nextSec

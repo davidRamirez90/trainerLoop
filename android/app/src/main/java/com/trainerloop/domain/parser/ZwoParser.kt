@@ -7,7 +7,10 @@ import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
 import org.w3c.dom.Element
 import org.w3c.dom.Node
+import org.xml.sax.InputSource
 import javax.xml.parsers.DocumentBuilderFactory
+import javax.xml.parsers.ParserConfigurationException
+import java.io.StringReader
 import kotlin.math.roundToInt
 
 class ZwoParseException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -15,6 +18,7 @@ class ZwoParseException(message: String, cause: Throwable? = null) : Exception(m
 object ZwoParser {
 
   private const val WORK_THRESHOLD = 0.85
+  private const val DOCTYPE_FEATURE = "http://apache.org/xml/features/disallow-doctype-decl"
   private const val MAX_SEGMENT_SEC = 86_400
   private const val MAX_REPEATS = 200
   private const val MAX_SEGMENTS = 2_000
@@ -22,9 +26,20 @@ object ZwoParser {
   fun parse(name: String, content: String, ftpWatts: Int = 250): Workout {
     val document = try {
       val factory = DocumentBuilderFactory.newInstance().apply {
-        setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+        isExpandEntityReferences = false
+        try {
+          setFeature(DOCTYPE_FEATURE, true)
+        } catch (_: ParserConfigurationException) {
+          // Android's XML parser does not expose this feature. The explicit
+          // DOCTYPE check below keeps the same protection on that platform.
+        }
       }
-      factory.newDocumentBuilder().parse(content.byteInputStream())
+      if (content.contains("<!DOCTYPE", ignoreCase = true)) {
+        throw IllegalArgumentException("DOCTYPE declarations are not allowed.")
+      }
+      factory.newDocumentBuilder().apply {
+        setEntityResolver { _, _ -> InputSource(StringReader("")) }
+      }.parse(content.byteInputStream())
     } catch (e: Exception) {
       throw ZwoParseException("Not a valid ZWO file", e)
     }
@@ -148,28 +163,15 @@ object ZwoParser {
             "Steady $recoveryCount"
           }
           val cadenceRange = getCadenceRange(element)
-          if (rangeLow != rangeHigh) {
-            segments.addRamp(
-              id = segmentIndex,
-              label = label,
-              durationSec = duration,
-              startPower = rangeLow,
-              endPower = rangeHigh,
-              phase = phase,
-              isWork = isWork,
-              cadenceRange = cadenceRange
-            )
-          } else {
-            segments.addStep(
-              id = segmentIndex,
-              label = label,
-              durationSec = duration,
-              targetRange = TargetRange(rangeLow, rangeHigh),
-              phase = phase,
-              isWork = isWork,
-              cadenceRange = cadenceRange
-            )
-          }
+          segments.addStep(
+            id = segmentIndex,
+            label = label,
+            durationSec = duration,
+            targetRange = TargetRange(rangeLow, rangeHigh),
+            phase = phase,
+            isWork = isWork,
+            cadenceRange = cadenceRange
+          )
           segmentIndex += 1
         }
 

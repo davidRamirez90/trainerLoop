@@ -50,6 +50,56 @@ class ParserTest {
   }
 
   @Test
+  fun `ZWO steadyState preserves unequal power bounds as a target range`() {
+    val content = """
+      <workout_file>
+        <name>Threshold range</name>
+        <workout>
+          <SteadyState Duration="600" PowerLow="0.88" PowerHigh="0.95" />
+        </workout>
+      </workout_file>
+    """.trimIndent()
+
+    val segment = ZwoParser.parse("threshold-range.zwo", content, ftpWatts = 250).segments.single()
+
+    assertTrue(segment is WorkoutSegment.Step)
+    segment as WorkoutSegment.Step
+    assertEquals(220, segment.targetRange.low)
+    assertEquals(238, segment.targetRange.high)
+  }
+
+  @Test
+  fun `ZWO explicit ramp remains a ramp`() {
+    val content = """
+      <workout_file>
+        <name>Ramp</name>
+        <workout>
+          <Ramp Duration="600" PowerLow="0.88" PowerHigh="0.95" />
+        </workout>
+      </workout_file>
+    """.trimIndent()
+
+    val segment = ZwoParser.parse("ramp.zwo", content, ftpWatts = 250).segments.single()
+
+    assertTrue(segment is WorkoutSegment.Ramp)
+  }
+
+  @Test
+  fun `ZWO parser rejects doctype declarations on all XML platforms`() {
+    val content = """
+      <!DOCTYPE workout_file [<!ENTITY injected "bad">]>
+      <workout_file>
+        <name>Unsafe workout</name>
+        <workout><SteadyState Duration="60" Power="1" /></workout>
+      </workout_file>
+    """.trimIndent()
+
+    assertThrows(ZwoParseException::class.java) {
+      ZwoParser.parse("unsafe.zwo", content)
+    }
+  }
+
+  @Test
   fun `ZWO parser caps repeats and segment durations`() {
     val content = """
       <?xml version="1.0" encoding="UTF-8"?>

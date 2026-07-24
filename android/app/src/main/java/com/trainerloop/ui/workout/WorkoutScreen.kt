@@ -97,7 +97,13 @@ import com.trainerloop.ui.components.StatusPill
 import com.trainerloop.ui.components.StatusPillState
 import com.trainerloop.ui.components.TrainerLoopTopBar
 import com.trainerloop.ui.components.PLAN_FILL_ALPHA
+import com.trainerloop.ui.components.PLAN_RANGE_FILL_ALPHA
+import com.trainerloop.ui.components.PLAN_REFERENCE_ALPHA
+import com.trainerloop.ui.components.PLAN_SPLINE_ALPHA
 import com.trainerloop.ui.components.buildPlanProfilePaths
+import com.trainerloop.ui.components.drawPlanRangeFills
+import com.trainerloop.ui.components.drawPlanRangeOutlines
+import com.trainerloop.ui.components.drawPlanRangeReferences
 import com.trainerloop.ui.components.planProfileRuns
 import com.trainerloop.ui.components.pressable
 import com.trainerloop.ui.components.zoneBands
@@ -921,6 +927,9 @@ private fun ImmersiveWorkoutChart(
   val gridColor = semanticColors.chartGrid.copy(alpha = 0.15f)
   val planOutlineColor = semanticColors.chartPlanOutline
   val planFillColor = semanticColors.chartPlanFill.copy(alpha = PLAN_FILL_ALPHA)
+  val planRangeFillColor = semanticColors.chartPlanFill.copy(alpha = PLAN_RANGE_FILL_ALPHA)
+  val planSplineColor = planOutlineColor.copy(alpha = PLAN_SPLINE_ALPHA)
+  val planReferenceColor = planOutlineColor.copy(alpha = PLAN_REFERENCE_ALPHA)
 
   Box(
     modifier = modifier
@@ -982,14 +991,19 @@ private fun ImmersiveWorkoutChart(
         }
 
         // Monochrome plan profile: faint fill under a stepped outline.
-        val planRuns = planProfileRuns(
-          zoneBands(
-            segments = segments,
-            ftp = ftp,
-            winStartSec = 0f,
-            winEndSec = totalDuration.toFloat(),
-            stepSec = (totalDuration / 400f).coerceAtLeast(1f)
-          )
+        val planBands = zoneBands(
+          segments = segments,
+          ftp = ftp,
+          winStartSec = 0f,
+          winEndSec = totalDuration.toFloat(),
+          stepSec = (totalDuration / 400f).coerceAtLeast(1f)
+        )
+        val planRuns = planProfileRuns(planBands)
+        drawPlanRangeFills(
+          bands = planBands,
+          xForTime = { sec -> (sec / totalDuration.toFloat()) * width },
+          yForPower = { watts -> yForPower(watts.toInt()) },
+          color = planRangeFillColor
         )
         val planOutline = Path()
         val planFill = Path()
@@ -1004,7 +1018,21 @@ private fun ImmersiveWorkoutChart(
           baselineY = chartBottom
         )
         drawPath(planFill, color = planFillColor)
-        drawPath(planOutline, color = planOutlineColor, style = Stroke(width = 2.dp.toPx()))
+        drawPlanRangeOutlines(
+          bands = planBands,
+          xForTime = { sec -> (sec / totalDuration.toFloat()) * width },
+          yForPower = { watts -> yForPower(watts.toInt()) },
+          color = planSplineColor,
+          strokeWidth = 2.dp.toPx()
+        )
+        drawPath(planOutline, color = planSplineColor, style = Stroke(width = 2.dp.toPx()))
+        drawPlanRangeReferences(
+          bands = planBands,
+          xForTime = { sec -> (sec / totalDuration.toFloat()) * width },
+          yForPower = { watts -> yForPower(watts.toInt()) },
+          color = planReferenceColor,
+          strokeWidth = 2.dp.toPx()
+        )
 
         if (samples.size >= 2) {
           var hrPath: Path? = null

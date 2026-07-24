@@ -39,21 +39,21 @@ fun WorkoutMiniChart(
     WorkoutSummaryMath.isFreeRideOnly(workout)
   }
   // Plan geometry depends only on the workout and FTP, not on canvas size.
-  val runs = remember(workout, ftp) {
-    if (totalDuration == 0) emptyList() else planProfileRuns(
-      zoneBands(
-        segments = workout.segments,
-        ftp = ftp,
-        winStartSec = 0f,
-        winEndSec = totalDuration.toFloat(),
-        stepSec = (totalDuration / 120f).coerceAtLeast(1f)
-      )
+  val planBands = remember(workout, ftp) {
+    if (totalDuration == 0) emptyList() else zoneBands(
+      segments = workout.segments,
+      ftp = ftp,
+      winStartSec = 0f,
+      winEndSec = totalDuration.toFloat(),
+      stepSec = (totalDuration / 120f).coerceAtLeast(1f)
     )
   }
-  val axisMax = remember(runs, maxPowerAxis) {
-    maxOf(maxPowerAxis, runs.maxOfOrNull { run -> run.maxOf { it.watts } } ?: 0)
+  val runs = remember(planBands) { planProfileRuns(planBands) }
+  val axisMax = remember(planBands, maxPowerAxis) {
+    maxOf(maxPowerAxis, planPeakWatts(planBands))
   }
   val placeholderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
+  val rangeFillColor = MaterialTheme.trainerLoopColors.chartPlanFill.copy(alpha = PLAN_RANGE_FILL_ALPHA)
 
   Canvas(
     modifier = modifier
@@ -89,6 +89,14 @@ fun WorkoutMiniChart(
 
     val outline = Path()
     val fill = Path()
+    drawPlanRangeFills(
+      bands = planBands,
+      xForTime = { sec -> (sec / totalDuration.toFloat()) * width },
+      yForPower = { watts ->
+        chartBottom - (watts / axisMax.toFloat()).coerceIn(0f, 1f) * drawHeight
+      },
+      color = rangeFillColor
+    )
     buildPlanProfilePaths(
       runs = runs,
       outline = outline,
@@ -100,6 +108,28 @@ fun WorkoutMiniChart(
       baselineY = chartBottom
     )
     drawPath(fill, color = lineColor.copy(alpha = PLAN_FILL_ALPHA))
-    drawPath(outline, color = lineColor, style = Stroke(width = 2.dp.toPx()))
+    drawPlanRangeOutlines(
+      bands = planBands,
+      xForTime = { sec -> (sec / totalDuration.toFloat()) * width },
+      yForPower = { watts ->
+        chartBottom - (watts / axisMax.toFloat()).coerceIn(0f, 1f) * drawHeight
+      },
+      color = lineColor.copy(alpha = PLAN_SPLINE_ALPHA),
+      strokeWidth = 2.dp.toPx()
+    )
+    drawPath(
+      outline,
+      color = lineColor.copy(alpha = PLAN_SPLINE_ALPHA),
+      style = Stroke(width = 2.dp.toPx())
+    )
+    drawPlanRangeReferences(
+      bands = planBands,
+      xForTime = { sec -> (sec / totalDuration.toFloat()) * width },
+      yForPower = { watts ->
+        chartBottom - (watts / axisMax.toFloat()).coerceIn(0f, 1f) * drawHeight
+      },
+      color = lineColor.copy(alpha = PLAN_REFERENCE_ALPHA),
+      strokeWidth = 2.dp.toPx()
+    )
   }
 }
