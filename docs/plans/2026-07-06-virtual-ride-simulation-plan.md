@@ -1,6 +1,6 @@
 # Virtual Ride Simulation Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** ERG interval workouts gain a simulated route: terrain generated from the workout structure, physics-based virtual speed/distance/ascent computed from real power, an elevation overlay on the workout chart, and speed/distance/altitude recorded into the FIT upload.
 
@@ -31,7 +31,7 @@
 - Consumes: nothing (pure math).
 - Produces: `data class PhysicsParams(riderKg: Double, bikeKg: Double = 8.0, crr: Double = 0.005, cda: Double = 0.32)` and `object VirtualSpeed { fun speedMps(powerWatts: Int, gradePercent: Double, p: PhysicsParams): Double; fun powerAt(v: Double, gradePercent: Double, p: PhysicsParams): Double }`. Later tasks call `speedMps`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```kotlin
 package com.trainerloop.domain.sim
@@ -98,12 +98,12 @@ class VirtualSpeedTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run (from `android/`): `./gradlew :app:testDebugUnitTest --tests "com.trainerloop.domain.sim.VirtualSpeedTest"`
 Expected: FAIL — unresolved reference `PhysicsParams` / `VirtualSpeed` (compile error counts as the failing state).
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```kotlin
 package com.trainerloop.domain.sim
@@ -153,12 +153,12 @@ object VirtualSpeed {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.trainerloop.domain.sim.VirtualSpeedTest"`
 Expected: PASS (8 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add android/app/src/main/java/com/trainerloop/domain/sim/VirtualSpeed.kt \
@@ -178,7 +178,7 @@ git commit -m "feat(sim): physics solver for virtual speed from power and grade"
 - Consumes: `Workout`, `WorkoutMath.totalDurationSec(segments)`, `WorkoutMath.targetRangeAt(segments, sec)` (both exist in `com.trainerloop.domain.WorkoutMath`), `VirtualSpeed.speedMps` + `PhysicsParams` from Task 1.
 - Produces: `RouteGenerator.generate(workout: Workout, ftp: Int, params: PhysicsParams): RouteProfile` where `class RouteProfile(val gradePercent: DoubleArray, val expectedAltitudeM: DoubleArray)` (one entry per second) with `fun gradeAt(sec: Int): Double`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```kotlin
 package com.trainerloop.domain.sim
@@ -274,12 +274,12 @@ class RouteGeneratorTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.trainerloop.domain.sim.RouteGeneratorTest"`
 Expected: FAIL — unresolved reference `RouteGenerator`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 ```kotlin
 package com.trainerloop.domain.sim
@@ -347,12 +347,12 @@ object RouteGenerator {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.trainerloop.domain.sim.RouteGeneratorTest"`
 Expected: PASS (8 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add android/app/src/main/java/com/trainerloop/domain/sim/RouteGenerator.kt \
@@ -373,7 +373,7 @@ git commit -m "feat(sim): deterministic terrain generation from workout structur
 - Consumes: `RouteProfile` (Task 2), `VirtualSpeed`/`PhysicsParams` (Task 1).
 - Produces: `TelemetrySample` gains `virtualSpeedKph: Double?`, `virtualDistanceM: Double?`, `virtualAltitudeM: Double?`, `gradePercent: Double?` (all default `null`). `class VirtualRideTracker(route: RouteProfile, params: PhysicsParams)` with `fun onTick(timeSec: Int, powerWatts: Int, dropout: Boolean): VirtualPoint`; `data class VirtualPoint(speedKph: Double, distanceM: Double, altitudeM: Double, gradePercent: Double)`.
 
-- [ ] **Step 1: Add the sample fields (no test needed — pure data)**
+- [x] **Step 1: Add the sample fields (no test needed — pure data)**
 
 In `TelemetrySample.kt` change the data class to:
 
@@ -396,7 +396,7 @@ data class TelemetrySample(
 
 Defaults mean old `samplesJson` blobs (which lack these keys) still deserialize — no Room migration.
 
-- [ ] **Step 2: Write the failing tracker test**
+- [x] **Step 2: Write the failing tracker test**
 
 ```kotlin
 package com.trainerloop.domain.sim
@@ -461,12 +461,12 @@ class VirtualRideTrackerTest {
 }
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.trainerloop.domain.sim.VirtualRideTrackerTest"`
 Expected: FAIL — unresolved reference `VirtualRideTracker`.
 
-- [ ] **Step 4: Write the implementation**
+- [x] **Step 4: Write the implementation**
 
 ```kotlin
 package com.trainerloop.domain.sim
@@ -510,14 +510,14 @@ class VirtualRideTracker(
 }
 ```
 
-- [ ] **Step 5: Run tests — tracker suite plus regression**
+- [x] **Step 5: Run tests — tracker suite plus regression**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.trainerloop.domain.sim.*"`
 Expected: PASS.
 Run: `./gradlew :app:testDebugUnitTest`
 Expected: PASS — the new `TelemetrySample` fields must not break any existing test (serialization round-trips, recorder, FIT).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add android/app/src/main/java/com/trainerloop/data/model/TelemetrySample.kt \
@@ -540,7 +540,7 @@ git commit -m "feat(sim): virtual ride tracker + nullable sim fields on Telemetr
 - Consumes: existing `ProfileRepository` prefs pattern, `SettingsGroupCard`/`OutlinedTextField` patterns in `SettingsScreen.kt`.
 - Produces: `UserProfile` gains `virtualRideEnabled: Boolean = true`, `bikeWeightKg: Double = 8.0`, `rollingResistanceCrr: Double = 0.005`, `dragAreaCda: Double = 0.32`. Task 5 reads these to build `PhysicsParams`.
 
-- [ ] **Step 1: Add fields to UserProfile**
+- [x] **Step 1: Add fields to UserProfile**
 
 Append to the `UserProfile` data class:
 
@@ -552,7 +552,7 @@ Append to the `UserProfile` data class:
   val dragAreaCda: Double = 0.32
 ```
 
-- [ ] **Step 2: Persist them in ProfileRepository**
+- [x] **Step 2: Persist them in ProfileRepository**
 
 In `load()` add before the closing paren:
 
@@ -581,7 +581,7 @@ In `companion object` add:
     private const val KEY_CDA = "drag_area_cda"
 ```
 
-- [ ] **Step 3: Extend SettingsViewModel**
+- [x] **Step 3: Extend SettingsViewModel**
 
 Add to `SettingsUiState`:
 
@@ -639,7 +639,7 @@ In `save()`'s `it.copy(...)` add (clamps are the trust boundary — these feed a
             .coerceIn(0.15, 0.60),
 ```
 
-- [ ] **Step 4: Add the settings section to SettingsScreen**
+- [x] **Step 4: Add the settings section to SettingsScreen**
 
 Insert a new group after the existing `SettingsGroupCard(title = "Zones")` block (around line 193), using the file's existing composable patterns (`SettingsGroupCard`, `OutlinedTextField`; add imports for `Switch`, `TextButton`, `KeyboardOptions`, `KeyboardType` if not present):
 
@@ -702,12 +702,12 @@ Insert a new group after the existing `SettingsGroupCard(title = "Zones")` block
 
 Match the exact parameter names/callback style used by the surrounding groups in the file (e.g. whether the screen passes `viewModel` or lambda callbacks down — follow what `SettingsGroupCard(title = "Preferences")` does).
 
-- [ ] **Step 5: Build + run existing tests**
+- [x] **Step 5: Build + run existing tests**
 
 Run: `./gradlew :app:assembleDebug :app:testDebugUnitTest`
 Expected: BUILD SUCCESSFUL, all tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add android/app/src/main/java/com/trainerloop/data/model/UserProfile.kt \
@@ -730,7 +730,7 @@ git commit -m "feat(settings): virtual ride toggle + advanced physics params"
 - Consumes: `VirtualRideTracker`, `RouteGenerator`, `PhysicsParams` (Tasks 1–3); `UserProfile.virtualRideEnabled/bikeWeightKg/rollingResistanceCrr/dragAreaCda` (Task 4).
 - Produces: `TelemetryRecorder` constructors gain a trailing `virtualRide: VirtualRideTracker? = null` parameter. `WorkoutUiState` gains `currentVirtualSpeedKph: Double?`, `currentGradePercent: Double?`, `virtualDistanceM: Double?`, `elevationProfile: DoubleArray?` — Task 8 reads all four.
 
-- [ ] **Step 1: Write the failing recorder test**
+- [x] **Step 1: Write the failing recorder test**
 
 Add to the existing `TelemetryRecorderTest.kt`, which already has `bikeData(...)` and `shortWorkout(...)` helpers and drives time with `StandardTestDispatcher` + `advanceTimeBy`/`runCurrent`. New imports needed: `com.trainerloop.domain.sim.PhysicsParams`, `com.trainerloop.domain.sim.RouteProfile`, `com.trainerloop.domain.sim.VirtualRideTracker`, `org.junit.Assert.assertNotNull`, `org.junit.Assert.assertNull`.
 
@@ -789,12 +789,12 @@ Add to the existing `TelemetryRecorderTest.kt`, which already has `bikeData(...)
   }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.trainerloop.domain.TelemetryRecorderTest"`
 Expected: FAIL — no such constructor parameter / null fields.
 
-- [ ] **Step 3: Extend TelemetryRecorder**
+- [x] **Step 3: Extend TelemetryRecorder**
 
 Primary constructor gains the parameter:
 
@@ -845,7 +845,7 @@ In `startCollecting()`'s collect block, replace the `val sample = TelemetrySampl
         )
 ```
 
-- [ ] **Step 4: Wire the ViewModel**
+- [x] **Step 4: Wire the ViewModel**
 
 In `WorkoutViewModel`, after `private val isRampTest = ...` add:
 
@@ -906,12 +906,12 @@ Add to `WorkoutUiState`:
 
 (`DoubleArray` in a data class: it is set once at construction and never replaced, so reference equality through `copy()` is fine here.)
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `./gradlew :app:testDebugUnitTest`
 Expected: PASS — recorder tests (old + new) and any `ui/workout` ViewModel tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add android/app/src/main/java/com/trainerloop/domain/TelemetryRecorder.kt \
@@ -933,7 +933,7 @@ git commit -m "feat(sim): stamp virtual ride data onto telemetry samples during 
 - Consumes: `TelemetrySample` virtual fields (Task 3).
 - Produces: FIT record messages carry speed (field 6, uint16, m/s×1000), distance (field 5, uint32, cm), altitude (field 2, uint16, (m+500)×5); session message carries total_distance (field 9, uint32, cm). `FitDecoder` fills the matching `TelemetrySample` fields on decode. `IcuActivityUploader` and `FitShareHelper` need no changes — they already pass full samples to `FitEncoder.encode`.
 
-- [ ] **Step 1: Write the failing round-trip test**
+- [x] **Step 1: Write the failing round-trip test**
 
 Add to `FitEncoderTest.kt` (follow the file's existing sample-building helpers):
 
@@ -970,12 +970,12 @@ Add to `FitEncoderTest.kt` (follow the file's existing sample-building helpers):
   }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.trainerloop.domain.fit.FitEncoderTest"`
 Expected: FAIL — decoded virtual fields are null in the first test.
 
-- [ ] **Step 3: Extend FitEncoder**
+- [x] **Step 3: Extend FitEncoder**
 
 `recordFields` becomes:
 
@@ -1055,7 +1055,7 @@ and the session data message adds the value in the matching position (after `tot
         )
 ```
 
-- [ ] **Step 4: Extend FitDecoder**
+- [x] **Step 4: Extend FitDecoder**
 
 Replace the `records` triple bookkeeping with explicit locals. In the data-message branch, add locals and field cases:
 
@@ -1112,12 +1112,12 @@ Change the `records` list element type to a private data class and the final map
     }
 ```
 
-- [ ] **Step 5: Run all FIT tests**
+- [x] **Step 5: Run all FIT tests**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.trainerloop.domain.fit.*"`
 Expected: PASS — new round-trip tests and all pre-existing encoder/decoder tests (real-file fixtures in `FitDecoderTest` must still decode).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add android/app/src/main/java/com/trainerloop/domain/fit/FitEncoder.kt \
@@ -1141,7 +1141,7 @@ git commit -m "feat(fit): speed/distance/altitude record fields + session total 
 - Consumes: `TelemetrySample` virtual fields (Task 3).
 - Produces: `WorkoutSummaryMath.totalDistanceKm(samples: List<TelemetrySample>): Double` and `WorkoutSummaryMath.totalAscentM(samples: List<TelemetrySample>): Int`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```kotlin
 package com.trainerloop.domain
@@ -1179,12 +1179,12 @@ class WorkoutSummaryMathVirtualTest {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.trainerloop.domain.WorkoutSummaryMathVirtualTest"`
 Expected: FAIL — unresolved references.
 
-- [ ] **Step 3: Implement in WorkoutSummaryMath**
+- [x] **Step 3: Implement in WorkoutSummaryMath**
 
 ```kotlin
   fun totalDistanceKm(samples: List<TelemetrySample>): Double =
@@ -1202,12 +1202,12 @@ Expected: FAIL — unresolved references.
   }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `./gradlew :app:testDebugUnitTest --tests "com.trainerloop.domain.WorkoutSummaryMathVirtualTest"`
 Expected: PASS
 
-- [ ] **Step 5: Surface in the complete screen**
+- [x] **Step 5: Surface in the complete screen**
 
 `WorkoutCompleteUiState` gains:
 
@@ -1235,7 +1235,7 @@ In `WorkoutCompleteScreen.kt`, after the `StatRow("Total Work", ...)` line (~128
           }
 ```
 
-- [ ] **Step 6: Surface in the session detail screen**
+- [x] **Step 6: Surface in the session detail screen**
 
 `SessionDetailScreen.kt` already decodes samples from `s.samplesJson` (~line 89). In the same composable scope as the existing `StatRow` block (~line 131–135), compute once with `remember` and append rows after `StatRow("Avg Cadence", ...)`:
 
@@ -1249,12 +1249,12 @@ In `WorkoutCompleteScreen.kt`, after the `StatRow("Total Work", ...)` line (~128
 
 (If the decoded `samples` variable isn't in scope at the StatRow block, hoist the existing decode so both the chart and these rows share it — don't decode twice. Import `com.trainerloop.domain.WorkoutSummaryMath` and `androidx.compose.runtime.remember` as needed.)
 
-- [ ] **Step 7: Build + full test run**
+- [x] **Step 7: Build + full test run**
 
 Run: `./gradlew :app:assembleDebug :app:testDebugUnitTest`
 Expected: BUILD SUCCESSFUL, all tests pass.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add android/app/src/main/java/com/trainerloop/domain/WorkoutSummaryMath.kt \
@@ -1277,7 +1277,7 @@ git commit -m "feat(sim): distance and elevation gain in ride summaries"
 - Consumes: `WorkoutUiState.elevationProfile / currentVirtualSpeedKph / currentGradePercent / virtualDistanceM` (Task 5).
 - Produces: `WorkoutChart` gains `elevationProfile: DoubleArray? = null` parameter. UI only — no unit test; verify visually (Step 4).
 
-- [ ] **Step 1: Add the overlay to WorkoutChart**
+- [x] **Step 1: Add the overlay to WorkoutChart**
 
 Signature:
 
@@ -1322,7 +1322,7 @@ Inside the Canvas, right after the `yForHr` helper definition and *before* the g
         }
 ```
 
-- [ ] **Step 2: Pass the profile and add live tiles in WorkoutScreen**
+- [x] **Step 2: Pass the profile and add live tiles in WorkoutScreen**
 
 At the `WorkoutChart(` call (~line 352) add:
 
@@ -1363,12 +1363,12 @@ After the existing `BigMetric` Row's closing brace (~line 329), add a second con
 
 The immersive chart (`ImmersiveWorkoutChart`, ~line 639) is deliberately left without the overlay — add later if the immersive mode wants it.
 
-- [ ] **Step 3: Build + full test run**
+- [x] **Step 3: Build + full test run**
 
 Run: `./gradlew :app:assembleDebug :app:testDebugUnitTest`
 Expected: BUILD SUCCESSFUL, all tests pass.
 
-- [ ] **Step 4: Manual verification (device or emulator)**
+- [x] **Step 4: Manual verification (device or emulator)**
 
 Install the debug build, start any interval workout with the trainer (or the scenario simulator):
 - terrain silhouette visible behind the interval blocks, climbing during hard intervals;
@@ -1376,7 +1376,7 @@ Install the debug build, start any interval workout with the trainer (or the sce
 - Settings → Virtual Ride toggle off → tiles and overlay gone on the next workout;
 - finish a short ride → Distance + Elevation Gain rows on the complete screen; FIT upload on intervals.icu shows speed/distance/altitude.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add android/app/src/main/java/com/trainerloop/ui/components/WorkoutChart.kt \
