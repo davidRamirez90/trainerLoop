@@ -3,6 +3,8 @@
 ## Project structure
 
 - `android/` is the Android Gradle project; the application module is `android/app`.
+- `src/` is the React/Vite web dashboard used for browser development and
+  telemetry simulation.
 - `android/app/src/main/java/com/trainerloop/domain/` contains the pure-Kotlin core (coaching, parsing, FIT, and ride simulation).
 - `android/app/src/main/java/com/trainerloop/ui/` contains the Jetpack Compose UI and ViewModels; `data/` contains models, repositories, and Room/remote sources.
 - `android/README.md` documents the app architecture, setup, and useful commands. Product and implementation notes live in `docs/plans/`.
@@ -16,6 +18,14 @@ Run commands from `android/` with JDK 17:
 ```
 
 Use `./gradlew assembleDebug` for a debug APK. Instrumentation tests require an Android device or emulator.
+
+Run web checks from the repository root:
+
+```bash
+npm run lint
+npm test -- --run
+npm run build
+```
 
 ## Kotlin and tests
 
