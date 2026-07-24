@@ -26,3 +26,17 @@ Use `./gradlew assembleDebug` for a debug APK. Instrumentation tests require an 
 ## Commits and documentation
 
 Use concise conventional prefixes such as `feat:`, `fix:`, `test:`, `chore:`, and `chg:`. Update `android/README.md` or the relevant `docs/plans/` note when architecture, setup, or delivery scope changes.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub at `davidRamirez90/trainerLoop`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the standard five-role label vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository. See `docs/agents/domain.md`.
