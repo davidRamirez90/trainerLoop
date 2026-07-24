@@ -20,6 +20,12 @@ import { useBluetoothDevices } from './hooks/useBluetoothDevices';
 import { useBluetoothTelemetry } from './hooks/useBluetoothTelemetry';
 import { useFtmsControl } from './hooks/useFtmsControl';
 import { useTelemetryProcessing } from './hooks/useTelemetryProcessing';
+import {
+  getSimulationScenarioLabel,
+  useTelemetrySimulation,
+  type SimulationScenario,
+} from './hooks/useTelemetrySimulation';
+import { useWorkoutLog } from './hooks/useWorkoutLog';
 import { useWorkoutClock } from './hooks/useWorkoutClock';
 import { useStravaAuth } from './hooks/useStravaAuth';
 import type { CoachSuggestion } from './types/coach';
@@ -362,6 +368,9 @@ function App() {
   const [autoPauseArmed, setAutoPauseArmed] = useState(true);
   const [showResumeOverlay, setShowResumeOverlay] = useState(false);
   const [showPower3s, setShowPower3s] = useState(false);
+  const [simulationEnabled, setSimulationEnabled] = useState(false);
+  const [simulationScenario, setSimulationScenario] = useState<SimulationScenario>('steady');
+  const [isWorkoutLogOpen, setIsWorkoutLogOpen] = useState(false);
   const [cadenceScale, setCadenceScale] = useState(DEFAULT_CADENCE_RANGE);
   const [isFreeRide, setIsFreeRide] = useState(false);
   const [freeRideDurationSec, setFreeRideDurationSec] = useState(FREE_RIDE_EXTENSION_SEC);
@@ -395,6 +404,7 @@ function App() {
   const [segmentShortenings] = useState<Record<string, number>>({});
   const [criticalSuggestion, setCriticalSuggestion] = useState<CoachSuggestion | null>(null);
   const { toasts, success, removeToast } = useToast();
+  const { logs: workoutLogs, addLog, clearLogs } = useWorkoutLog();
   const { authenticated: stravaAuthenticated, athlete: stravaAthlete, loading: stravaLoading, error: stravaError, initiateAuth: stravaInitiateAuth, logout: stravaLogout } = useStravaAuth();
   const lastWorkRef = useRef<number | null>(null);
   const resumeTimeoutRef = useRef<number | null>(null);
@@ -481,10 +491,12 @@ function App() {
   const isComplete = clock.isComplete;
   const isSessionActive = clock.isSessionActive;
   const sessionStartMs = clock.sessionStartMs;
-  const rawSamples = bluetoothTelemetry.samples;
-  const latestTelemetry = bluetoothTelemetry.latest;
   const sessionElapsedSecRef = useRef(sessionElapsedSec);
-  const latestTelemetryRef = useRef(latestTelemetry);
+  const latestTelemetryRef = useRef<{ powerWatts: number | null; cadenceRpm: number | null; hrBpm: number | null }>({
+    powerWatts: null,
+    cadenceRpm: null,
+    hrBpm: null,
+  });
   const isRunningRef = useRef(isRunning);
 
   useEffect(() => {
@@ -512,9 +524,6 @@ function App() {
     sessionElapsedSecRef.current = sessionElapsedSec;
   }, [sessionElapsedSec]);
 
-  useEffect(() => {
-    latestTelemetryRef.current = latestTelemetry;
-  }, [latestTelemetry]);
 
   useEffect(() => {
     isRunningRef.current = isRunning;
@@ -560,12 +569,6 @@ function App() {
 
     return () => window.clearInterval(intervalId);
   }, [isSessionActive]);
-  const processedTelemetry = useTelemetryProcessing({
-    samples: rawSamples,
-    elapsedSec: activeSec,
-    isRunning,
-  });
-  const telemetrySamples = processedTelemetry.samples;
   const hasStarted = isSessionActive || activeSec > 0;
   const isPaused = hasPlan && hasStarted && !isRunning && !isComplete;
   const liveStatus = !hasPlan
@@ -586,7 +589,6 @@ function App() {
         : hasStarted
           ? 'paused'
           : 'ready';
-  const latestSample = processedTelemetry.latestSample;
   const {
     segment,
     index,
@@ -598,7 +600,7 @@ function App() {
   const ftpWatts = activePlan?.ftpWatts ?? 0;
   const hrSensorConnected =
     hrSensor.status === 'connected' || hrSensor.status === 'connecting';
-  const powerConnected = trainer.status === 'connected';
+  const powerConnected = simulationEnabled || trainer.status === 'connected';
   const sessionError = importError ?? startError;
 
   const { low: targetLow, high: targetHigh } = targetRange;
@@ -611,10 +613,34 @@ function App() {
   const ergTargetWatts = isErgRamping
     ? Math.min(ergTargetBaseWatts, ERG_START_TARGET_WATTS)
     : ergTargetBaseWatts;
+  const simulationTelemetry = useTelemetrySimulation({
+    enabled: simulationEnabled,
+    scenario: simulationScenario,
+    elapsedSec: clock.activeSec,
+    isRecording: clock.isRunning,
+    sessionId: clock.sessionId,
+    targetWatts: ergTargetWatts,
+    isRecovery: segment?.phase === 'recovery',
+  });
+  const rawSamples = simulationEnabled ? simulationTelemetry.samples : bluetoothTelemetry.samples;
+  const latestTelemetry = simulationEnabled ? simulationTelemetry.latest : bluetoothTelemetry.latest;
+
+  useEffect(() => {
+    latestTelemetryRef.current = latestTelemetry;
+  }, [latestTelemetry]);
+
+  const processedTelemetry = useTelemetryProcessing({
+    samples: rawSamples,
+    elapsedSec: activeSec,
+    isRunning,
+  });
+  const telemetrySamples = processedTelemetry.samples;
+  const latestSample = processedTelemetry.latestSample;
+
   const ftmsControl = useFtmsControl({
     trainerDevice,
     targetWatts: ergTargetWatts,
-    isActive: isRunning && ergEnabled && hasPlan,
+    isActive: isRunning && ergEnabled && hasPlan && !simulationEnabled,
   });
 
   const bluetoothLatest = latestTelemetry;
@@ -625,7 +651,7 @@ function App() {
       : null;
   const thresholdHr = parsePositiveNumber(profile.thresholdHr);
   const displayCadence = latestSample ? Math.round(latestSample.cadenceRpm) : null;
-  const canDetectWork = trainer.status === 'connected' || bluetoothTelemetry.isActive;
+  const canDetectWork = simulationEnabled || trainer.status === 'connected' || bluetoothTelemetry.isActive;
   const latestPower = bluetoothLatest.powerWatts ?? 0;
   const latestCadence = bluetoothLatest.cadenceRpm ?? 0;
   const hasWorkTelemetry = latestPower > 0 || latestCadence > 0;
@@ -970,7 +996,7 @@ function App() {
       disconnect: disconnectHeartRate,
     },
   ];
-  const trainerTelemetryError = bluetoothTelemetry.error;
+  const trainerTelemetryError = simulationEnabled ? null : bluetoothTelemetry.error;
   const trainerControlError = ftmsControl.error;
   const trainerControlStatus = ftmsControl.status;
   const trainerControlLabel = trainerControlStatus === 'ready'
@@ -990,6 +1016,9 @@ function App() {
       ? 'Resume'
       : 'Start';
   const ergToggleLabel = ergEnabled ? 'ERG On' : 'ERG Off';
+  const simulationLabel = simulationEnabled
+    ? `Simulator: ${getSimulationScenarioLabel(simulationScenario)}`
+    : 'Simulator Off';
 
   const handleProfileOpen = () => {
     setDraftProfile(cloneProfile(profile));
@@ -1154,6 +1183,32 @@ function App() {
       setImportNotice(null);
     }
   }, [profile.ftpWatts]);
+
+  useEffect(() => {
+    addLog('info', simulationEnabled ? 'Telemetry simulator enabled' : 'Telemetry simulator disabled', {
+      scenario: getSimulationScenarioLabel(simulationScenario),
+    });
+  }, [addLog, simulationEnabled, simulationScenario]);
+
+  useEffect(() => {
+    if (isRunning) {
+      addLog('info', 'Workout running', {
+        planName,
+        source: simulationEnabled ? 'simulation' : 'bluetooth',
+        scenario: simulationEnabled ? getSimulationScenarioLabel(simulationScenario) : undefined,
+      });
+    }
+  }, [addLog, isRunning, planName, simulationEnabled, simulationScenario]);
+
+  useEffect(() => {
+    if (isComplete && hasPlan) {
+      addLog('info', 'Workout completed', {
+        planName,
+        elapsedSec: sessionElapsedSec,
+        samples: rawSamples.length,
+      });
+    }
+  }, [addLog, hasPlan, isComplete, planName, rawSamples.length, sessionElapsedSec]);
 
   useEffect(() => {
     setIsFreeRide(false);
@@ -1402,6 +1457,10 @@ function App() {
       return;
     }
     setStartError(null);
+    addLog('info', 'Start requested', {
+      planName,
+      source: simulationEnabled ? 'simulation' : 'bluetooth',
+    });
     const isSessionStarting = !isSessionActive;
     if (isSessionStarting) {
       sessionSavedRef.current = false;
@@ -1422,6 +1481,7 @@ function App() {
   };
 
   const handlePause = () => {
+    addLog('info', 'Pause requested', { elapsedSec: sessionElapsedSec });
     clock.pause();
     ftmsControl.pauseWorkout();
     setAutoResumeOnWork(false);
@@ -1431,6 +1491,7 @@ function App() {
     if (!hasStarted) {
       return;
     }
+    addLog('info', 'Stop requested', { elapsedSec: sessionElapsedSec });
     stopPromptWasRunningRef.current = isRunning;
     setStopPromptElapsedSec(sessionElapsedSec);
     setShowStopPrompt(true);
@@ -1830,6 +1891,15 @@ function App() {
             <span aria-hidden="true">💾</span>
           </button>
           <button
+            className="sessions-button"
+            type="button"
+            aria-label="View workout logs"
+            onClick={() => setIsWorkoutLogOpen(true)}
+            title="Workout Logs"
+          >
+            <span aria-hidden="true">🧾</span>
+          </button>
+          <button
             className="theme-toggle"
             type="button"
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -1934,6 +2004,27 @@ function App() {
           >
             {ergToggleLabel}
           </button>
+          <button
+            className={`session-button toggle ${simulationEnabled ? 'on' : 'off'}`}
+            type="button"
+            onClick={() => setSimulationEnabled((prev) => !prev)}
+            disabled={hasStarted}
+            title="Use generated development telemetry instead of Bluetooth power."
+          >
+            {simulationLabel}
+          </button>
+          <select
+            className="session-select"
+            value={simulationScenario}
+            onChange={(event) => setSimulationScenario(event.target.value as SimulationScenario)}
+            disabled={hasStarted || !simulationEnabled}
+            aria-label="Simulation scenario"
+          >
+            <option value="steady">Steady</option>
+            <option value="fatigue">Fatigue</option>
+            <option value="recovery">Recovery HR</option>
+            <option value="dropouts">Dropouts</option>
+          </select>
           <button
             className="session-button"
             type="button"
@@ -2428,6 +2519,59 @@ function App() {
           adherencePercent={compliance}
         />
       )}
+
+
+      {isWorkoutLogOpen ? (
+        <div className="modal-scrim" role="presentation" onClick={() => setIsWorkoutLogOpen(false)}>
+          <div
+            className="modal workout-log-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="workout-log-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div>
+                <div className="modal-title" id="workout-log-title">
+                  Workout Logs
+                </div>
+                <div className="modal-subtitle">
+                  Recent local development events for ad hoc debugging.
+                </div>
+              </div>
+              <button className="modal-close" type="button" onClick={() => setIsWorkoutLogOpen(false)}>
+                x
+              </button>
+            </div>
+            <div className="modal-body workout-log-body">
+              {workoutLogs.length ? (
+                workoutLogs.map((entry) => (
+                  <div key={entry.id} className={`workout-log-entry ${entry.level}`}>
+                    <div className="workout-log-meta">
+                      <span>{new Date(entry.timestamp).toLocaleString()}</span>
+                      <strong>{entry.level.toUpperCase()}</strong>
+                    </div>
+                    <div className="workout-log-message">{entry.message}</div>
+                    {entry.data ? (
+                      <pre>{JSON.stringify(entry.data, null, 2)}</pre>
+                    ) : null}
+                  </div>
+                ))
+              ) : (
+                <div className="workout-placeholder">No workout logs yet.</div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="session-button danger" type="button" onClick={clearLogs}>
+                Clear Logs
+              </button>
+              <button className="session-button primary" type="button" onClick={() => setIsWorkoutLogOpen(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <SavedSessionsModal
         isOpen={isSavedSessionsOpen}

@@ -3560,3 +3560,67 @@
     flex: 1;
   }
 }
+
+.session-select {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-muted);
+  color: var(--text-primary);
+  padding: 9px 12px;
+  font-size: 12px;
+  min-height: 38px;
+}
+
+.session-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.workout-log-modal {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(760px, calc(100vh - 32px));
+}
+
+.workout-log-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 520px;
+  overflow: auto;
+}
+
+.workout-log-entry {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-muted);
+  padding: 12px;
+}
+
+.workout-log-entry.warning {
+  border-color: rgba(255, 193, 7, 0.45);
+}
+
+.workout-log-entry.error {
+  border-color: rgba(255, 82, 82, 0.45);
+}
+
+.workout-log-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.4px;
+}
+
+.workout-log-message {
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.workout-log-entry pre {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
