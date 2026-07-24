@@ -2,10 +2,6 @@
 *.log
 *.local
 
-# Web dashboard
-node_modules/
-dist/
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
