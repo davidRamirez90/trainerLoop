@@ -82,4 +82,24 @@ class FeedbackDecisionEngineTest {
     }
     assertEquals(4, emitted)
   }
+
+  @Test
+  fun `scheduled motivation slots bypass motivation budget and cooldown`() {
+    val engine = FeedbackDecisionEngine(180)
+
+    engine.submit(listOf(event("slot-interval-start", FeedbackCategory.MOTIVATION)))
+    assertNotNull(engine.arbitrate(5, modificationPending = false))
+
+    engine.submit(listOf(event("slot-final-60", FeedbackCategory.MOTIVATION)))
+    assertNotNull(engine.arbitrate(120, modificationPending = false))
+  }
+
+  @Test
+  fun `zero motivation share suppresses scheduled motivation slots`() {
+    val engine = FeedbackDecisionEngine(180, motivationShare = 0.0)
+
+    engine.submit(listOf(event("slot-interval-start", FeedbackCategory.MOTIVATION)))
+
+    assertNull(engine.arbitrate(5, modificationPending = false))
+  }
 }

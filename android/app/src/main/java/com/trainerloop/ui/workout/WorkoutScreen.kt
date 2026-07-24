@@ -87,7 +87,6 @@ import com.trainerloop.app.WorkoutForegroundService
 import com.trainerloop.app.BuildConfig
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
-import com.trainerloop.domain.coach.FeedbackItem
 import com.trainerloop.domain.telemetry.TelemetryScenario
 import com.trainerloop.ui.components.WorkoutChart
 import com.trainerloop.ui.components.workoutProfileSummary
@@ -119,6 +118,7 @@ import com.trainerloop.ui.theme.zoneColorSet
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.reducedMotionAware
 import com.trainerloop.ui.theme.trainerLoopColors
+import com.trainerloop.ui.coach.CoachFeedbackArea
 import com.trainerloop.ui.workout.WorkoutStatsPager
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -144,10 +144,6 @@ fun WorkoutScreen(
     )
   }
   var completionCueConsumed by rememberSaveable { mutableStateOf(false) }
-  var displayedLiveFeedback by remember { mutableStateOf<FeedbackItem?>(null) }
-  LaunchedEffect(uiState.liveFeedback) {
-    uiState.liveFeedback?.let { displayedLiveFeedback = it }
-  }
   val currentPowerColor = zoneColorSet(uiState.currentPowerWatts, ftp).line
   var showStopConfirm by remember { mutableStateOf(false) }
   var showTelemetrySourcePicker by remember { mutableStateOf(false) }
@@ -492,25 +488,14 @@ fun WorkoutScreen(
 
       Spacer(modifier = Modifier.weight(1f))
 
-      // Live coach feedback (auto-dismisses after 12 s)
-      AnimatedVisibility(
-        visible = uiState.liveFeedback != null,
-        enter = expandVertically(
-          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
-        ) + fadeIn(animationSpec = reducedMotionAware(MotionSpec.default)),
-        exit = shrinkVertically(
-          animationSpec = reducedMotionAware(MotionSpec.defaultSpring<IntSize>())
-        ) + fadeOut(animationSpec = reducedMotionAware(MotionSpec.default))
-      ) {
-        displayedLiveFeedback?.let { feedback ->
-          Column {
-            com.trainerloop.ui.coach.LiveFeedbackCard(item = feedback)
-            Spacer(modifier = Modifier.height(8.dp))
-          }
-        }
-      }
+      CoachFeedbackArea(
+        pendingSuggestion = uiState.pendingSuggestion,
+        liveFeedback = uiState.liveFeedback,
+        onAcceptSuggestion = viewModel::acceptSuggestion,
+        onRejectSuggestion = viewModel::rejectSuggestion
+      )
 
-        Spacer(modifier = Modifier.height(8.dp))
+      Spacer(modifier = Modifier.height(Spacing.sm))
       }
 
       PlayerControlsSheet(

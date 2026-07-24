@@ -32,13 +32,22 @@ class FeedbackDecisionEngine(
     val candidate = pending
       .filter { event ->
         val p0 = event.category.isP0
+        val scheduledMotivationSlot = event.category == FeedbackCategory.MOTIVATION &&
+          event.ruleId.startsWith("slot-") &&
+          motivationShare > 0.0
         if (!p0 && modificationPending) return@filter false
         val lastEmitted = lastEmittedAtSec
         if (!p0 && lastEmitted != null && activeSec - lastEmitted < GLOBAL_GAP_SEC) return@filter false
         if (!p0 && emittedCount >= budget) return@filter false
-        if (event.category == FeedbackCategory.MOTIVATION && motivationCount >= motivationBudget) return@filter false
+        if (event.category == FeedbackCategory.MOTIVATION &&
+          !scheduledMotivationSlot && motivationCount >= motivationBudget
+        ) return@filter false
         val lastFired = lastFiredByRule[event.ruleId]
-        val cooldown = if (p0) P0_REFIRE_SEC else categoryCooldownSec(event.category)
+        val cooldown = when {
+          p0 -> P0_REFIRE_SEC
+          scheduledMotivationSlot -> 0
+          else -> categoryCooldownSec(event.category)
+        }
         lastFired == null || activeSec - lastFired >= cooldown
       }
       .maxByOrNull { it.category.tierBase + it.severity * 50 + (it.signalConfidence * 20).toInt() }
@@ -54,7 +63,11 @@ class FeedbackDecisionEngine(
     lastFiredByRule[candidate.ruleId] = activeSec
     lastEmittedAtSec = activeSec
     emittedCount++
-    if (candidate.category == FeedbackCategory.MOTIVATION) motivationCount++
+    if (candidate.category == FeedbackCategory.MOTIVATION &&
+      !candidate.ruleId.startsWith("slot-")
+    ) {
+      motivationCount++
+    }
 
     return FeedbackItem(
       id = "${candidate.ruleId}-$activeSec",

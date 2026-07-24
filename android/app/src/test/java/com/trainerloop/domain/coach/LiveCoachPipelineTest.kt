@@ -128,6 +128,18 @@ class LiveCoachPipelineTest {
   }
 
   @Test
+  fun `180 second hard interval emits start and final minute slots`() {
+    val segments = listOf(step("threshold", 180, 250))
+    val coach = LiveCoach(segments, profile)
+    val items = run(coach, 0, 180) { t ->
+      TelemetrySample(timeSec = t, powerWatts = 250, cadenceRpm = 90, hrBpm = 150)
+    }
+
+    assertTrue(items.any { it.ruleId == "slot-interval-start" })
+    assertTrue(items.any { it.ruleId == "slot-final-60" })
+  }
+
+  @Test
   fun `hr feedback suppressed when hr confidence low`() {
     val coach = LiveCoach(segments(), profile)
     // HR wildly implausible (above maxHr + 5) → samples rejected → low confidence.

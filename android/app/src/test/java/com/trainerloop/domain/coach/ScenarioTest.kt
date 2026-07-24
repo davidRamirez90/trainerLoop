@@ -57,10 +57,10 @@ class ScenarioTest {
 
   @Test
   fun `erg spiral - collapsing cadence draws a technique warning`() {
-    val items = ride(vo2Set(), AthleteSimulator(ftp = profile.ftp, blowUpAtSec = 1500))
+    val items = ride(vo2Set(), AthleteSimulator(ftp = profile.ftp, blowUpAtSec = 1600))
     assertTrue(
       "expected erg-spiral warning, got: ${items.map { it.ruleId }}",
-      items.any { it.ruleId == "erg-spiral" && it.timestampSec >= 1500 }
+      items.any { it.ruleId == "erg-spiral" && it.timestampSec >= 1600 }
     )
   }
 

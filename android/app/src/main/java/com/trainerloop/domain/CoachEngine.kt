@@ -229,6 +229,7 @@ class CoachEngine(
       .filter { it.status == SuggestionStatus.REJECTED }
       .takeLast(2)
     val allowIncrease = recentRejections.size < 2 &&
+      !input.ergEnabled &&
       input.elapsedInSegmentSec >= MIN_ELAPSED_FOR_INCREASE_SEC &&
       stability.adherencePct >= profile.rules.targetAdherenceWarn &&
       stability.cadenceVariance <= profile.rules.cadenceVarianceWarn &&

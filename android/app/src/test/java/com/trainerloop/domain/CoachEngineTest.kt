@@ -74,6 +74,38 @@ class CoachEngineTest {
   }
 
   @Test
+  fun `stable on-target ERG input does not suggest increasing intensity`() = runTest {
+    val segments = listOf(workSegment(durationSec = 120))
+    val samples = stableSamples(endSec = 50, count = 50)
+    val ergEngine = CoachEngine(defaultProfile(), segments)
+    val nonErgEngine = CoachEngine(defaultProfile(), segments)
+
+    ergEngine.tick(
+      input(
+        segmentIndex = 0,
+        elapsedInSegmentSec = 50,
+        activeSec = 50,
+        samples = samples,
+        sessionId = 1,
+        ergEnabled = true
+      )
+    )
+    nonErgEngine.tick(
+      input(
+        segmentIndex = 0,
+        elapsedInSegmentSec = 50,
+        activeSec = 50,
+        samples = samples,
+        sessionId = 1,
+        ergEnabled = false
+      )
+    )
+
+    assertNull(ergEngine.pendingSuggestion.value)
+    assertTrue(nonErgEngine.pendingSuggestion.value?.action is CoachAction.AdjustIntensityUp)
+  }
+
+  @Test
   fun `pending suggestion blocks new suggestions`() = runTest {
     val segments = listOf(workSegment(durationSec = 120))
     val engine = CoachEngine(defaultProfile(), segments)
