@@ -1,40 +1,41 @@
-# Trainer Loop
+# TrainerLoop
 
-Trainer Loop is a browser-first, Bluetooth-connected interval training controller
-that closes the loop between a planned workout and real-time physiology. It
-drives smart trainers (ERG or resistance targets), streams live telemetry, and
-adds a "live coach" layer that suggests adaptations based on compliance and
-strain.
+TrainerLoop is a native Android app that turns a Bluetooth smart trainer into an
+indoor-cycling computer. It supports structured workouts, GPX-based virtual
+rides, free rides, live coaching, FIT recording, and intervals.icu sync.
 
-## Documentation
+The earlier React/Vite proof of concept has been retired. Android is the only
+supported application.
 
-- Implementation plan: `docs/implementation-plan.md` - Phases, MVP scope, and
-  future extensions (including intervals.icu).
-- Data model: `docs/data-model.md` - Core entities for workouts, sessions,
-  telemetry, coach profiles, and notes.
-- Coach profiles: `docs/coach-profiles.md` - JSON schema, storage location, and
-  copyable template for new coach definitions.
-- Coach rules: `docs/coach-rules.md` - Rule definitions and trigger logic for
-  actionable suggestions.
-- UX flow: `docs/ux-flow.md` - User flows for running workouts and accepting or
-  rejecting coach feedback.
+## Repository layout
+
+- [`android/`](android/) — Android Gradle project and application source.
+- [`android/README.md`](android/README.md) — architecture, features, setup, and
+  development commands.
+- [`docs/plans/`](docs/plans/) — Android product and implementation plans.
+- [`rides/`](rides/) — FIT fixtures used by Android replay and decoder tests.
 
 ## Development
 
-```bash
-npm install
-npm run dev
-```
+Requirements:
 
-If you're running in a web sandbox that omits devDependencies, install them
-explicitly:
+- JDK 17
+- Android SDK
+- A physical Android device for BLE and full end-to-end ride testing
 
-```bash
-npm install --include=dev
-```
-
-To expose the dev server to the sandbox, run:
+Run the standard checks from the repository root:
 
 ```bash
-npm run dev -- --host 0.0.0.0 --port 4173
+cd android
+./gradlew testDebugUnitTest lint
 ```
+
+Build a debug APK:
+
+```bash
+cd android
+./gradlew assembleDebug
+```
+
+See the [Android README](android/README.md) for configuration, architecture, and
+device-testing details.
