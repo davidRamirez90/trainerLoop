@@ -84,9 +84,11 @@ import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.app.WorkoutForegroundService
+import com.trainerloop.app.BuildConfig
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
 import com.trainerloop.domain.coach.FeedbackItem
+import com.trainerloop.domain.telemetry.TelemetryScenario
 import com.trainerloop.ui.components.WorkoutChart
 import com.trainerloop.ui.components.workoutProfileSummary
 import com.trainerloop.ui.haptics.Haptics
@@ -148,6 +150,7 @@ fun WorkoutScreen(
   }
   val currentPowerColor = zoneColorSet(uiState.currentPowerWatts, ftp).line
   var showStopConfirm by remember { mutableStateOf(false) }
+  var showTelemetrySourcePicker by remember { mutableStateOf(false) }
 
   fun requestStop() {
     if (uiState.elapsedSec == 0) onExit() else showStopConfirm = true
@@ -273,23 +276,48 @@ fun WorkoutScreen(
     LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
   if (isLandscape) {
-    LandscapeWorkout(
-      uiState = uiState,
-      ftp = ftp,
-      powerColor = currentPowerColor,
-      onPlayPause = {
-        when {
-          uiState.isRunning -> viewModel.pause()
-          uiState.isComplete -> viewModel.maybeEmitFinish()
-          else -> if (uiState.elapsedSec == 0) viewModel.start() else viewModel.resume()
+    Box(modifier = Modifier.fillMaxSize()) {
+      LandscapeWorkout(
+        uiState = uiState,
+        ftp = ftp,
+        powerColor = currentPowerColor,
+        onPlayPause = {
+          when {
+            uiState.isRunning -> viewModel.pause()
+            uiState.isComplete -> viewModel.maybeEmitFinish()
+            else -> if (uiState.elapsedSec == 0) viewModel.start() else viewModel.resume()
+          }
+        },
+        onStop = { requestStop() }
+      )
+      if (BuildConfig.DEBUG && uiState.elapsedSec == 0 && !uiState.isRunning) {
+        FilledTonalButton(
+          onClick = { showTelemetrySourcePicker = true },
+          modifier = Modifier
+            .align(Alignment.TopCenter)
+            .padding(top = Spacing.sm)
+        ) {
+          Text(
+            uiState.telemetryScenario?.let { "Debug: ${it.label}" }
+              ?: "Debug: Bluetooth"
+          )
         }
-      },
-      onStop = { requestStop() }
-    )
+      }
+    }
     if (showStopConfirm) {
       StopConfirmDialog(
         onDismiss = { showStopConfirm = false },
         onConfirm = { showStopConfirm = false; viewModel.stop() }
+      )
+    }
+    if (showTelemetrySourcePicker) {
+      TelemetrySourceDialog(
+        selected = uiState.telemetryScenario,
+        onSelect = {
+          viewModel.setTelemetryScenario(it)
+          showTelemetrySourcePicker = false
+        },
+        onDismiss = { showTelemetrySourcePicker = false }
       )
     }
     return
@@ -324,8 +352,32 @@ fun WorkoutScreen(
         )
       )
 
+      if (BuildConfig.DEBUG && !sessionHasStarted) {
+        Spacer(modifier = Modifier.height(Spacing.sm))
+        FilledTonalButton(
+          onClick = { showTelemetrySourcePicker = true },
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          Text(
+            uiState.telemetryScenario?.let { "Debug telemetry: ${it.label}" }
+              ?: "Debug telemetry: Bluetooth"
+          )
+        }
+      } else {
+        uiState.telemetryScenario?.let { scenario ->
+          Text(
+            text = "SIMULATED · ${scenario.label}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.padding(top = Spacing.xs)
+          )
+        }
+      }
+
       ConnectionStatusRow(
-        visible = sessionHasStarted && uiState.sensorDropout,
+        visible = sessionHasStarted &&
+          uiState.sensorDropout &&
+          uiState.telemetryScenario != TelemetryScenario.SENSOR_DROPOUT,
         modifier = Modifier.padding(top = Spacing.xs)
       )
 
@@ -505,6 +557,87 @@ fun WorkoutScreen(
       onDismiss = { showStopConfirm = false },
       onConfirm = { showStopConfirm = false; viewModel.stop() }
     )
+  }
+
+  if (showTelemetrySourcePicker) {
+    TelemetrySourceDialog(
+      selected = uiState.telemetryScenario,
+      onSelect = {
+        viewModel.setTelemetryScenario(it)
+        showTelemetrySourcePicker = false
+      },
+      onDismiss = { showTelemetrySourcePicker = false }
+    )
+  }
+}
+
+@Composable
+private fun TelemetrySourceDialog(
+  selected: TelemetryScenario?,
+  onSelect: (TelemetryScenario?) -> Unit,
+  onDismiss: () -> Unit
+) {
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("Debug telemetry source") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(
+          "Choose before starting. Simulated samples use the normal workout, coach, and save pipeline.",
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        TelemetrySourceOption(
+          title = "Bluetooth",
+          description = "Use connected trainer and heart-rate sensors.",
+          selected = selected == null,
+          onClick = { onSelect(null) }
+        )
+        TelemetryScenario.entries.forEach { scenario ->
+          TelemetrySourceOption(
+            title = scenario.label,
+            description = scenario.description,
+            selected = selected == scenario,
+            onClick = { onSelect(scenario) }
+          )
+        }
+      }
+    },
+    confirmButton = {
+      TextButton(onClick = onDismiss) { Text("Cancel") }
+    }
+  )
+}
+
+@Composable
+private fun TelemetrySourceOption(
+  title: String,
+  description: String,
+  selected: Boolean,
+  onClick: () -> Unit
+) {
+  TextButton(
+    onClick = onClick,
+    modifier = Modifier.fillMaxWidth(),
+    colors = ButtonDefaults.textButtonColors(
+      contentColor = if (selected) {
+        MaterialTheme.colorScheme.primary
+      } else {
+        MaterialTheme.colorScheme.onSurface
+      }
+    )
+  ) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+      Text(
+        text = if (selected) "✓ $title" else title,
+        style = MaterialTheme.typography.titleSmall
+      )
+      Text(
+        text = description,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+      )
+    }
   }
 }
 

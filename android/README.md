@@ -214,6 +214,27 @@ adb logcat --pid=$(adb shell pidof -s com.trainerloop.app)
 adb shell run-as com.trainerloop.app ls files
 ```
 
+#### In-app telemetry scenarios
+
+Debug builds can run structured workouts without Bluetooth hardware while
+still exercising the production workout clock, recorder, live coach, charts,
+completion flow, FIT encoding, and Room session persistence.
+
+1. Open any workout and enter the player.
+2. Before pressing Play, tap **Debug telemetry: Bluetooth**.
+3. Select a deterministic scenario:
+   - **Good adherence + stable HR**
+   - **Low cadence + HR drift**
+   - **Recovery HR remains high**
+   - **Repeated fatigue**
+   - **Sensor dropouts**
+4. Start the workout normally.
+
+The selected source is locked after the workout starts so one saved session
+cannot mix live and simulated samples. Simulated mode never scans, connects, or
+writes FTMS control commands. The picker is shown in debug builds only; release
+builds continue to use Bluetooth.
+
 ---
 
 ## Testing

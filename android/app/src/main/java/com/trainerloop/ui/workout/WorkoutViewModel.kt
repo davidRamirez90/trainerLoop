@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.trainerloop.ble.FtmsControlManager
 import com.trainerloop.ble.FtmsManager
 import com.trainerloop.ble.HrManager
+import com.trainerloop.ble.model.Stamped
 import com.trainerloop.data.model.CoachEvent
 import com.trainerloop.data.model.CoachInterventions
 import com.trainerloop.data.model.CoachMessages
@@ -26,6 +27,10 @@ import com.trainerloop.domain.RampTest
 import com.trainerloop.domain.TelemetryRecorder
 import com.trainerloop.domain.WorkoutClock
 import com.trainerloop.domain.WorkoutMath
+import com.trainerloop.domain.telemetry.ScenarioTelemetryProvider
+import com.trainerloop.domain.telemetry.TelemetryInputContext
+import com.trainerloop.domain.telemetry.TelemetryInputProvider
+import com.trainerloop.domain.telemetry.TelemetryScenario
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -75,7 +80,9 @@ data class WorkoutUiState(
   val currentGradePercent: Double? = null,
   val virtualDistanceM: Double? = null,
   /** Expected elevation per second (static per workout); null when sim is off. */
-  val elevationProfile: DoubleArray? = null
+  val elevationProfile: DoubleArray? = null,
+  /** Debug-only source selection. Null means live Bluetooth telemetry. */
+  val telemetryScenario: TelemetryScenario? = null
 )
 
 data class WorkoutFinishData(
@@ -108,7 +115,8 @@ class WorkoutViewModel(
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
   private val userProfile: UserProfile = UserProfile(),
   coachProfile: CoachProfile? = null,
-  private val now: () -> Long = System::currentTimeMillis
+  private val now: () -> Long = System::currentTimeMillis,
+  initialTelemetryScenario: TelemetryScenario? = null
 ) : ViewModel() {
 
   private val clock = WorkoutClock(workout.segments, dispatcher)
@@ -140,7 +148,8 @@ class WorkoutViewModel(
     WorkoutUiState(
       segments = workout.segments,
       elevationProfile = route?.expectedAltitudeM,
-      intensityOffsetPct = userProfile.ergBiasPct.coerceIn(-20, 20)
+      intensityOffsetPct = userProfile.ergBiasPct.coerceIn(-20, 20),
+      telemetryScenario = initialTelemetryScenario
     )
   )
   val uiState: StateFlow<WorkoutUiState> = _uiState.asStateFlow()
@@ -154,6 +163,8 @@ class WorkoutViewModel(
    * one that reattaches after a disconnect) is picked up.
    */
   private val recorder = MutableStateFlow<TelemetryRecorder?>(null)
+  private val selectedTelemetryScenario = MutableStateFlow(initialTelemetryScenario)
+  private val activeTelemetryProvider = MutableStateFlow<TelemetryInputProvider?>(null)
 
   private var wasErgEnabled: Boolean = true
   private var sessionStartMs: Long? = null
@@ -175,22 +186,38 @@ class WorkoutViewModel(
 
     // (Re)create the recorder whenever the manager references change.
     viewModelScope.launch {
-      combine(ftmsManagerFlow, hrManagerFlow) { ftms, hr -> ftms to hr }
+      combine(
+        ftmsManagerFlow,
+        hrManagerFlow,
+        selectedTelemetryScenario
+      ) { ftms, hr, scenario -> Triple(ftms, hr, scenario) }
         .distinctUntilChanged()
-        .collect { (ftms, hr) ->
+        .collect { (ftms, hr, scenario) ->
           val previous = recorder.value
           previous?.flush()
           val carried = previous?.samples?.value ?: emptyList()
-          val next = if (ftms != null) {
+          val provider = when {
+            scenario != null -> ScenarioTelemetryProvider(scenario)
+            ftms != null -> TelemetryRecorder.DataProvider(
+              data = ftms.data,
+              heartRate = hr?.heartRate
+                ?: MutableStateFlow<Stamped<Int>?>(null).asStateFlow()
+            )
+            else -> null
+          }
+          activeTelemetryProvider.value = provider
+          val next = if (provider != null) {
             TelemetryRecorder(
-              clock, ftms, hr, dispatcher, virtualRide, initialSamples = carried
+              clock, provider, dispatcher, virtualRide, initialSamples = carried
             )
               .also { it.startCollecting() }
           } else null
           recorder.value = next
           previous?.stop()
+          updateTelemetryProvider()
           com.trainerloop.ble.BleLog.d(
-            "VM recorder swap: ftms=${ftms?.device?.address} hr=${hr?.device?.address}"
+            "VM recorder swap: source=${scenario?.name ?: "BLUETOOTH"} " +
+              "ftms=${ftms?.device?.address} hr=${hr?.device?.address}"
           )
         }
     }
@@ -225,8 +252,10 @@ class WorkoutViewModel(
     // updates the instant an HR packet arrives instead of waiting for the
     // next 1 Hz clock tick.
     viewModelScope.launch {
-      hrManagerFlow
-        .flatMapLatest { hr -> hr?.heartRate?.map { it?.value } ?: flowOf(null) }
+      activeTelemetryProvider
+        .flatMapLatest { provider ->
+          provider?.heartRate?.map { it?.value } ?: flowOf(null)
+        }
         .filterNotNull()
         .collect { bpm -> _uiState.value = _uiState.value.copy(currentHrBpm = bpm) }
     }
@@ -234,6 +263,7 @@ class WorkoutViewModel(
     viewModelScope.launch {
       clock.elapsedSec.collect {
         updateFromClock()
+        updateTelemetryProvider()
         updateInZone()
         if (userProfile.coachEnabled) {
           tickCoach()
@@ -323,6 +353,20 @@ class WorkoutViewModel(
     sendControlWhenReady { it.startResume() }
   }
 
+  /**
+   * Switches between live Bluetooth and a deterministic debug scenario.
+   * Source changes are intentionally locked after the clock starts so a saved
+   * session cannot silently mix simulated and live telemetry.
+   */
+  fun setTelemetryScenario(scenario: TelemetryScenario?) {
+    if (_uiState.value.elapsedSec > 0 || _uiState.value.isRunning) return
+    selectedTelemetryScenario.value = scenario
+    _uiState.value = _uiState.value.copy(telemetryScenario = scenario)
+    com.trainerloop.ble.BleLog.i(
+      "Workout telemetry source selected: ${scenario?.name ?: "BLUETOOTH"}"
+    )
+  }
+
   fun pause() {
     clock.pause()
     viewModelScope.launch {
@@ -345,6 +389,7 @@ class WorkoutViewModel(
     maybeEmitFinish()
     sessionStartMs = null
     recorder.value?.reset(clock.sessionId.value)
+    activeTelemetryProvider.value?.reset()
     _uiState.value = _uiState.value.copy(
       intensityOffsetPct = userProfile.ergBiasPct.coerceIn(-20, 20),
       samples = emptyList()
@@ -473,7 +518,8 @@ class WorkoutViewModel(
     }
   }
 
-  private fun controlNow(): FtmsControlManager? = ftmsControlManagerFlow.value
+  private fun controlNow(): FtmsControlManager? =
+    if (selectedTelemetryScenario.value == null) ftmsControlManagerFlow.value else null
 
   /**
    * Sends a control command once the FTMS control point reports READY.
@@ -651,6 +697,17 @@ class WorkoutViewModel(
       segmentEndSec = segEnd,
       elapsedInSegmentSec = elapsedInSeg,
       targetRange = adjustedTarget
+    )
+  }
+
+  private fun updateTelemetryProvider() {
+    val state = _uiState.value
+    activeTelemetryProvider.value?.update(
+      TelemetryInputContext(
+        elapsedSec = state.elapsedSec,
+        targetRange = state.targetRange,
+        phase = segments.getOrNull(state.segmentIndex)?.phase ?: SegmentPhase.WARMUP
+      )
     )
   }
 

@@ -5,6 +5,7 @@ import com.trainerloop.ble.HrManager
 import com.trainerloop.ble.model.IndoorBikeData
 import com.trainerloop.ble.model.Stamped
 import com.trainerloop.data.model.TelemetrySample
+import com.trainerloop.domain.telemetry.TelemetryInputProvider
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,16 +19,16 @@ import kotlinx.coroutines.launch
 
 class TelemetryRecorder(
   private val clock: WorkoutClock,
-  private val dataProvider: DataProvider,
+  private val dataProvider: TelemetryInputProvider,
   private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
   private val stamper: com.trainerloop.domain.sim.SampleStamper? = null,
   private val now: () -> Long = android.os.SystemClock::elapsedRealtime,
   initialSamples: List<TelemetrySample> = emptyList()
 ) {
   data class DataProvider(
-    val data: StateFlow<Stamped<IndoorBikeData>?>,
-    val heartRate: StateFlow<Stamped<Int>?>
-  )
+    override val data: StateFlow<Stamped<IndoorBikeData>?>,
+    override val heartRate: StateFlow<Stamped<Int>?>
+  ) : TelemetryInputProvider
 
   constructor(
     clock: WorkoutClock,
@@ -114,6 +115,17 @@ class TelemetryRecorder(
         if (elapsedSec > 0) {
           if (buffer.isEmpty() || buffer.last().timeSec < elapsedSec) {
             buffer.add(sample)
+            if (elapsedSec % SNAPSHOT_EVERY_SEC == 0) {
+              _samples.value = buffer.toList()
+            }
+          } else if (
+            dataProvider.replacesCurrentTick &&
+            buffer.last().timeSec == elapsedSec
+          ) {
+            // A source notification can arrive just after the clock tick.
+            // Replace that tick's provisional sample so scenario and live BLE
+            // updates are recorded rather than leaving a false dropout behind.
+            buffer[buffer.lastIndex] = sample
             if (elapsedSec % SNAPSHOT_EVERY_SEC == 0) {
               _samples.value = buffer.toList()
             }

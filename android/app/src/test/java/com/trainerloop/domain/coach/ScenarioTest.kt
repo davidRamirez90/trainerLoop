@@ -4,6 +4,8 @@ import com.trainerloop.data.model.SegmentPhase
 import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.UserProfile
 import com.trainerloop.data.model.WorkoutSegment
+import com.trainerloop.domain.telemetry.TelemetryScenario
+import com.trainerloop.domain.telemetry.TelemetryScenarioGenerator
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -117,5 +119,27 @@ class ScenarioTest {
     val items = ride(vo2Set(), AthleteSimulator(ftp = profile.ftp))
     assertTrue(items.isNotEmpty())
     assertTrue(items.all { it.snapshot.containsKey("power30s") && it.snapshot.containsKey("segment") })
+  }
+
+  @Test
+  fun `built-in low-cadence scenario reaches the live coach pipeline`() {
+    val segments = listOf(step("work", 600, 250, SegmentPhase.WORK))
+    val samples = (0 until 600).map { elapsedSec ->
+      TelemetryScenarioGenerator.sample(
+        scenario = TelemetryScenario.LOW_CADENCE_HR_DRIFT,
+        elapsedSec = elapsedSec,
+        targetRange = TargetRange(250, 250),
+        phase = SegmentPhase.WORK
+      )
+    }
+
+    val items = ReplayHarness.replay(segments, profile, samples, ergEnabled = true)
+
+    assertTrue(
+      "expected a cadence or fatigue decision, got ${items.map { it.ruleId }}",
+      items.any {
+        it.ruleId in setOf("erg-spiral", "cadence-low", "fatigue-accumulating", "hr-above-expected")
+      }
+    )
   }
 }

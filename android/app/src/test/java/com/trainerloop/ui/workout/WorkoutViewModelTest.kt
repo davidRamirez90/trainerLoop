@@ -13,6 +13,7 @@ import com.trainerloop.data.model.UserProfile
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
+import com.trainerloop.domain.telemetry.TelemetryScenario
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -405,6 +406,49 @@ class WorkoutViewModelTest {
     viewModel.toggleErg()
 
     assertFalse(viewModel.uiState.value.isErgEnabled)
+  }
+
+  @Test
+  fun `scenario telemetry runs the normal workout recorder without BLE`() =
+    runTest(testDispatcher) {
+      val viewModel = WorkoutViewModel(
+        workout = sampleWorkout(),
+        dispatcher = testDispatcher,
+        initialTelemetryScenario = TelemetryScenario.GOOD_ADHERENCE
+      )
+      runCurrent()
+
+      viewModel.start()
+      advanceTimeBy(5_000)
+      runCurrent()
+
+      val state = viewModel.uiState.value
+      assertEquals(TelemetryScenario.GOOD_ADHERENCE, state.telemetryScenario)
+      assertTrue(state.currentPowerWatts in 200..220)
+      assertTrue(state.currentCadenceRpm in 88..90)
+      assertTrue(state.currentHrBpm > 0)
+      assertFalse(state.sensorDropout)
+      assertEquals(5, state.samples.size)
+    }
+
+  @Test
+  fun `telemetry source cannot change after workout starts`() = runTest(testDispatcher) {
+    val viewModel = WorkoutViewModel(
+      workout = sampleWorkout(),
+      dispatcher = testDispatcher,
+      initialTelemetryScenario = TelemetryScenario.GOOD_ADHERENCE
+    )
+    runCurrent()
+    viewModel.start()
+    advanceTimeBy(1_000)
+    runCurrent()
+
+    viewModel.setTelemetryScenario(TelemetryScenario.SENSOR_DROPOUT)
+
+    assertEquals(
+      TelemetryScenario.GOOD_ADHERENCE,
+      viewModel.uiState.value.telemetryScenario
+    )
   }
 
   private fun mockFtmsManager(
