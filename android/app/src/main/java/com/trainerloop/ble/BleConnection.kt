@@ -31,7 +31,7 @@ enum class ConnectionStatus {
 class BleConnection(
   private val context: Context,
   private val device: BluetoothDevice
-) {
+) : HeartRateBleConnection {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
   private val _connectionState = MutableStateFlow(false)
@@ -63,12 +63,12 @@ class BleConnection(
     callback.onUnexpectedDisconnect = { handleUnexpectedDisconnect() }
   }
 
-  fun addReconnectHandler(handler: suspend () -> Unit) {
+  override fun addReconnectHandler(handler: suspend () -> Unit) {
     synchronized(reconnectHandlers) { reconnectHandlers.add(handler) }
   }
 
   @Suppress("MissingPermission")
-  suspend fun connect(): Result<Unit> {
+  override suspend fun connect(): Result<Unit> {
     userInitiatedDisconnect = false
     _connectionStatus.value = ConnectionStatus.CONNECTING
     gatt?.close()
@@ -106,7 +106,7 @@ class BleConnection(
   }
 
   @Suppress("MissingPermission")
-  suspend fun disconnect() {
+  override suspend fun disconnect() {
     userInitiatedDisconnect = true
     autoReconnectEnabled = false
     _connectionStatus.value = ConnectionStatus.IDLE
@@ -173,7 +173,7 @@ class BleConnection(
     scope.isActive && autoReconnectEnabled && !userInitiatedDisconnect
 
   @Suppress("MissingPermission")
-  suspend fun discoverServices(): Result<Unit> {
+  override suspend fun discoverServices(): Result<Unit> {
     val gattInstance = gatt ?: return Result.failure(Exception("Not connected"))
     return gattMutex.withLock {
       callback.resetServicesDeferred()
@@ -191,7 +191,10 @@ class BleConnection(
     }
   }
 
-  fun getCharacteristic(serviceUuid: UUID, characteristicUuid: UUID): BluetoothGattCharacteristic? {
+  override fun getCharacteristic(
+    serviceUuid: UUID,
+    characteristicUuid: UUID
+  ): BluetoothGattCharacteristic? {
     return gatt?.getService(serviceUuid)?.getCharacteristic(characteristicUuid)
   }
 
@@ -213,7 +216,9 @@ class BleConnection(
    */
   @Suppress("MissingPermission")
   @SuppressLint("WrongConstant")
-  suspend fun enableNotifications(characteristic: BluetoothGattCharacteristic): Flow<ByteArray> {
+  override suspend fun enableNotifications(
+    characteristic: BluetoothGattCharacteristic
+  ): Flow<ByteArray> {
     val gattInstance = gatt ?: throw IllegalStateException("Not connected")
     val uuid = characteristic.uuid
     val useIndicate =

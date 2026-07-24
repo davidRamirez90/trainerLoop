@@ -5,6 +5,7 @@ import android.content.Context
 import com.trainerloop.ble.model.HeartRateMeasurementParser
 import com.trainerloop.ble.model.Stamped
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,12 +14,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
 
-class HrManager(
+class HrManager internal constructor(
   private val context: Context,
-  val device: BluetoothDevice
+  val device: BluetoothDevice,
+  private val sharedConnection: HeartRateBleConnection?,
+  dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) {
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-  private var connection: BleConnection? = null
+  constructor(
+    context: Context,
+    device: BluetoothDevice
+  ) : this(context, device, null, Dispatchers.Main)
+
+  private val scope = CoroutineScope(SupervisorJob() + dispatcher)
+  private var connection: HeartRateBleConnection? = null
+  private val ownsConnection = sharedConnection == null
+  internal val usesSharedTrainerConnection: Boolean = !ownsConnection
+  private var active = false
 
   private val _heartRate = MutableStateFlow<Stamped<Int>?>(null)
   val heartRate: StateFlow<Stamped<Int>?> = _heartRate.asStateFlow()
@@ -27,17 +38,21 @@ class HrManager(
   val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
   suspend fun connect(): Result<Unit> {
-    BleLog.d("HrManager.connect device=${device.address}")
-    val conn = BleConnection(context, device)
+    BleLog.d(
+      "HrManager.connect device=${device.address} sharedTrainerLink=${!ownsConnection}"
+    )
+    val conn = sharedConnection ?: BleConnection(context, device)
     connection = conn
 
-    conn.connect().getOrElse {
-      BleLog.e("HrManager.connect: connect() failed: ${it.message}")
-      return Result.failure(it)
-    }
-    conn.discoverServices().getOrElse {
-      BleLog.e("HrManager.connect: discoverServices failed: ${it.message}")
-      return Result.failure(it)
+    if (ownsConnection) {
+      conn.connect().getOrElse {
+        BleLog.e("HrManager.connect: connect() failed: ${it.message}")
+        return Result.failure(it)
+      }
+      conn.discoverServices().getOrElse {
+        BleLog.e("HrManager.connect: discoverServices failed: ${it.message}")
+        return Result.failure(it)
+      }
     }
 
     val subscribed = subscribeToNotifications(conn)
@@ -45,10 +60,11 @@ class HrManager(
       return Result.failure(Exception("Heart Rate Measurement subscription failed"))
     }
 
+    active = true
     // Auto-resubscribe on reconnect. Service discovery is re-run once by
     // BleConnection before handlers fire.
     conn.addReconnectHandler {
-      subscribeToNotifications(conn)
+      if (active) subscribeToNotifications(conn)
     }
 
     _isConnected.value = true
@@ -56,7 +72,7 @@ class HrManager(
     return Result.success(Unit)
   }
 
-  private suspend fun subscribeToNotifications(conn: BleConnection): Boolean {
+  private suspend fun subscribeToNotifications(conn: HeartRateBleConnection): Boolean {
     val dataChar = conn.getCharacteristic(
       BleConstants.HEART_RATE_SERVICE,
       BleConstants.HEART_RATE_MEASUREMENT
@@ -95,7 +111,10 @@ class HrManager(
 
   suspend fun disconnect() {
     BleLog.d("HrManager.disconnect device=${device.address}")
-    connection?.disconnect()
+    active = false
+    if (ownsConnection) {
+      connection?.disconnect()
+    }
     connection = null
     _isConnected.value = false
     _heartRate.value = null
