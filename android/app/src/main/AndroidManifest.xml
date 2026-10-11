@@ -18,6 +18,14 @@
     android:name="android.hardware.bluetooth_le"
     android:required="true" />
 
+  <!-- FIT-handler discovery requires package visibility on Android 11+. -->
+  <queries>
+    <intent>
+      <action android:name="android.intent.action.SEND" />
+      <data android:mimeType="application/fit" />
+    </intent>
+  </queries>
+
   <application
     android:name=".TrainerLoopApplication"
     android:allowBackup="false"

@@ -28,7 +28,7 @@ fun TrainerLoopCard(
       MaterialTheme.colorScheme.surface
     }
   )
-  val shape = RoundedCornerShape(16.dp)
+  val shape = MaterialTheme.shapes.medium
 
   if (onClick == null) {
     Card(modifier = modifier, shape = shape, colors = colors) {

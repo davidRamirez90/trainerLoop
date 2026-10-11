@@ -13,6 +13,7 @@ data class SessionEntity(
     val endedAt: String?,
     val durationSec: Int,
     val samplesJson: String,
+    /** Legacy column retained to preserve the v4 database schema. */
     val coachEventsJson: String,
     val completed: Boolean,
     val avgPower: Int,
@@ -23,6 +24,6 @@ data class SessionEntity(
     val icuSyncedAt: String? = null,
     /** "WORKOUT" or "FREE_RIDE". */
     val sessionType: String = "WORKOUT",
-    /** RouteEntity id for free rides; null for workouts. */
+    /** Legacy route reference retained for existing sessions; new workouts use null. */
     val routeId: String? = null
 )

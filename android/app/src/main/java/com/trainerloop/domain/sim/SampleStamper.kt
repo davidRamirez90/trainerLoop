@@ -12,5 +12,5 @@ data class VirtualStamp(
 
 /** 1 Hz hook for [com.trainerloop.domain.TelemetryRecorder]. */
 interface SampleStamper {
-  fun stamp(timeSec: Int, powerWatts: Int, cadenceRpm: Int, dropout: Boolean): VirtualStamp
+  fun stamp(timeSec: Int, powerWatts: Int, cadenceRpm: Int, dropout: Boolean, planTimeSec: Int = timeSec): VirtualStamp
 }

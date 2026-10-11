@@ -1,112 +1,84 @@
 # TrainerLoop
 
-A personal Android app that turns a smart bike trainer into a full indoor-cycling
-computer. It connects to the trainer over Bluetooth, drives it in **ERG mode**
-(the app commands a target wattage and the trainer holds it), plays structured,
-virtual, and free rides with live coaching, records every ride as a FIT file, and
-syncs with [intervals.icu](https://intervals.icu).
+Personal Android indoor-cycling app for structured training with a Bluetooth
+FTMS smart trainer. Single user, single device; no app accounts or server backend.
+intervals.icu is an optional external integration.
 
-> **Scope.** Single-user, single-device app (built and tuned for a Pixel 2 XL).
-> Not published to the Play Store. No accounts, no cloud, no multi-user — see
-> [`ROADMAP.md`](ROADMAP.md) for what is intentionally out of scope.
+## Focus navigation
 
----
+Today, Workouts, and History are the three primary tabs. Open Profile from the
+Today avatar; its back action returns to Today. Devices remains a modal setup
+flow from Today. Opening a workout enters idle Player; Play starts recording.
 
-## What it does
+## Current functionality
 
-### 🚴 Ride modes
-- **Structured workouts** — ERG-controlled interval sessions. The app sends the
-  target watts for each segment; the trainer holds them. Live target-vs-actual
-  power band, zone-colored power, HR, cadence, and an interval chart.
-- **Virtual rides** — ride a GPX route as a simulated course. A physics model
-  (gradient, gearing, rolling resistance, aero drag) turns your power into speed
-  and position along the route; the trainer resistance follows the terrain.
-- **Free rides** — open-ended riding with a virtual drivetrain (shift gears with
-  the **volume keys**) and optional gated ERG targets.
-- **Ramp test** — progressive step test to estimate FTP.
+- Structured ERG workouts with stepped, ramp, and untargeted segments. Start,
+  pause/resume, stop, skip intervals, toggle ERG, adjust intensity in 1% steps
+  (±20%), reset intensity, and extend recovery by 30 seconds.
+- Live power/target range, cadence, HR, interval countdown and on-target progress;
+  workout profile and ride statistics. Landscape charts support zoom, panning,
+  and automatic following. Ride averages include coasting and exclude dropouts.
+- Bluetooth FTMS trainer and HR-sensor scanning/connection. Trainer control
+  observes readiness so late attachment/reconnection applies the current target.
+  Untargeted intervals send zero watts rather than retaining the previous load.
+- Interval beeps, spoken interval/target announcements, haptics, optional completion
+  sound, screen keep-awake, and foreground service. These cues are independent of
+  the removed coaching system.
+- Workout library: Sweet Spot (88–94% FTP work intervals), Power Pyramid, and a
+  structured Endurance Ride, with built-in targets scaled to FTP. Import `.zwo`, `.mrc`, `.erg`, and `.json`;
+  search, category filters, favorites, duplication, and deletion of stored workouts.
+  Existing workouts created with the retired builder remain available.
+- FTP ramp test: five-minute warm-up, one-minute +20 W steps, low-power exhaustion
+  detection (sensor dropouts are excluded), estimate from 75% of best rolling
+  one-minute power. Accept/discard FTP and optionally push it to intervals.icu.
+- Optional generated virtual route overlay during workouts: simulated speed,
+  distance, elevation and gradient. Profile controls rider/bike weight, rolling
+  resistance and aerodynamic drag. This overlay does not change ERG targets.
+- Completion: ride statistics, telemetry chart, Save/Discard, FIT sharing. Save
+  persists full telemetry locally and initiates upload if credentials are set.
+- History: saved sessions and sync/completion status; six-week **riding-duration**
+  chart; session detail with power-zone time distribution and telemetry chart.
+- intervals.icu: today's workout preview/Open workout and library sync, FTP/weight
+  sync, FIT upload on Save, manual upload for completed unsynced sessions, and
+  optional FTP write-back after a ramp test. Sync covers today, not a week calendar.
+- Profile: rider name, FTP, weight, max HR/zone tables, default ERG bias, simulation
+  options, completion sound, integration credentials, and About/version. Power-zone
+  tables use the same six bands and exact watt boundaries as charts and history.
 
-### 🎙️ Live coaching
-A configurable "coach" watches expected-vs-actual effort during a ride, models
-athlete state, decides when it's worth speaking, and calls out intervals and
-targets via **text-to-speech** (plus a tone beep on interval changes). Coach
-personalities are data-driven JSON assets in
-[`app/src/main/assets/coach_profiles/`](app/src/main/assets/coach_profiles):
-`default`, `mentor`, `drill-sergeant`, `silent-scientist`, `base-builder`.
+## Removed functionality and compatibility
 
-### 📊 During the ride
-- ERG on/off toggle, intensity bias (±1% / ±5%, clamped ±20%), skip interval,
-  and extend-current-recovery (+30s).
-- Time-in-zone bar, voice call-outs, audio cue on interval change.
-- **Landscape immersive chart** with 1×/2×/4×/8× zoom that auto-follows the cursor.
-- Runs under a **foreground service** with a partial wake-lock so the ride and BLE
-  link survive screen-off; the screen is kept awake while the clock runs.
-- Auto-reconnect on BLE drop (re-arms trainer control and re-subscribes).
+Workout builder, standalone free ride, GPX import/route riding, live coaching,
+coach profiles and summaries, route difficulty, and Zwift Click/volume-key gearing
+have been removed. Untargeted segments inside imported workouts remain supported.
+The hardcoded Trainer statistics page was removed rather than presented as live data.
 
-### 📚 Workouts & routes
-- Import workouts from `.zwo` (Zwift), `.mrc`, `.erg`, and `.json`.
-- Import routes from `.gpx`.
-- Workout library with search, category filter, favorites, duplicate, and a
-  (stepped-interval) workout builder.
-
-### ☁️ intervals.icu integration
-- Home **Quick Start** card shows today's planned workout; tap to download the
-  `.zwo`, parse it, and drop straight into the player.
-- Auto-sync **FTP / weight** from the athlete endpoint.
-- Auto-**upload the FIT file** after a ride.
-
-### 🗂️ History & data
-- Every ride is saved to a local **Room** database with full telemetry.
-- History tab with a 6-week calendar strip and per-session detail.
-- Rides are encoded to **FIT** files (custom encoder/decoder) for sharing and upload.
-
----
+The Room v4 schema is retained: historical route rows and legacy session metadata
+are kept for compatibility, but there is no route DAO or active route/coaching flow.
+Existing saved sessions are preserved. Obsolete preference keys are ignored.
 
 ## Architecture
 
-Single-activity Jetpack Compose app, MVVM, organized by layer:
+Native single-activity Jetpack Compose app with MVVM, Coroutines/Flow, Room,
+and kotlinx-serialization. `minSdk 30`, `targetSdk/compileSdk 35`, JVM 17.
 
-```
-app/src/main/java/com/trainerloop/
-├── app/          Application, MainActivity, foreground service, manager wiring
-├── ble/          BLE stack: scanning, GATT connection, FTMS control + data, HR
-│   └── model/    FTMS IndoorBikeData & Heart Rate Measurement packet parsers
-├── data/
-│   ├── model/    Domain models (Session, Workout, Route, TelemetrySample, Coach…)
-│   ├── repository/  Session, Route, Profile repos + intervals.icu uploader
-│   └── source/
-│       ├── local/   Room database, DAOs, entities, coach-profile loader
-│       └── remote/  intervals.icu REST client
-├── domain/
-│   ├── coach/    Live coaching engine (expectation, athlete model, messaging)
-│   ├── fit/      FIT file encoder / decoder
-│   ├── parser/   .zwo / .mrc / .erg / .json / .gpx parsers
-│   └── sim/      Virtual-ride & free-ride physics (drivetrain, speed, terrain)
-└── ui/           Compose screens + ViewModels (home, workout, freeride, routes,
-                  history, library, devices, settings, coach, theme, components)
-```
+- `app/`: application manager wiring, activity and foreground service.
+- `ble/`: scanning, shared trainer GATT connection, FTMS data/control, and HR.
+- `data/`: models, profile/session repositories, Room, and intervals.icu REST client.
+- `domain/`: workout clock/math, telemetry, workout parsers, FIT, and optional
+  workout-route simulation. Android-independent logic is unit-tested here.
+- `ui/`: Home, Workouts/Preview/Player/Complete, History/Detail, Devices, Profile.
 
-**Key design points**
-- **One shared GATT connection** to the trainer (`TrainerLoopApplication`), split
-  between a data manager (`FtmsManager`) and a control manager
-  (`FtmsControlManager`) — BLE allows only one GATT client per peripheral.
-- BLE/trainer managers live on the `Application` as `StateFlow`s so ride state
-  survives navigation and rotation.
-- Coaching, physics, FIT, and parsing are pure Kotlin in `domain/` — unit-testable
-  with no Android dependencies.
-
-**Stack:** Kotlin, Jetpack Compose (Material 3), Navigation-Compose, Coroutines/Flow,
-Room, kotlinx-serialization. `minSdk 30`, `targetSdk 35`, JVM 17, Gradle 8.7.
-
----
+Only one GATT connection is opened to a trainer and shared by the telemetry and
+control managers. Application-owned manager StateFlows survive navigation;
+ViewModels observe changes instead of capturing manager snapshots.
 
 ## Theme architecture
 
 Colors are a **two-layer system**, both in `ui/theme/`:
 
-1. **Foundation ramps** (`Color.kt`) — raw hue/step values (`Sun80`, `Coral40`,
-   `Sky60`, `Ocean40`, `Sand90`, `Kelp40`, `Amber40`, `Red40`, plus warm-neutral
-   and independent dark-elevation steps). These are implementation detail and
-   are only ever referenced from `Theme.kt` and `TrainerLoopColors.kt`.
+1. **Focus foundation** (`Color.kt`) — warm paper, forest, ink and sage tokens.
+   Older palette constants remain compatibility references for historical/debug
+   code; active Material and app-specific roles use Focus colors.
 2. **Semantic roles**, built from the ramps and exposed two ways:
    - **Material roles** (`MaterialTheme.colorScheme.*`) — `LightColorScheme` /
      `DarkColorScheme` in `Theme.kt` give full coverage of the Material 3 role
@@ -114,7 +86,7 @@ Colors are a **two-layer system**, both in `ui/theme/`:
      etc.) so nothing falls back to the Material baseline palette.
    - **`TrainerLoopColors` semantic roles** (`MaterialTheme.trainerLoopColors`,
      defined in `TrainerLoopColors.kt`) — app-specific roles with a single
-     responsibility each (readiness, coaching, connection state, warnings,
+     responsibility each (hero surfaces/actions, assessment, connection state, warnings,
      staleness, hero actions, chart series). Read via the
      `MaterialTheme.trainerLoopColors` extension, backed by
      `LocalTrainerLoopColors` and swapped light/dark by `TrainerLoopTheme`.
@@ -130,10 +102,9 @@ index (1–6, from `%FTP` via `PowerZoneMath`) to a light/dark `ZoneColorSet`
 semantic role system above, and is looked up via `zoneColorSet(targetWatts, ftp)`
 or `ZoneColors.forZone/forTarget`, never by hand-picking a hex value.
 
-See
-[`docs/app-redesign/2026-07-12-token-usage-spec.md`](docs/app-redesign/2026-07-12-token-usage-spec.md)
-for the full role-by-role table (light/dark hex + responsibility) and the
-component inventory.
+See [Focus migration](../docs/design/focus-migration/README.md) for the active
+design contract, screen coverage, and visual gallery. July design specifications
+are historical references.
 
 **Validate theme changes:**
 
@@ -216,32 +187,37 @@ adb shell run-as com.trainerloop.app ls files
 
 ---
 
-## Testing
+## Verification
 
-Unit tests live under [`app/src/test/`](app/src/test) and cover the pure-Kotlin
-core: FIT encode/decode (golden-master), workout parsers, virtual/free-ride
-physics, workout math and clock, the coaching pipeline (including replay golden
-tests and a scripted athlete simulator), repositories, the intervals.icu client,
-and the ViewModels (via Turbine + MockK + coroutines-test).
+Run from `android/` with JDK 17 and Android SDK 35:
 
 ```bash
-./gradlew testDebugUnitTest
+./gradlew testDebugUnitTest lint assembleDebug compileDebugAndroidTestKotlin
 ```
 
-Compose UI tests live under [`app/src/androidTest/`](app/src/androidTest) and
-cover the shared primitives in `ui/components/` and the bottom navigation bar
-(semantics: labels, selection state, stateDescription). They require a device
-or emulator to run; compile-check them with:
+Unit tests cover retained parsers, FIT, workout math/clock, telemetry, virtual
+simulation, BLE packet/control logic, repositories, and ViewModels. Regression
+coverage includes late trainer readiness, disconnect recording continuity, HR
+clearing, intensity ranges, dropout-aware ramp detection, FTP-scaled workouts, and
+skip/pause-safe recorded riding time.
+Compose and Room migration tests require an Android device/emulator to execute.
+A physical trainer is needed to validate reconnection, load release, ERG toggling,
+and cues end to end.
 
-```bash
-./gradlew compileDebugAndroidTestKotlin
-```
+## Known limits
 
----
+- Imported percentage targets are resolved to watts at import/sync time. Reimport
+  or sync after changing FTP to refresh those workouts; built-ins scale at load.
+- Historical IF/TSS/zone details currently use the current profile FTP, rather than
+  an FTP snapshot saved per session.
+- No trainer spindown/calibration, RPE/notes write-back, lap markers, interrupted
+  process recovery, future plan calendar, or local FTP/TSS trend charts.
+- `docs/plans/`, old implementation/review notes, and screenshot reference documents
+  are historical records. This README and `ROADMAP.md` define current scope.
 
-## Documentation
+### Compose screenshots without a device
 
-- [`ROADMAP.md`](ROADMAP.md) — feature status and what's intentionally out of scope
-- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — phased build history
-- [`BATTERY_OPTIMIZATION.md`](BATTERY_OPTIMIZATION.md) — foreground-service / wake-lock notes
-- [`docs/plans/`](../docs/plans) — design docs for major features
+See [COMPOSE_SCREENSHOTS.md](COMPOSE_SCREENSHOTS.md) for host-side production screen
+rendering, reference comparison, actual PNG inspection, and adding screens.
+From the repository root, run `./scripts/compose-screenshots.sh compare` to render
+and compare, or `./scripts/compose-screenshots.sh verify` to check references.

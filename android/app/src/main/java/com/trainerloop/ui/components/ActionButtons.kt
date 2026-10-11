@@ -25,7 +25,7 @@ fun PrimaryActionButton(
   val interactionSource = remember { MutableInteractionSource() }
   Button(
     onClick = onClick,
-    modifier = modifier.heightIn(min = 48.dp).pressable(interactionSource),
+    modifier = modifier.heightIn(min = 56.dp).pressable(interactionSource),
     enabled = enabled,
     interactionSource = interactionSource,
     colors = ButtonDefaults.buttonColors(

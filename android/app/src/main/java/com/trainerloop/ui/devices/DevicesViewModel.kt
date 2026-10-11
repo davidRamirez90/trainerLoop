@@ -23,8 +23,7 @@ import java.util.Locale
 
 enum class DeviceCapability(val label: String) {
   TRAINER("Trainer"),
-  HEART_RATE("Heart Rate"),
-  CONTROLLER("Controller")
+  HEART_RATE("Heart Rate")
 }
 
 data class AggregatedDevice(
@@ -34,8 +33,7 @@ data class AggregatedDevice(
 
 fun aggregateDevices(
   trainers: List<BleDevice>,
-  hrSensors: List<BleDevice>,
-  controllers: List<BleDevice>
+  hrSensors: List<BleDevice>
 ): List<AggregatedDevice> {
   val aggregated = linkedMapOf<String, AggregatedDevice>()
 
@@ -56,45 +54,37 @@ fun aggregateDevices(
 
   add(trainers, DeviceCapability.TRAINER)
   add(hrSensors, DeviceCapability.HEART_RATE)
-  add(controllers, DeviceCapability.CONTROLLER)
   return aggregated.values.toList()
 }
 
 internal fun connectAggregatedDevice(
   device: AggregatedDevice,
   connectTrainer: (BleDevice) -> Unit,
-  connectHr: (BleDevice) -> Unit,
-  connectClick: (BleDevice) -> Unit
+  connectHr: (BleDevice) -> Unit
 ) {
   if (DeviceCapability.TRAINER in device.capabilities) connectTrainer(device.device)
   if (DeviceCapability.HEART_RATE in device.capabilities) connectHr(device.device)
-  if (DeviceCapability.CONTROLLER in device.capabilities) connectClick(device.device)
 }
 
 internal fun disconnectAggregatedDevice(
   device: AggregatedDevice,
   disconnectTrainer: () -> Unit,
-  disconnectHr: () -> Unit,
-  disconnectClick: () -> Unit
+  disconnectHr: () -> Unit
 ) {
   if (DeviceCapability.TRAINER in device.capabilities) disconnectTrainer()
   if (DeviceCapability.HEART_RATE in device.capabilities) disconnectHr()
-  if (DeviceCapability.CONTROLLER in device.capabilities) disconnectClick()
 }
 
 fun connectedDevices(state: DevicesUiState): List<AggregatedDevice> = aggregateDevices(
   trainers = listOfNotNull(state.connectedTrainer),
   hrSensors = listOfNotNull(state.connectedHr),
-  controllers = listOfNotNull(state.connectedClick)
 )
 
 internal fun DevicesUiState.isConnecting(device: AggregatedDevice): Boolean =
   (DeviceCapability.TRAINER in device.capabilities && isConnectingTrainer &&
     pendingTrainerAddress.equals(device.device.address, ignoreCase = true)) ||
     (DeviceCapability.HEART_RATE in device.capabilities && isConnectingHr &&
-      pendingHrAddress.equals(device.device.address, ignoreCase = true)) ||
-    (DeviceCapability.CONTROLLER in device.capabilities && isConnectingClick &&
-      pendingClickAddress.equals(device.device.address, ignoreCase = true))
+      pendingHrAddress.equals(device.device.address, ignoreCase = true))
 
 private fun mergeDevices(first: BleDevice, second: BleDevice): BleDevice = first.copy(
   name = first.name ?: second.name,
@@ -106,20 +96,15 @@ data class DevicesUiState(
   val isScanning: Boolean = false,
   val trainerDevices: List<BleDevice> = emptyList(),
   val hrDevices: List<BleDevice> = emptyList(),
-  val clickDevices: List<BleDevice> = emptyList(),
   val availableDevices: List<AggregatedDevice> = emptyList(),
   val connectedTrainer: BleDevice? = null,
   val connectedHr: BleDevice? = null,
-  val connectedClick: BleDevice? = null,
   val pendingTrainerAddress: String? = null,
   val pendingHrAddress: String? = null,
-  val pendingClickAddress: String? = null,
   val isConnectingTrainer: Boolean = false,
   val isConnectingHr: Boolean = false,
-  val isConnectingClick: Boolean = false,
   val trainerBattery: Int? = null,
   val latestHrBpm: Int? = null,
-  val clickBattery: Int? = null,
   val hasPermissions: Boolean = false,
   val isBluetoothOn: Boolean = false,
   val isLocationOn: Boolean = false,
@@ -138,10 +123,8 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
   private var scanTimeoutJob: Job? = null
   private var trainerConnectionJob: Job? = null
   private var hrConnectionJob: Job? = null
-  private var clickConnectionJob: Job? = null
   private var trainerCollectorJob: Job? = null
   private var hrCollectorJob: Job? = null
-  private var clickCollectorJob: Job? = null
 
   init {
     refreshStatus()
@@ -184,7 +167,6 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
       services = listOf(
         BleConstants.FTMS_SERVICE,
         BleConstants.HEART_RATE_SERVICE,
-        BleConstants.ZWIFT_CLICK_SERVICE
       ),
       durationMs = 10_000L
     )
@@ -206,14 +188,10 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
           val hrSensors = devices.filter { device ->
             device.services.contains(BleConstants.HEART_RATE_SERVICE)
           }
-          val controllers = devices.filter { device ->
-            device.services.contains(BleConstants.ZWIFT_CLICK_SERVICE)
-          }
           _uiState.value = _uiState.value.copy(
             trainerDevices = trainers,
             hrDevices = hrSensors,
-            clickDevices = controllers,
-            availableDevices = aggregateDevices(trainers, hrSensors, controllers),
+            availableDevices = aggregateDevices(trainers, hrSensors),
             isScanning = true
           )
         }
@@ -247,7 +225,6 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
       device = device,
       connectTrainer = ::connectTrainer,
       connectHr = ::connectHr,
-      connectClick = ::connectClick
     )
   }
 
@@ -256,7 +233,6 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
       device = device,
       disconnectTrainer = ::disconnectTrainer,
       disconnectHr = ::disconnectHr,
-      disconnectClick = ::disconnectClick
     )
   }
 
@@ -397,73 +373,6 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
     }
   }
 
-  fun connectClick(device: BleDevice) {
-    val app = appContext.trainerLoopApp
-    _uiState.value = _uiState.value.copy(
-      isConnectingClick = true,
-      pendingClickAddress = device.address,
-      error = null
-    )
-
-    val btDevice = resolveBluetoothDevice(appContext, device.address)
-    if (btDevice == null) {
-      _uiState.value = _uiState.value.copy(
-        isConnectingClick = false,
-        pendingClickAddress = null,
-        error = "Could not resolve Bluetooth device ${device.address}."
-      )
-      return
-    }
-
-    clickCollectorJob?.cancel()
-    clickConnectionJob?.cancel()
-    clickConnectionJob = viewModelScope.launch {
-      var success = false
-      var capturedClick: com.trainerloop.ble.ZwiftClickManager? = null
-      try {
-        app.attachClick(btDevice)
-        val clickManager = app.clickManager.value ?: run {
-          _uiState.value = _uiState.value.copy(
-            connectedClick = null,
-            isConnectingClick = false,
-            pendingClickAddress = null,
-            error = "Controller connection failed: manager not created"
-          )
-          return@launch
-        }
-        capturedClick = clickManager
-
-        val result = try {
-          clickManager.connect()
-        } catch (e: CancellationException) {
-          throw e
-        } catch (e: Exception) {
-          Result.failure(e)
-        }
-        if (result.isSuccess) {
-          _uiState.value = _uiState.value.copy(
-            connectedClick = device,
-            isConnectingClick = false,
-            pendingClickAddress = null
-          )
-          collectClickState()
-          success = true
-        } else {
-          _uiState.value = _uiState.value.copy(
-            connectedClick = null,
-            isConnectingClick = false,
-            pendingClickAddress = null,
-            error = "Controller connection failed: ${result.exceptionOrNull()?.message ?: "unknown"}"
-          )
-        }
-      } finally {
-        if (!success && app.clickManager.value == capturedClick) {
-          app.clearClick()
-        }
-      }
-    }
-  }
-
   fun disconnectTrainer() {
     trainerConnectionJob?.cancel()
     trainerCollectorJob?.cancel()
@@ -494,21 +403,6 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
     )
   }
 
-  fun disconnectClick() {
-    clickConnectionJob?.cancel()
-    clickCollectorJob?.cancel()
-    val app = appContext.trainerLoopApp
-    viewModelScope.launch {
-      app.clearClick()
-    }
-    _uiState.value = _uiState.value.copy(
-      connectedClick = null,
-      clickBattery = null,
-      pendingClickAddress = null,
-      error = null
-    )
-  }
-
   fun clearError() {
     _uiState.value = _uiState.value.copy(error = null)
   }
@@ -517,15 +411,12 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
     val app = appContext.trainerLoopApp
     val trainer = app.ftmsManager.value?.takeIf { it.isConnected.value }?.device?.toBleDevice()
     val hr = app.hrManager.value?.takeIf { it.isConnected.value }?.device?.toBleDevice()
-    val click = app.clickManager.value?.takeIf { it.isConnected.value }?.device?.toBleDevice()
     _uiState.value = _uiState.value.copy(
       connectedTrainer = trainer,
       connectedHr = hr,
-      connectedClick = click
     )
     if (trainer != null) collectTrainerState()
     if (hr != null) collectHrState()
-    if (click != null) collectClickState()
   }
 
   private fun collectTrainerState() {
@@ -572,37 +463,13 @@ class DevicesViewModel(application: Application) : AndroidViewModel(application)
     }
   }
 
-  private fun collectClickState() {
-    clickCollectorJob?.cancel()
-    val app = appContext.trainerLoopApp
-    val manager = app.clickManager.value ?: return
-    clickCollectorJob = viewModelScope.launch {
-      launch {
-        manager.batteryLevel.collect { battery ->
-          _uiState.value = _uiState.value.copy(clickBattery = battery)
-        }
-      }
-      launch {
-        manager.isConnected.collect { connected ->
-          if (connected) {
-            _uiState.value = _uiState.value.copy(connectedClick = manager.device.toBleDevice())
-          } else if (_uiState.value.connectedClick != null) {
-            _uiState.value = _uiState.value.copy(connectedClick = null)
-          }
-        }
-      }
-    }
-  }
-
   override fun onCleared() {
     scanJob?.cancel()
     scanTimeoutJob?.cancel()
     trainerConnectionJob?.cancel()
     hrConnectionJob?.cancel()
-    clickConnectionJob?.cancel()
     trainerCollectorJob?.cancel()
     hrCollectorJob?.cancel()
-    clickCollectorJob?.cancel()
     scanner.stopScan()
     super.onCleared()
   }

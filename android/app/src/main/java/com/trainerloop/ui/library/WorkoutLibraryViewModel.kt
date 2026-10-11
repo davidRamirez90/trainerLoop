@@ -85,7 +85,7 @@ class WorkoutLibraryViewModel @JvmOverloads constructor(
 
   private fun loadWorkouts() {
     val ftp = profileRepository.getProfileSync().ftp
-    val builtIn = BuiltInWorkouts.all().map { it.toListItem(ftp) }
+    val builtIn = BuiltInWorkouts.all(ftp).map { it.toListItem(ftp) }
     val stored = loadImportedWorkouts()
     val imported = stored.map { it.toListItem(ftp) }
     val all = builtIn + imported
@@ -103,7 +103,7 @@ class WorkoutLibraryViewModel @JvmOverloads constructor(
     applyFilter()
   }
 
-  /** Copies a workout (built-in or imported) into the store so it can be tweaked. */
+  /** Creates an independent stored copy of a built-in or imported workout. */
   fun duplicateWorkout(workout: Workout) {
     val copy = workout.copy(
       id = "custom_${System.currentTimeMillis()}",

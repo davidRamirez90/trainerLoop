@@ -23,8 +23,8 @@ fun SectionHeader(
     Text(
       text = title,
       modifier = Modifier.weight(1f),
-      style = MaterialTheme.typography.titleLarge,
-      fontWeight = FontWeight.SemiBold
+      style = MaterialTheme.typography.headlineSmall,
+      fontWeight = FontWeight.Normal
     )
     trailingAction?.invoke(this)
   }

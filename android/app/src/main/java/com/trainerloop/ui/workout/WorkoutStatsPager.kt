@@ -20,7 +20,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.ui.components.PagerDots
-import com.trainerloop.ui.theme.Spacing
 import kotlinx.coroutines.launch
 
 @Composable
@@ -29,7 +28,7 @@ fun WorkoutStatsPager(
   modifier: Modifier = Modifier,
   content: @Composable () -> Unit
 ) {
-  val pages = listOf("Chart", "Ride stats", "Trainer")
+  val pages = listOf("Chart", "Ride stats")
   val pagerState = rememberPagerState(pageCount = { pages.size })
   val scope = rememberCoroutineScope()
 
@@ -46,7 +45,6 @@ fun WorkoutStatsPager(
           }
         }
         1 -> PowerTab(powerSamples = powerSamples)
-        2 -> TrainerTab()
       }
     }
 
@@ -60,8 +58,9 @@ fun WorkoutStatsPager(
 
 @Composable
 private fun PowerTab(powerSamples: List<TelemetrySample>) {
-  val powers = powerSamples.map { it.powerWatts }.filter { it > 0 }
-  val avg3s = powers.takeLast(3).average().toInt()
+  val powers = powerSamples.filterNot { it.dropout }.map { it.powerWatts }
+  val recentPowers = powerSamples.takeLast(3).filterNot { it.dropout }.map { it.powerWatts }
+  val avg3s = if (recentPowers.isEmpty()) 0 else recentPowers.average().toInt()
   val avg = if (powers.isNotEmpty()) powers.average().toInt() else 0
   val max = if (powers.isNotEmpty()) powers.maxOrNull() ?: 0 else 0
   val hrs = powerSamples.map { it.hrBpm }.filter { it > 0 }
@@ -79,22 +78,6 @@ private fun PowerTab(powerSamples: List<TelemetrySample>) {
     StatRow(label = "Max Power", value = "$max W")
     StatRow(label = "Avg Heart Rate", value = if (avgHr > 0) "$avgHr bpm" else "—")
     StatRow(label = "Max Heart Rate", value = if (maxHr > 0) "$maxHr bpm" else "—")
-  }
-}
-
-@Composable
-private fun TrainerTab() {
-  Column(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(vertical = 12.dp),
-    verticalArrangement = Arrangement.spacedBy(8.dp)
-  ) {
-    StatRow(label = "Resistance", value = "Auto")
-    StatRow(label = "Power Smoothing", value = "3s")
-    StatRow(label = "Temperature", value = "—")
-    StatRow(label = "Connection", value = "Bluetooth LE")
-    StatRow(label = "Control Mode", value = "ERG")
   }
 }
 

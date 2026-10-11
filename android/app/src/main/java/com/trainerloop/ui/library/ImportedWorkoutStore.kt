@@ -31,7 +31,7 @@ object FavoriteStore {
   }
 }
 
-/** File-backed store for user-imported and user-built workouts. */
+/** File-backed store for imported, duplicated, and previously built workouts. */
 object ImportedWorkoutStore {
 
   private fun file(context: Context) = File(context.filesDir, "imported_workouts.json")

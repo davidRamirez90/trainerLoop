@@ -14,22 +14,21 @@ class DevicesViewModelTest {
       name = "Zwift Hub",
       service = BleConstants.FTMS_SERVICE
     )
-    val controller = device(
+    val hrSensor = device(
       address = "AA:BB:CC:DD:EE:FF",
       name = "Zwift Hub",
-      service = BleConstants.ZWIFT_CLICK_SERVICE
+      service = BleConstants.HEART_RATE_SERVICE
     )
 
     val aggregated = aggregateDevices(
       trainers = listOf(trainer),
-      hrSensors = emptyList(),
-      controllers = listOf(controller)
+      hrSensors = listOf(hrSensor)
     )
 
     assertEquals(1, aggregated.size)
     assertEquals("AA:BB:CC:DD:EE:FF", aggregated.single().device.address)
     assertEquals(
-      setOf(DeviceCapability.TRAINER, DeviceCapability.CONTROLLER),
+      setOf(DeviceCapability.TRAINER, DeviceCapability.HEART_RATE),
       aggregated.single().capabilities
     )
   }
@@ -43,19 +42,18 @@ class DevicesViewModelTest {
     )
     val aggregated = AggregatedDevice(
       device = device,
-      capabilities = setOf(DeviceCapability.TRAINER, DeviceCapability.CONTROLLER)
+      capabilities = setOf(DeviceCapability.TRAINER, DeviceCapability.HEART_RATE)
     )
     val connectedRoles = mutableListOf<DeviceCapability>()
 
     connectAggregatedDevice(
       device = aggregated,
       connectTrainer = { connectedRoles += DeviceCapability.TRAINER },
-      connectHr = { connectedRoles += DeviceCapability.HEART_RATE },
-      connectClick = { connectedRoles += DeviceCapability.CONTROLLER }
+      connectHr = { connectedRoles += DeviceCapability.HEART_RATE }
     )
 
     assertEquals(
-      listOf(DeviceCapability.TRAINER, DeviceCapability.CONTROLLER),
+      listOf(DeviceCapability.TRAINER, DeviceCapability.HEART_RATE),
       connectedRoles
     )
   }

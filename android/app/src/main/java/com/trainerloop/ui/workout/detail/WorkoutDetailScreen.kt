@@ -24,15 +24,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.data.model.Workout
 import com.trainerloop.ui.components.MetricTile
 import com.trainerloop.ui.components.PrimaryActionButton
@@ -48,15 +45,16 @@ fun WorkoutDetailScreen(
   workout: Workout,
   onStartWorkout: () -> Unit,
   onBack: () -> Unit,
-  viewModel: WorkoutDetailViewModel = viewModel(factory = WorkoutDetailViewModelFactory(workout))
+  ftp: Int,
+  viewModel: WorkoutDetailViewModel = viewModel(
+    key = "${workout.hashCode()}-$ftp", factory = WorkoutDetailViewModelFactory(workout, ftp)
+  )
 ) {
-  val context = LocalContext.current
-  val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
   Scaffold(
     contentWindowInsets = WindowInsets(0),
     topBar = {
       TrainerLoopTopBar(
-        title = "Workout Preview",
+        title = "Workout preview",
         onBack = onBack,
         windowInsets = WindowInsets(0)
       )
@@ -71,7 +69,7 @@ fun WorkoutDetailScreen(
         PrimaryActionButton(onClick = onStartWorkout, modifier = Modifier.fillMaxWidth()) {
           Icon(Icons.Default.PlayArrow, contentDescription = null)
           Spacer(modifier = Modifier.width(Spacing.controlGap))
-          Text("Start Workout")
+          Text("Open workout")
         }
       }
     }
@@ -88,8 +86,7 @@ fun WorkoutDetailScreen(
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
           Text(
             workout.name,
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold
+            style = MaterialTheme.typography.headlineLarge
           )
           Text(
             viewModel.category.label,

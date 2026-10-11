@@ -17,7 +17,7 @@ internal data class PlanProfilePoint(val timeSec: Float, val watts: Int)
 
 /**
  * Groups [bands] into contiguous runs and emits stepped-polyline vertices per
- * run. A run breaks wherever bands are not contiguous (free-ride stretches
+ * run. A run breaks wherever bands are not contiguous (untargeted stretches
  * emit no band), so the outline gaps instead of bridging a plan that does not
  * exist.
  */

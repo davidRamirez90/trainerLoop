@@ -545,15 +545,15 @@ fun WorkoutChart(
 
           val previous = samples[samples.lastIndex - 1]
           val newest = samples.last()
-          val tailSpan = newest.timeSec - previous.timeSec
-          if (tailSpan > 0) {
-            val tailProgress = ((animatedElapsedSec - previous.timeSec) / tailSpan).coerceIn(0f, 1f)
-            val tailTime = previous.timeSec + tailSpan * tailProgress
+          val tailSpan = newest.workoutTimeSec - previous.workoutTimeSec
+          if (tailSpan == 1) {
+            val tailProgress = ((animatedElapsedSec - previous.workoutTimeSec) / tailSpan).coerceIn(0f, 1f)
+            val tailTime = previous.workoutTimeSec + tailSpan * tailProgress
             val tailPower = previous.powerWatts +
               (newest.powerWatts - previous.powerWatts) * tailProgress
             drawLine(
               color = powerLineColor,
-              start = Offset(xForTime(previous.timeSec.toFloat()), yForPower(previous.powerWatts.toFloat())),
+              start = Offset(xForTime(previous.workoutTimeSec.toFloat()), yForPower(previous.powerWatts.toFloat())),
               end = Offset(xForTime(tailTime), yForPower(tailPower)),
               strokeWidth = 2.5.dp.toPx()
             )
@@ -674,13 +674,16 @@ internal fun rubberBandWorkoutChartPanOffset(
 
 private fun buildHrPath(samples: List<TelemetrySample>): Path = Path().apply {
   var hasPoint = false
+  var previousTime: Int? = null
   samples.forEach { sample ->
+    if (previousTime != null && sample.workoutTimeSec != previousTime!! + 1) hasPoint = false
+    previousTime = sample.workoutTimeSec
     if (sample.hrBpm <= 0) {
       hasPoint = false
     } else if (hasPoint) {
-      lineTo(sample.timeSec.toFloat(), sample.hrBpm.toFloat())
+      lineTo(sample.workoutTimeSec.toFloat(), sample.hrBpm.toFloat())
     } else {
-      moveTo(sample.timeSec.toFloat(), sample.hrBpm.toFloat())
+      moveTo(sample.workoutTimeSec.toFloat(), sample.hrBpm.toFloat())
       hasPoint = true
     }
   }
@@ -688,10 +691,14 @@ private fun buildHrPath(samples: List<TelemetrySample>): Path = Path().apply {
 
 private fun buildPowerPath(samples: List<TelemetrySample>): Path = Path().apply {
   if (samples.size < 2) return@apply
-  moveTo(samples.first().timeSec.toFloat(), samples.first().powerWatts.toFloat())
+  moveTo(samples.first().workoutTimeSec.toFloat(), samples.first().powerWatts.toFloat())
   for (index in 1 until samples.lastIndex) {
     val sample = samples[index]
-    lineTo(sample.timeSec.toFloat(), sample.powerWatts.toFloat())
+    if (sample.workoutTimeSec == samples[index - 1].workoutTimeSec + 1) {
+      lineTo(sample.workoutTimeSec.toFloat(), sample.powerWatts.toFloat())
+    } else {
+      moveTo(sample.workoutTimeSec.toFloat(), sample.powerWatts.toFloat())
+    }
   }
 }
 
@@ -756,7 +763,7 @@ internal fun workoutProfileSummary(segments: List<WorkoutSegment>): String {
     }
   }
   val targetSummary = if (targetValues.isEmpty()) {
-    "free ride"
+    "untargeted riding"
   } else {
     "targets ${targetValues.minOrNull()} to ${targetValues.maxOrNull()} watts"
   }

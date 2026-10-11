@@ -15,7 +15,11 @@ data class TelemetrySample(
   val virtualDistanceM: Double? = null,
   val virtualAltitudeM: Double? = null,
   val gradePercent: Double? = null,
-  /** GPS position from the GPX route at the simulated distance (free rides only). */
+  /** Position retained for compatibility with previously recorded sessions. */
   val positionLat: Double? = null,
-  val positionLon: Double? = null
-)
+  val positionLon: Double? = null,
+  /** Position within the workout plan; actual riding time remains in timeSec. */
+  val planTimeSec: Int? = null
+) {
+  val workoutTimeSec: Int get() = planTimeSec ?: timeSec
+}

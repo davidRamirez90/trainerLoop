@@ -88,16 +88,8 @@ fun WorkoutCompleteScreen(
   Scaffold(
     contentWindowInsets = WindowInsets(0),
     topBar = {
-      TopAppBar(
-        windowInsets = WindowInsets(0),
-        title = { Text("Workout Complete") },
-        navigationIcon = {
-          Icon(
-            imageVector = Icons.AutoMirrored.Filled.DirectionsBike,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
-          )
-        }
+      com.trainerloop.ui.components.TrainerLoopTopBar(
+        title = "Ride complete", windowInsets = WindowInsets(0)
       )
     }
   ) { padding ->
@@ -113,8 +105,7 @@ fun WorkoutCompleteScreen(
     ) {
       Text(
         text = uiState.workoutName,
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold
+        style = MaterialTheme.typography.headlineLarge
       )
       Text(
         text = "${formatDuration(uiState.durationSec)} · ${uiState.avgPower} W avg",
@@ -255,8 +246,9 @@ fun WorkoutCompleteScreen(
         Spacer(modifier = Modifier.height(Spacing.sectionGap))
       }
 
-      uiState.coachData?.let { coach ->
-        CoachSummaryCard(coach)
+      if (viewModel.samples.isEmpty()) {
+        Text("No trainer data was recorded. Connect your trainer before starting a workout.",
+          style = MaterialTheme.typography.bodyMedium)
         Spacer(modifier = Modifier.height(Spacing.sectionGap))
       }
 
@@ -277,7 +269,7 @@ fun WorkoutCompleteScreen(
         }
         PrimaryActionButton(
           onClick = { viewModel.onSave() },
-          enabled = !uiState.isSaved && !uiState.isSaving,
+          enabled = viewModel.samples.isNotEmpty() && !uiState.isSaved && !uiState.isSaving,
           modifier = Modifier.weight(1f)
         ) {
           AnimatedContent(
@@ -417,76 +409,78 @@ private fun RampTestResultCard(
             style = MaterialTheme.typography.bodyLarge
           )
         } else {
-          val resultFtp = requireNotNull(newFtp)
-          val prev = uiState.rampTestPreviousFtp
-          val delta = resultFtp - prev
-          val pct = if (prev > 0) delta * 100 / prev else 0
-          Text(
-            text = "$resultFtp W",
-            style = MaterialTheme.typography.headlineLarge.copy(fontFeatureSettings = "tnum"),
-            fontWeight = FontWeight.Bold
-          )
-          Text(
-            text = "${if (delta >= 0) "up" else "down"} ${kotlin.math.abs(delta)} W " +
-              "(${if (delta >= 0) "+" else ""}$pct%) from $prev W",
-            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-          Spacer(modifier = Modifier.height(12.dp))
+          Column {
+            val resultFtp = requireNotNull(newFtp)
+            val prev = uiState.rampTestPreviousFtp
+            val delta = resultFtp - prev
+            val pct = if (prev > 0) delta * 100 / prev else 0
+            Text(
+              text = "$resultFtp W",
+              style = MaterialTheme.typography.headlineLarge.copy(fontFeatureSettings = "tnum"),
+              fontWeight = FontWeight.Bold
+            )
+            Text(
+              text = "${if (delta >= 0) "up" else "down"} ${kotlin.math.abs(delta)} W " +
+                "(${if (delta >= 0) "+" else ""}$pct%) from $prev W",
+              style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+              color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(12.dp))
 
-          AnimatedContent(
-            targetState = Triple(uiState.ftpDecided, uiState.showIcuFtpPrompt, uiState.ftpAccepted),
-            transitionSpec = {
-              fadeIn(animationSpec = fastMotionSpec) togetherWith
-                fadeOut(animationSpec = fastMotionSpec)
-            },
-            label = "ramp-test-actions"
-          ) { actionState ->
-            when {
-              !actionState.first -> Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
-              ) {
-                androidx.compose.material3.OutlinedButton(
-                  onClick = onDiscard,
-                  modifier = Modifier.weight(1f).heightIn(min = 48.dp),
-                  colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                  )
-                ) {
-                  Text("Discard FTP")
-                }
-                PrimaryActionButton(onClick = onAccept, modifier = Modifier.weight(1f)) {
-                  Text("Accept FTP")
-                }
-              }
-              actionState.second -> {
-                Text(
-                  text = "FTP saved. Set FTP on intervals.icu now?",
-                  style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(modifier = Modifier.height(Spacing.sm))
-                Row(
+            AnimatedContent(
+              targetState = Triple(uiState.ftpDecided, uiState.showIcuFtpPrompt, uiState.ftpAccepted),
+              transitionSpec = {
+                fadeIn(animationSpec = fastMotionSpec) togetherWith
+                  fadeOut(animationSpec = fastMotionSpec)
+              },
+              label = "ramp-test-actions"
+            ) { actionState ->
+              when {
+                !actionState.first -> Row(
                   modifier = Modifier.fillMaxWidth(),
                   horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
                 ) {
-                  SecondaryActionButton(
-                    onClick = onDeclinePush,
-                    modifier = Modifier.weight(1f),
-                    style = SecondaryActionStyle.Outlined
+                  androidx.compose.material3.OutlinedButton(
+                    onClick = onDiscard,
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                      contentColor = MaterialTheme.colorScheme.error
+                    )
                   ) {
-                    Text("Later")
+                    Text("Discard FTP")
                   }
-                  PrimaryActionButton(onClick = onPush, modifier = Modifier.weight(1f)) {
-                    Text("Yes")
+                  PrimaryActionButton(onClick = onAccept, modifier = Modifier.weight(1f)) {
+                    Text("Accept FTP")
                   }
                 }
+                actionState.second -> Column {
+                  Text(
+                    text = "FTP saved. Set FTP on intervals.icu now?",
+                    style = MaterialTheme.typography.bodyMedium
+                  )
+                  Spacer(modifier = Modifier.height(Spacing.sm))
+                  Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.controlGap)
+                  ) {
+                    SecondaryActionButton(
+                      onClick = onDeclinePush,
+                      modifier = Modifier.weight(1f),
+                      style = SecondaryActionStyle.Outlined
+                    ) {
+                      Text("Later")
+                    }
+                    PrimaryActionButton(onClick = onPush, modifier = Modifier.weight(1f)) {
+                      Text("Yes")
+                    }
+                  }
+                }
+                else -> Text(
+                  text = if (actionState.third) "New FTP saved to your profile" else "FTP discarded",
+                  style = MaterialTheme.typography.bodyMedium,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
               }
-              else -> Text(
-                text = if (actionState.third) "New FTP saved to your profile" else "FTP discarded",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-              )
             }
           }
         }

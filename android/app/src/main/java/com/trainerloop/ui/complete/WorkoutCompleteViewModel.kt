@@ -54,7 +54,6 @@ data class WorkoutCompleteUiState(
   val ftpAccepted: Boolean = false,
   val showIcuFtpPrompt: Boolean = false,
   val ftpPushStatus: String? = null,
-  val coachData: com.trainerloop.domain.coach.CoachSessionData? = null
 )
 
 class WorkoutCompleteViewModel(
@@ -64,9 +63,6 @@ class WorkoutCompleteViewModel(
   private val workoutName: String,
   val samples: List<TelemetrySample>,
   private val startTimeMs: Long = System.currentTimeMillis(),
-  private val coachJson: String = "",
-  private val sessionType: String = "WORKOUT",
-  private val routeId: String? = null,
   private val completed: Boolean = false,
   private val profileRepository: ProfileRepository =
     (application as? TrainerLoopApplication)?.profileRepository ?: ProfileRepository(application),
@@ -78,9 +74,6 @@ class WorkoutCompleteViewModel(
 
   init {
     computeSummary()
-    _uiState.value = _uiState.value.copy(
-      coachData = com.trainerloop.domain.coach.CoachSessionData.fromJson(coachJson)
-    )
     createFitFile()
     if (RampTest.isRampTest(workoutId)) {
       _uiState.value = _uiState.value.copy(
@@ -185,14 +178,12 @@ class WorkoutCompleteViewModel(
       endedAt = Instant.now().toString(),
       durationSec = state.durationSec,
       samplesJson = samplesJson,
-      coachEventsJson = coachJson,
+      coachEventsJson = "",
       completed = completed,
       avgPower = state.avgPower,
       maxPower = state.maxPower,
       avgCadence = state.avgCadence,
       avgHr = state.avgHr,
-      sessionType = sessionType,
-      routeId = routeId
     )
 
     viewModelScope.launch {

@@ -74,27 +74,27 @@ class TelemetryRecorder(
 
     scope.launch {
       combine(
-        clock.elapsedSec,
+        clock.activeSec,
         dataProvider.data,
         dataProvider.heartRate
-      ) { elapsedSec, ftmsData, hrBpm ->
-        Triple(elapsedSec, ftmsData, hrBpm)
-      }.collect { (elapsedSec, ftmsData, hrBpm) ->
+      ) { activeSec, ftmsData, hrBpm ->
+        Triple(activeSec, ftmsData, hrBpm)
+      }.collect { (activeSec, ftmsData, hrBpm) ->
         val nowMs = now()
         val ftmsFresh = ftmsData != null && nowMs - ftmsData.atMs <= STALE_AFTER_MS
         val hrFresh = hrBpm != null && nowMs - hrBpm.atMs <= HR_STALE_AFTER_MS
         val dropout = !ftmsFresh
 
         if (ftmsFresh) {
-          lastDataReceivedAtSec = elapsedSec
+          lastDataReceivedAtSec = activeSec
           ftmsData!!.value.powerWatts?.let { lastPowerWatts = it }
           ftmsData.value.cadenceRpm?.let { lastCadenceRpm = it.toInt() }
         }
         if (hrFresh) lastHrBpm = hrBpm!!.value
 
-        val virtual = stamper?.stamp(elapsedSec, lastPowerWatts, lastCadenceRpm, dropout)
+        val virtual = stamper?.stamp(activeSec, lastPowerWatts, lastCadenceRpm, dropout, clock.elapsedSec.value)
         val sample = TelemetrySample(
-          timeSec = elapsedSec,
+          timeSec = activeSec,
           powerWatts = lastPowerWatts,
           cadenceRpm = lastCadenceRpm,
           hrBpm = if (hrFresh) lastHrBpm else 0,
@@ -105,22 +105,23 @@ class TelemetryRecorder(
           virtualAltitudeM = virtual?.altitudeM,
           gradePercent = virtual?.gradePercent,
           positionLat = virtual?.lat,
-          positionLon = virtual?.lon
+          positionLon = virtual?.lon,
+          planTimeSec = clock.elapsedSec.value
         )
 
         _latest.value = sample
 
         // Skip time 0 (initial flow values) and dedup by timeSec
-        if (elapsedSec > 0) {
-          if (buffer.isEmpty() || buffer.last().timeSec < elapsedSec) {
+        if (activeSec > 0) {
+          if (buffer.isEmpty() || buffer.last().timeSec < activeSec) {
             buffer.add(sample)
-            if (elapsedSec % SNAPSHOT_EVERY_SEC == 0) {
+            if (activeSec % SNAPSHOT_EVERY_SEC == 0) {
               _samples.value = buffer.toList()
             }
           }
         }
         com.trainerloop.ble.BleLog.d {
-          "tick t=${elapsedSec}s p=${sample.powerWatts} c=${sample.cadenceRpm} " +
+          "tick t=${activeSec}s p=${sample.powerWatts} c=${sample.cadenceRpm} " +
             "hr=${sample.hrBpm} dropout=${sample.dropout}"
         }
       }

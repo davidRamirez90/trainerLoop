@@ -10,7 +10,7 @@ val Sun60 = Color(0xFFDFC900)
 val Sun40 = Color(0xFF776B00)
 val Sun20 = Color(0xFF3D3600)
 
-// Coral — coaching and assessment
+// Coral — assessment
 val Coral95 = Color(0xFFFFF0ED)
 val Coral90 = Color(0xFFFFD8D3)
 val Coral80 = Color(0xFFF88379)
@@ -88,3 +88,11 @@ val Neutral20 = DarkRaised
 val Neutral15 = DarkGrouped
 val Neutral12 = DarkCard
 val Neutral10 = DarkBackground
+
+// Focus: warm paper, forest ink, and a restrained sage action accent.
+val FocusPaper = Color(0xFFF5F4ED)
+val FocusForest = Color(0xFF163E32)
+val FocusInk = Color(0xFF172B25)
+val FocusSage = Color(0xFFDFEDC8)
+val FocusHeroText = Color(0xFFD4E6DB)
+val FocusNight = Color(0xFF101C17)

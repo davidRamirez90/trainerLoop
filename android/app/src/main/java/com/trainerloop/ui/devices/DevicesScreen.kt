@@ -496,9 +496,6 @@ private fun pairedDeviceDetail(
     if (DeviceCapability.HEART_RATE in device.capabilities) {
       state.latestHrBpm?.let { add("HR $it bpm") }
     }
-    if (DeviceCapability.CONTROLLER in device.capabilities) {
-      state.clickBattery?.let { add("Battery $it%") }
-    }
     add(
       if (device.device.rssi == 0) "Signal connected" else "Signal ${device.device.rssi} dBm"
     )

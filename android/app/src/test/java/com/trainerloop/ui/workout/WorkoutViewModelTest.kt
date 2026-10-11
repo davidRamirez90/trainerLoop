@@ -7,12 +7,14 @@ import com.trainerloop.ble.HrManager
 import com.trainerloop.ble.model.IndoorBikeData
 import com.trainerloop.ble.model.Stamped
 import com.trainerloop.data.model.SegmentPhase
-import com.trainerloop.data.model.CoachAction
 import com.trainerloop.data.model.TargetRange
 import com.trainerloop.data.model.UserProfile
 import com.trainerloop.data.model.Workout
 import com.trainerloop.data.model.WorkoutSegment
 import com.trainerloop.data.model.WorkoutSource
+import io.mockk.coEvery
+import io.mockk.coVerify
+import com.trainerloop.ble.FtmsControlStatus
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -322,36 +324,6 @@ class WorkoutViewModelTest {
   }
 
   @Test
-  fun `adjust intensity up action raises the offset`() = runTest(testDispatcher) {
-    val viewModel = WorkoutViewModel(workout = sampleWorkout(), dispatcher = testDispatcher)
-
-    viewModel.applyCoachAction(CoachAction.AdjustIntensityUp(percent = 5))
-
-    assertEquals(5, viewModel.uiState.value.intensityOffsetPct)
-  }
-
-  @Test
-  fun `adjust intensity down clamps at -20`() = runTest(testDispatcher) {
-    val viewModel = WorkoutViewModel(workout = sampleWorkout(), dispatcher = testDispatcher)
-
-    repeat(6) { viewModel.applyCoachAction(CoachAction.AdjustIntensityDown(percent = 5)) }
-
-    assertEquals(-20, viewModel.uiState.value.intensityOffsetPct)
-  }
-
-  @Test
-  fun `skip remaining seeks to the first cooldown segment`() = runTest(testDispatcher) {
-    val viewModel = WorkoutViewModel(workout = intervalWorkout(), dispatcher = testDispatcher)
-
-    viewModel.start()
-    advanceTimeBy(10_000)
-    viewModel.applyCoachAction(CoachAction.SkipRemainingOnIntervals)
-    advanceTimeBy(1_000)
-
-    assertEquals(2, viewModel.uiState.value.segmentIndex)
-  }
-
-  @Test
   fun `stop with samples emits finish event`() = runTest(testDispatcher) {
     val ftmsData = MutableStateFlow<Stamped<IndoorBikeData>?>(null)
     val ftms = mockFtmsManager(data = ftmsData)
@@ -388,12 +360,12 @@ class WorkoutViewModelTest {
   }
 
   @Test
-  fun `stop with no samples leaves finish event null`() = runTest(testDispatcher) {
+  fun `stopping a ride without trainer data still opens completion`() = runTest(testDispatcher) {
     val viewModel = WorkoutViewModel(workout = sampleWorkout(), dispatcher = testDispatcher)
 
     viewModel.stop()
 
-    assertEquals(null, viewModel.finishEvent.value)
+    assertTrue(viewModel.finishEvent.value!!.samples.isEmpty())
   }
 
   @Test
@@ -519,6 +491,119 @@ class WorkoutViewModelTest {
     runCurrent()
 
     assertTrue("normal workout keeps running", viewModel.uiState.value.isRunning)
+  }
+
+  @Test
+  fun `HR clears when its manager is detached`() = runTest(testDispatcher) {
+    val hrFlow = MutableStateFlow<HrManager?>(mockHrManager(MutableStateFlow(stamp(145))))
+    val viewModel = WorkoutViewModel(
+      workout = sampleWorkout(), hrManagerFlow = hrFlow, dispatcher = testDispatcher
+    )
+    runCurrent()
+    assertEquals(145, viewModel.uiState.value.currentHrBpm)
+    hrFlow.value = null
+    runCurrent()
+    assertEquals(0, viewModel.uiState.value.currentHrBpm)
+  }
+
+  @Test
+  fun `detaching and reattaching a trainer preserves recorded samples`() = runTest(testDispatcher) {
+    val ftms = mockFtmsManager(MutableStateFlow(stamp(lowPowerData(200))))
+    val ftmsFlow = MutableStateFlow<FtmsManager?>(ftms)
+    val viewModel = WorkoutViewModel(
+      workout = sampleWorkout(), ftmsManagerFlow = ftmsFlow, dispatcher = testDispatcher
+    )
+    viewModel.start()
+    advanceTimeBy(2_000)
+    runCurrent()
+    ftmsFlow.value = null
+    runCurrent()
+    val retained = viewModel.uiState.value.samples
+    assertTrue(retained.isNotEmpty())
+    ftmsFlow.value = ftms
+    runCurrent()
+    assertEquals(retained, viewModel.uiState.value.samples)
+    viewModel.stop()
+    assertTrue(viewModel.finishEvent.value!!.samples.containsAll(retained))
+  }
+
+  @Test
+  fun `intensity adjustment preserves both ends of the target range`() = runTest(testDispatcher) {
+    val viewModel = WorkoutViewModel(workout = sampleWorkout(), dispatcher = testDispatcher)
+    viewModel.adjustIntensityUp()
+    assertEquals(TargetRange(210, 231), viewModel.uiState.value.targetRange)
+    repeat(6) { viewModel.adjustIntensityDown() }
+    assertEquals(-20, viewModel.uiState.value.intensityOffsetPct)
+    assertEquals(TargetRange(160, 176), viewModel.uiState.value.targetRange)
+  }
+
+  @Test
+  fun `late trainer readiness starts the trainer and sends the current target`() = runTest(testDispatcher) {
+    val controls = MutableStateFlow<FtmsControlManager?>(null)
+    val status = MutableStateFlow(FtmsControlStatus.REQUESTING)
+    val control = mockk<FtmsControlManager>(relaxed = true)
+    every { control.status } returns status
+    coEvery { control.startResume() } returns true
+    coEvery { control.setTargetPower(any()) } returns true
+    val viewModel = WorkoutViewModel(
+      workout = sampleWorkout(), ftmsControlManagerFlow = controls, dispatcher = testDispatcher
+    )
+    viewModel.start()
+    runCurrent()
+    controls.value = control
+    runCurrent()
+    coVerify(exactly = 0) { control.startResume() }
+    status.value = FtmsControlStatus.READY
+    runCurrent()
+    coVerify(exactly = 1) { control.startResume() }
+    coVerify { control.setTargetPower(210) }
+    viewModel.pause()
+    runCurrent()
+    status.value = FtmsControlStatus.REQUESTING
+    status.value = FtmsControlStatus.READY
+    runCurrent()
+    coVerify(exactly = 1) { control.startResume() }
+  }
+
+  @Test
+  fun `sensor dropout does not end a ramp test as exhaustion`() = runTest(testDispatcher) {
+    val ftms = mockFtmsManager()
+    val viewModel = WorkoutViewModel(
+      workout = com.trainerloop.domain.RampTest.generate(250),
+      ftmsManagerFlow = MutableStateFlow<FtmsManager?>(ftms), dispatcher = testDispatcher
+    )
+    viewModel.start()
+    viewModel.seek(300)
+    runCurrent()
+    advanceTimeBy(6_000)
+    runCurrent()
+    assertTrue(viewModel.uiState.value.isRunning)
+    viewModel.stop()
+  }
+
+  @Test
+  fun `untargeted segments release load and completion stops the trainer`() = runTest(testDispatcher) {
+    val control = mockk<FtmsControlManager>(relaxed = true)
+    every { control.status } returns MutableStateFlow(FtmsControlStatus.READY)
+    coEvery { control.startResume() } returns true
+    coEvery { control.setTargetPower(any()) } returns true
+    val workout = sampleWorkout().let {
+      it.copy(segments = it.segments + WorkoutSegment.FreeRide(
+        "cooldown", 30, "Cool Down", SegmentPhase.COOLDOWN
+      ))
+    }
+    val viewModel = WorkoutViewModel(
+      workout = workout, dispatcher = testDispatcher,
+      ftmsControlManagerFlow = MutableStateFlow<FtmsControlManager?>(control)
+    )
+    viewModel.start()
+    runCurrent()
+    viewModel.seek(60)
+    runCurrent()
+    coVerify { control.setTargetPower(0) }
+    viewModel.seek(90)
+    runCurrent()
+    coVerify { control.stopPause(stop = true) }
   }
 
   private fun lowPowerData(watts: Int) = IndoorBikeData(

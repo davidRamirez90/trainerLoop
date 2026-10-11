@@ -1,3 +1,5 @@
+> Historical reference. Current scope is documented in [Android README](../../README.md). Workout builder, standalone free ride, GPX riding, and live coaching were removed in October 2026; screenshots and plans may show retired features.
+
 # TrainerLoop — current app screen and product brief
 
 Prepared for a product/UI designer from the running Android app and its implemented feature set. Screenshots were captured on the app's target device, a Pixel 2 XL (portrait, 1440 × 2880-class display), on 11 July 2026.

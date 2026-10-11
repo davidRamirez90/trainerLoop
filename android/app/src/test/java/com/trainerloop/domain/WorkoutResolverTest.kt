@@ -21,15 +21,23 @@ class WorkoutResolverTest {
   }
 
   @Test
-  fun `free ride id generates an open-ended free ride workout`() {
-    val w = WorkoutResolver.resolve(WorkoutResolver.FREE_RIDE_ID, 200, emptyList())
-    assertTrue(w!!.segments.all { it is com.trainerloop.data.model.WorkoutSegment.FreeRide })
-  }
-
-  @Test
   fun `ramp test id regenerates from ftp`() {
     val ramp = RampTest.generate(220)
     assertEquals(ramp.segments.size, WorkoutResolver.resolve(ramp.id, 220, emptyList())?.segments?.size)
+  }
+
+  @Test
+  fun `retired standalone free ride cannot be resolved`() {
+    assertNull(WorkoutResolver.resolve("free-ride", 250, emptyList()))
+  }
+
+  @Test
+  fun `built-in power targets scale with FTP and endurance is structured`() {
+    val sweetSpot = WorkoutResolver.resolve("sweet_spot", 200, emptyList())!!
+    val step = sweetSpot.segments[1] as com.trainerloop.data.model.WorkoutSegment.Step
+    assertEquals(com.trainerloop.data.model.TargetRange(176, 184), step.targetRange)
+    val endurance = WorkoutResolver.resolve("endurance", 200, emptyList())!!
+    assertTrue(endurance.segments.any { it is com.trainerloop.data.model.WorkoutSegment.Step })
   }
 
   @Test

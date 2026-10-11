@@ -58,7 +58,7 @@ fun TrainerLoopTopBar(
   windowInsets: WindowInsets = TopAppBarDefaults.windowInsets
 ) {
   TrainerLoopTopBar(
-    title = { androidx.compose.material3.Text(title) },
+    title = { androidx.compose.material3.Text(title, style = MaterialTheme.typography.headlineSmall, maxLines = 2) },
     modifier = modifier,
     onBack = onBack,
     firstAction = firstAction,

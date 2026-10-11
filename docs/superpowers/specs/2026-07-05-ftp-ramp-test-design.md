@@ -1,3 +1,5 @@
+> Historical reference. Current scope is documented in [Android README](../../../android/README.md). Workout builder, standalone free ride, GPX riding, and live coaching were removed in October 2026; screenshots and plans may show retired features.
+
 # FTP Ramp Test — Design
 
 Date: 2026-07-05

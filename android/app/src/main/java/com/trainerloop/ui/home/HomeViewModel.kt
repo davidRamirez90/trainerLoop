@@ -20,11 +20,11 @@ import com.trainerloop.domain.WorkoutImporter
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ensureActive
 
 data class HomeUiState(
   val riderName: String = "Rider",
@@ -71,7 +71,9 @@ class HomeViewModel(
   private val _plannedWorkoutReady = MutableStateFlow<Workout?>(null)
   val plannedWorkoutReady: StateFlow<Workout?> = _plannedWorkoutReady.asStateFlow()
 
+  private var plannedRefreshJob: Job? = null
   private var plannedEventId: Long? = null
+  private var plannedCredentials: Pair<String, String>? = null
 
   private var ftmsJob: Job? = null
   private var hrJob: Job? = null
@@ -84,6 +86,11 @@ class HomeViewModel(
           ftp = profile.ftp,
           weightKg = profile.weightKg
         )
+        val credentials = profile.intervalsIcuAthleteId to profile.intervalsIcuApiKey
+        if (credentials != plannedCredentials) {
+          plannedCredentials = credentials
+          refreshIntervals()
+        }
       }
     }
 
@@ -107,7 +114,6 @@ class HomeViewModel(
       }
     }
 
-    refreshIntervals()
   }
 
   /**
@@ -116,28 +122,38 @@ class HomeViewModel(
    * Failures are surfaced softly on the card, not fatal.
    */
   fun refreshIntervals() {
+    plannedRefreshJob?.cancel()
     val profile = profileRepository.getProfileSync()
     val athleteId = profile.intervalsIcuAthleteId
     val apiKey = profile.intervalsIcuApiKey
-    if (athleteId.isBlank() || apiKey.isBlank()) return
+    if (athleteId.isBlank() || apiKey.isBlank()) {
+      plannedEventId = null
+      _uiState.value = _uiState.value.copy(
+        plannedName = null, plannedWorkout = null, plannedLoading = false, plannedError = null
+      )
+      return
+    }
 
     val client = IntervalsIcuClient(apiKey)
-    // Show yesterday's-cached name immediately so the card isn't blank while
+    // Show a name cached for today immediately so the card isn't blank while
     // the network call is in flight (or if it fails offline).
     val cache = getApplication<Application>()
       .getSharedPreferences(PLANNED_CACHE_PREFS, Application.MODE_PRIVATE)
     val cachedToday = LocalDate.now().toString()
     val cachedName = cache.getString(KEY_PLANNED_NAME, null)
       ?.takeIf { cache.getString(KEY_PLANNED_DATE, "") == cachedToday }
+    plannedEventId = null
     _uiState.value = _uiState.value.copy(
-      plannedName = cachedName ?: _uiState.value.plannedName,
+      plannedName = cachedName,
+      plannedWorkout = null,
       plannedLoading = true,
       plannedError = null
     )
 
-    scope.launch {
+    plannedRefreshJob = scope.launch {
       // Sync FTP/weight from the athlete profile so targets stay current.
       runCatching { client.getAthlete(athleteId) }.getOrNull()?.let { athlete ->
+        coroutineContext.ensureActive()
         if (athlete.ftp != null || athlete.icu_weight != null) {
           profileRepository.updateProfile {
             it.copy(
@@ -148,8 +164,10 @@ class HomeViewModel(
         }
       }
 
+      coroutineContext.ensureActive()
       val today = LocalDate.now().toString()
       val result = runCatching { client.getTodaysWorkoutEvents(athleteId, today) }
+      coroutineContext.ensureActive()
       result.onSuccess { events ->
         val event = events.firstOrNull()
         plannedEventId = event?.id
@@ -167,9 +185,10 @@ class HomeViewModel(
           runCatching {
             val zwo = client.downloadZwo(athleteId, eventId)
             WorkoutImporter.import("$eventId.zwo", zwo, profileRepository.getProfileSync().ftp)
-              .let { workout -> name?.let { workout.copy(name = it) } ?: workout }
+              .copy(id = "icu_$eventId", name = name ?: "Planned workout")
           }.getOrNull()
         }
+        coroutineContext.ensureActive()
         _uiState.value = _uiState.value.copy(
           plannedName = name,
           plannedWorkout = workout,
@@ -187,6 +206,7 @@ class HomeViewModel(
 
   /** Downloads + parses the planned workout, then emits it via [plannedWorkoutReady]. */
   fun startPlanned() {
+    if (_uiState.value.plannedLoading) return
     // Fast path: refreshIntervals already downloaded + parsed it for the preview.
     _uiState.value.plannedWorkout?.let {
       _plannedWorkoutReady.value = it
@@ -204,7 +224,7 @@ class HomeViewModel(
       runCatching {
         val zwo = client.downloadZwo(athleteId, eventId)
         WorkoutImporter.import("$eventId.zwo", zwo, profile.ftp)
-          .let { workout -> _uiState.value.plannedName?.let { workout.copy(name = it) } ?: workout }
+          .copy(id = "icu_$eventId", name = _uiState.value.plannedName ?: "Planned workout")
       }.onSuccess { workout ->
         _uiState.value = _uiState.value.copy(plannedLoading = false)
         _plannedWorkoutReady.value = workout

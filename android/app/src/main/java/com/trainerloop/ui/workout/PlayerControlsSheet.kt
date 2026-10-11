@@ -48,7 +48,6 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -256,7 +255,7 @@ fun PlayerControlsSheet(
         orientation = Orientation.Vertical,
         overscrollEffect = rubberBandEffect
       )
-      .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+      .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
       .background(MaterialTheme.colorScheme.surfaceContainerHigh)
       .navigationBarsPadding()
       .padding(horizontal = Spacing.lg, vertical = Spacing.sm),

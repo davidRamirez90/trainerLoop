@@ -12,29 +12,19 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.DirectionsBike
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.view.WindowCompat
@@ -54,7 +44,6 @@ import com.trainerloop.ui.devices.DevicesScreen
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.ui.history.HistoryScreen
 import com.trainerloop.ui.history.SessionDetailScreen
-import com.trainerloop.ui.library.WorkoutBuilderScreen
 import com.trainerloop.ui.home.HomeScreen
 import com.trainerloop.ui.library.WorkoutLibraryScreen
 import com.trainerloop.ui.navigation.Screen
@@ -89,7 +78,7 @@ fun TrainerLoopApp(
   SystemBarIconAppearance(
     statusBarSurface = MaterialTheme.colorScheme.background,
     navigationBarSurface = if (showBottomBar) {
-      MaterialTheme.colorScheme.surface
+      MaterialTheme.colorScheme.background
     } else {
       MaterialTheme.colorScheme.background
     }
@@ -102,36 +91,11 @@ fun TrainerLoopApp(
     contentWindowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Top),
     bottomBar = {
       if (showBottomBar) {
-        NavigationBar(
-          containerColor = MaterialTheme.colorScheme.surface,
-          contentColor = MaterialTheme.colorScheme.onSurface
-        ) {
-          Screen.bottomTabs.forEach { screen ->
-            val selected = currentRoute == screen.route
-            NavigationBarItem(
-              selected = selected,
-              onClick = {
-                if (!selected) {
-                  navController.navigate(screen.route) {
-                    popUpTo(Screen.Home.route) { saveState = true }
-                    launchSingleTop = true
-                    restoreState = true
-                  }
-                }
-              },
-              icon = {
-                Icon(imageVector = screen.icon, contentDescription = screen.label)
-              },
-              label = { Text(screen.label) },
-              alwaysShowLabel = true,
-              colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-              )
-            )
+        com.trainerloop.ui.components.FocusNavigationBar(currentRoute) { route ->
+          navController.navigate(route) {
+            popUpTo(Screen.Home.route) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
           }
         }
       }
@@ -171,26 +135,13 @@ fun TrainerLoopApp(
         HomeScreen(
           onNavigateToDevices = { navController.navigate(Screen.Devices.route) },
           onNavigateToWorkouts = { navController.navigate(Screen.Workouts.route) },
-          onNavigateToBuilder = { navController.navigate(Screen.WorkoutBuilder.route) },
+          onNavigateToHistory = { navController.navigate(Screen.History.route) },
+          onSessionClick = { id -> navController.navigate(Screen.SessionDetail.createRoute(id)) },
           onNavigateToProfile = {
-            navController.navigate(Screen.Profile.route) {
-              popUpTo(Screen.Home.route) { saveState = true }
-              launchSingleTop = true
-              restoreState = true
-            }
-          },
-          onStartFreeRide = {
-            navController.navigate(
-              Screen.WorkoutPlayer.createRoute(
-                sessionId = System.currentTimeMillis(),
-                workoutId = WorkoutResolver.FREE_RIDE_ID
-              )
-            )
+            navController.navigate(Screen.Profile.route) { launchSingleTop = true }
           },
           onStartPlanned = { workout ->
-            if (com.trainerloop.ui.library.ImportedWorkoutStore.load(context).none { it.id == workout.id }) {
-              com.trainerloop.ui.library.ImportedWorkoutStore.add(context, workout)
-            }
+            com.trainerloop.ui.library.ImportedWorkoutStore.add(context, workout)
             navController.navigate(
               Screen.WorkoutPlayer.createRoute(
                 sessionId = System.currentTimeMillis(),
@@ -198,90 +149,7 @@ fun TrainerLoopApp(
               )
             )
           },
-          onGpxRoutes = { navController.navigate(Screen.Routes.route) }
-        )
-      }
-
-      composable(Screen.Routes.route) {
-        com.trainerloop.ui.routes.RoutesScreen(
-          onRouteClick = { id -> navController.navigate(Screen.RouteDetail.createRoute(id)) },
-          onBack = { navController.popBackStack() }
-        )
-      }
-
-      composable(
-        route = Screen.RouteDetail.route,
-        arguments = listOf(navArgument("routeId") { type = NavType.StringType })
-      ) { backStackEntry ->
-        val routeId = backStackEntry.arguments?.getString("routeId") ?: return@composable
-        com.trainerloop.ui.routes.RouteDetailScreen(
-          routeId = routeId,
-          onStartRide = { id -> navController.navigate(Screen.FreeRide.createRoute(id)) },
-          onBack = { navController.popBackStack() }
-        )
-      }
-
-      composable(
-        route = Screen.FreeRide.route,
-        arguments = listOf(navArgument("routeId") { type = NavType.StringType })
-      ) { backStackEntry ->
-        val context = LocalContext.current
-        val app = context.trainerLoopApp
-        val routeId = backStackEntry.arguments?.getString("routeId") ?: return@composable
-        var route by androidx.compose.runtime.remember {
-          androidx.compose.runtime.mutableStateOf<com.trainerloop.data.model.Route?>(null)
-        }
-        LaunchedEffect(routeId) {
-          route = com.trainerloop.data.repository.RouteRepository
-            .create(com.trainerloop.data.source.local.AppDatabase.getInstance(context))
-            .getById(routeId)
-        }
-        val loaded = route ?: return@composable
-        val profile = remember { app.profileRepository.getProfileSync() }
-        val freeRideFactory = remember(
-          loaded, routeId, app.ftmsManager, app.hrManager, app.ftmsControlManager,
-          app.clickManager, profile
-        ) {
-          com.trainerloop.ui.freeride.FreeRideViewModelFactory(
-            route = loaded,
-            routeId = routeId,
-            ftmsManagerFlow = app.ftmsManager,
-            hrManagerFlow = app.hrManager,
-            ftmsControlManagerFlow = app.ftmsControlManager,
-            clickManagerFlow = app.clickManager,
-            userProfile = profile
-          )
-        }
-        com.trainerloop.ui.freeride.FreeRideScreen(
-          viewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = freeRideFactory),
-          onSessionFinished = { data ->
-            navController.storeFinishPayload(
-              context, data.startTimeMs, data.samples, data.coachJson,
-              data.completedNaturally, "FREE_RIDE", routeId
-            )
-            navController.navigate(
-              Screen.WorkoutComplete.createRoute(
-                sessionId = data.startTimeMs.toString(),
-                workoutId = data.workoutId,
-                workoutName = data.workoutName,
-                startTimeMs = data.startTimeMs
-              )
-            )
-          },
-          onExit = { navController.popBackStack() }
-        )
-      }
-
-      composable(Screen.WorkoutBuilder.route) {
-        WorkoutBuilderScreen(
-          onSaved = {
-            navController.popBackStack()
-            navController.navigate(Screen.Workouts.route) {
-              popUpTo(Screen.Home.route) { saveState = true }
-              launchSingleTop = true
-            }
-          },
-          onBack = { navController.popBackStack() }
+          onChooseWorkout = { navController.navigate(Screen.Workouts.route) }
         )
       }
 
@@ -324,7 +192,7 @@ fun TrainerLoopApp(
       }
 
       composable(Screen.Profile.route) {
-        SettingsScreen()
+        SettingsScreen(onBack = { navController.popBackStack() })
       }
 
       composable(
@@ -334,8 +202,11 @@ fun TrainerLoopApp(
         val context = LocalContext.current
         val app = context.trainerLoopApp
         val workoutId = backStackEntry.arguments?.getString("workoutId") ?: return@composable
-        val ftp = remember { app.profileRepository.getProfileSync().ftp }
-        val workout = remember(workoutId) {
+        val profile by app.profileRepository.profile.collectAsStateWithLifecycle(
+          initialValue = app.profileRepository.getProfileSync()
+        )
+        val ftp = profile.ftp
+        val workout = remember(workoutId, ftp) {
           WorkoutResolver.resolve(
             workoutId,
             ftp,
@@ -348,6 +219,7 @@ fun TrainerLoopApp(
         }
         WorkoutDetailScreen(
           workout = workout,
+          ftp = ftp,
           onStartWorkout = {
             navController.navigate(
               Screen.WorkoutPlayer.createRoute(
@@ -389,21 +261,15 @@ fun TrainerLoopApp(
           }
           return@composable
         }
-        val coachProfile = remember(profile.selectedCoachProfileId) {
-          com.trainerloop.data.source.local.CoachProfileLoader.load(
-            context, profile.selectedCoachProfileId
-          )
-        }
         val workoutFactory = remember(
-          workout, app.ftmsManager, app.hrManager, app.ftmsControlManager, profile, coachProfile
+          workout, app.ftmsManager, app.hrManager, app.ftmsControlManager, profile
         ) {
           WorkoutViewModelFactory(
             workout = workout,
             ftmsManagerFlow = app.ftmsManager,
             hrManagerFlow = app.hrManager,
             ftmsControlManagerFlow = app.ftmsControlManager,
-            userProfile = profile,
-            coachProfile = coachProfile
+            userProfile = profile
           )
         }
         // Pass the StateFlows (not the .value snapshot) so the ViewModel
@@ -417,7 +283,7 @@ fun TrainerLoopApp(
           viewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = workoutFactory),
           onSessionFinished = { data ->
             navController.storeFinishPayload(
-              context, data.startTimeMs, data.samples, data.coachJson, data.completedNaturally
+              context, data.startTimeMs, data.samples, data.completedNaturally
             )
             navController.navigate(
               Screen.WorkoutComplete.createRoute(
@@ -447,10 +313,10 @@ fun TrainerLoopApp(
         val workoutName = backStackEntry.arguments?.getString("workoutName") ?: "Workout"
         val startTimeMs = backStackEntry.arguments?.getLong("startTimeMs") ?: System.currentTimeMillis()
         val payload = navController.previousBackStackEntry?.savedStateHandle
-        val samples = payload?.get<String>(FINISH_SAMPLES_KEY)?.let(::readSamplesFile) ?: emptyList()
-        val coachJson = payload?.get<String>(FINISH_COACH_KEY)?.let(::readAndDeleteFile) ?: ""
-        val sessionType = payload?.get<String>(FINISH_TYPE_KEY) ?: "WORKOUT"
-        val freeRideRouteId = payload?.get<String>(FINISH_ROUTE_KEY)
+        val samplesPath = payload?.get<String>(FINISH_SAMPLES_KEY)
+        val samples = remember(samplesPath) {
+          samplesPath?.let(::readSamplesFile) ?: emptyList()
+        }
         val completed = payload?.get<Boolean>(FINISH_COMPLETED_KEY) ?: false
         val completeFactory = remember(sessionId, completed) {
           WorkoutCompleteViewModelFactory(
@@ -460,17 +326,20 @@ fun TrainerLoopApp(
             workoutName = workoutName,
             samples = samples,
             startTimeMs = startTimeMs,
-            coachJson = coachJson,
-            sessionType = sessionType,
-            routeId = freeRideRouteId,
             completed = completed
           )
         }
 
         WorkoutCompleteScreen(
           viewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = completeFactory),
-          onDiscard = { navController.popBackStack(Screen.Home.route, inclusive = false) },
-          onDone = { navController.popBackStack(Screen.Home.route, inclusive = false) }
+          onDiscard = {
+            payload?.get<String>(FINISH_SAMPLES_KEY)?.let { File(it).delete() }
+            navController.popBackStack(Screen.Home.route, inclusive = false)
+          },
+          onDone = {
+            payload?.get<String>(FINISH_SAMPLES_KEY)?.let { File(it).delete() }
+            navController.popBackStack(Screen.Home.route, inclusive = false)
+          }
         )
       }
 
@@ -508,9 +377,6 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 private const val FINISH_SAMPLES_KEY = "finish_samples"
-private const val FINISH_COACH_KEY = "finish_coach"
-private const val FINISH_TYPE_KEY = "finish_type"
-private const val FINISH_ROUTE_KEY = "finish_route"
 private const val FINISH_COMPLETED_KEY = "finish_completed"
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.defaultEnterTransition(
@@ -574,50 +440,24 @@ private fun NavHostController.storeFinishPayload(
   context: Context,
   startTimeMs: Long,
   samples: List<TelemetrySample>,
-  coachJson: String,
-  completed: Boolean = false,
-  sessionType: String = "WORKOUT",
-  routeId: String? = null
+  completed: Boolean = false
 ) {
   val samplesFile = context.cacheDir.resolve("finish_samples_$startTimeMs.json")
-  val coachFile = context.cacheDir.resolve("finish_coach_$startTimeMs.json")
   samplesFile.writeText(Json.encodeToString(ListSerializer(TelemetrySample.serializer()), samples))
-  coachFile.writeText(coachJson)
   currentBackStackEntry?.savedStateHandle?.set(
     FINISH_SAMPLES_KEY,
     samplesFile.absolutePath
   )
-  currentBackStackEntry?.savedStateHandle?.set(FINISH_COACH_KEY, coachFile.absolutePath)
-  currentBackStackEntry?.savedStateHandle?.set(FINISH_TYPE_KEY, sessionType)
-  currentBackStackEntry?.savedStateHandle?.set(FINISH_ROUTE_KEY, routeId)
   currentBackStackEntry?.savedStateHandle?.set(FINISH_COMPLETED_KEY, completed)
 }
 
 private fun readSamplesFile(path: String): List<TelemetrySample> =
-  readAndDeleteFile(path)?.let { json ->
+  readPayloadFile(path)?.let { json ->
     runCatching {
       Json.decodeFromString(ListSerializer(TelemetrySample.serializer()), json)
     }.getOrDefault(emptyList())
   } ?: emptyList()
 
-private fun readAndDeleteFile(path: String): String? = runCatching {
-  File(path).readText().also { File(path).delete() }
+private fun readPayloadFile(path: String): String? = runCatching {
+  File(path).readText()
 }.getOrNull()
-
-private val Screen.icon: ImageVector
-  get() = when (this) {
-    Screen.Home -> Icons.Default.Home
-    Screen.Workouts -> Icons.AutoMirrored.Filled.DirectionsBike
-    Screen.History -> Icons.Default.History
-    Screen.Profile -> Icons.Default.Person
-    else -> Icons.AutoMirrored.Filled.DirectionsBike
-  }
-
-private val Screen.label: String
-  get() = when (this) {
-    Screen.Home -> "Home"
-    Screen.Workouts -> "Workouts"
-    Screen.History -> "History"
-    Screen.Profile -> "Profile"
-    else -> ""
-  }
