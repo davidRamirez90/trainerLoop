@@ -1,4 +1,5 @@
 plugins {
+  id("io.github.takahirom.roborazzi")
   id("com.android.application")
   id("org.jetbrains.kotlin.android")
   id("org.jetbrains.kotlin.kapt")
@@ -30,6 +31,7 @@ android {
 
   testOptions {
     unitTests {
+      isIncludeAndroidResources = true
       // android.util.Log.d(...) is called by BleLog and would otherwise
       // throw in JVM unit tests. Returning default values makes Log.d
       // a no-op on the test classpath.
@@ -85,6 +87,11 @@ dependencies {
   kapt("androidx.room:room-compiler:2.6.1")
   implementation("androidx.room:room-ktx:2.6.1")
 
+  testImplementation("org.robolectric:robolectric:4.14.1")
+  testImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
+  testImplementation("androidx.compose.ui:ui-test-junit4")
+  testImplementation("io.github.takahirom.roborazzi:roborazzi:1.9.0")
+  testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.9.0")
   testImplementation("junit:junit:4.13.2")
   testImplementation("io.mockk:mockk:1.13.13")
   testImplementation("app.cash.turbine:turbine:1.2.0")
@@ -96,4 +103,9 @@ dependencies {
   androidTestImplementation("androidx.compose.ui:ui-test-junit4")
   debugImplementation("androidx.compose.ui:ui-tooling")
   debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+// Track checked-in references as screenshot task inputs/outputs.
+roborazzi {
+  outputDir.set(file("src/test/screenshots"))
 }

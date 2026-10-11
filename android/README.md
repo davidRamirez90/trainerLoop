@@ -245,3 +245,10 @@ or emulator to run; compile-check them with:
 - [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — phased build history
 - [`BATTERY_OPTIMIZATION.md`](BATTERY_OPTIMIZATION.md) — foreground-service / wake-lock notes
 - [`docs/plans/`](../docs/plans) — design docs for major features
+
+### Compose screenshots without a device
+
+See [COMPOSE_SCREENSHOTS.md](COMPOSE_SCREENSHOTS.md) for host-side Home screen
+rendering, reference comparison, actual PNG inspection, and adding screens.
+From the repository root, run `./scripts/compose-screenshots.sh compare` to render
+and compare, or `./scripts/compose-screenshots.sh verify` to check references.
