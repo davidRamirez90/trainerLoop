@@ -1,3 +1,5 @@
+> Historical reference. Current scope is documented in [Android README](../../android/README.md). Workout builder, standalone free ride, GPX riding, and live coaching were removed in October 2026; screenshots and plans may show retired features.
+
 # Zwift Click Physical Shifter Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

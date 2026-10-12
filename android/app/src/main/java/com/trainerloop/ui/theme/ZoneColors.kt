@@ -1,6 +1,5 @@
 package com.trainerloop.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.trainerloop.domain.PowerZoneMath
@@ -48,4 +47,4 @@ object ZoneColors {
 /** Theme-aware helper for composables. */
 @Composable
 fun zoneColorSet(targetWatts: Int, ftp: Int): ZoneColorSet =
-  ZoneColors.forTarget(targetWatts, ftp, dark = isSystemInDarkTheme())
+  ZoneColors.forTarget(targetWatts, ftp, dark = LocalTrainerLoopDarkTheme.current)

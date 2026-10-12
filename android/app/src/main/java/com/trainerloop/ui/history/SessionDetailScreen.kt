@@ -72,6 +72,19 @@ fun SessionDetailScreen(
     )
   )
   val state by viewModel.uiState.collectAsStateWithLifecycle()
+  SessionDetailContent(
+    state = state, ftp = context.trainerLoopApp.profileRepository.getProfileSync().ftp,
+    onBack = onBack, onUpload = viewModel::uploadToIcu
+  )
+}
+
+@Composable
+internal fun SessionDetailContent(
+  state: SessionDetailUiState,
+  ftp: Int,
+  onBack: () -> Unit,
+  onUpload: () -> Unit
+) {
   val session = state.session
 
   Scaffold(
@@ -103,7 +116,6 @@ fun SessionDetailScreen(
       emptyList()
     }
     val np = WorkoutSummaryMath.normalizedPower(samples)
-    val ftp = context.trainerLoopApp.profileRepository.getProfileSync().ftp
     val ifactor = WorkoutSummaryMath.intensityFactor(np, ftp)
     val tss = WorkoutSummaryMath.tss(np, ftp, s.durationSec)
     val zoneSeconds = WorkoutSummaryMath.zoneTimeSec(samples, ftp)
@@ -177,7 +189,7 @@ fun SessionDetailScreen(
           }
         } ?: run {
           PrimaryActionButton(
-            onClick = { viewModel.uploadToIcu() },
+            onClick = onUpload,
             enabled = !state.isUploading,
             modifier = Modifier.fillMaxWidth()
           ) {
@@ -282,7 +294,7 @@ private fun StatRow(
 
 @Composable
 private fun ZoneTimeDistribution(zoneSeconds: IntArray) {
-  val dark = androidx.compose.foundation.isSystemInDarkTheme()
+  val dark = com.trainerloop.ui.theme.LocalTrainerLoopDarkTheme.current
   val nonZeroZones = zoneSeconds.indices.filter { zoneSeconds[it] > 0 }
 
   TrainerLoopCard(modifier = Modifier.fillMaxWidth()) {

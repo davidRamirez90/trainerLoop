@@ -3,6 +3,7 @@ package com.trainerloop.ui.theme
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
 
 val NumericDisplay = TextStyle(
@@ -55,22 +56,26 @@ val titleCompact = TextStyle(
 
 val Typography = Typography(
   displayLarge = TextStyle(
-    fontWeight = FontWeight.ExtraBold,
-    fontSize = 34.sp,
-    lineHeight = 40.sp,
+    fontFamily = FontFamily.Serif,
+    fontWeight = FontWeight.Normal,
+    fontSize = 38.sp,
+    lineHeight = 46.sp,
     letterSpacing = (-0.5).sp
   ),
   headlineLarge = TextStyle(
-    fontWeight = FontWeight.Bold,
-    fontSize = 26.sp,
-    lineHeight = 32.sp,
+    fontFamily = FontFamily.Serif,
+    fontWeight = FontWeight.Normal,
+    fontSize = 32.sp,
+    lineHeight = 38.sp,
     letterSpacing = (-0.25).sp
   ),
   headlineMedium = TextStyle(
-    fontWeight = FontWeight.Bold,
-    fontSize = 21.sp,
-    lineHeight = 27.sp
+    fontFamily = FontFamily.Serif,
+    fontWeight = FontWeight.Normal,
+    fontSize = 28.sp,
+    lineHeight = 34.sp
   ),
+  headlineSmall = TextStyle(fontFamily = FontFamily.Serif, fontSize = 24.sp, lineHeight = 30.sp),
   titleLarge = TextStyle(
     fontWeight = FontWeight.SemiBold,
     fontSize = 18.sp,

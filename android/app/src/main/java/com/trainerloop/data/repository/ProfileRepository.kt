@@ -23,7 +23,7 @@ open class ProfileRepository(context: Context) {
   suspend fun updateProfile(update: (UserProfile) -> UserProfile) {
     updateMutex.withLock {
       val current = _profile.value
-      val updated = update(current)
+      val updated = validate(update(current))
       save(updated)
       _profile.value = updated
     }
@@ -49,25 +49,17 @@ open class ProfileRepository(context: Context) {
     updateProfile { it.copy(ergBiasPct = bias) }
   }
 
-  suspend fun selectCoachProfile(profileId: String) {
-    updateProfile { it.copy(selectedCoachProfileId = profileId) }
-  }
-
   suspend fun updateIntervalsIcuCredentials(athleteId: String, apiKey: String) {
     updateProfile { it.copy(intervalsIcuAthleteId = athleteId, intervalsIcuApiKey = apiKey) }
   }
 
   private fun load(): UserProfile {
-    return UserProfile(
+    return validate(UserProfile(
       name = prefs.getString(KEY_NAME, "Rider") ?: "Rider",
       ftp = prefs.getInt(KEY_FTP, 250),
       weightKg = prefs.getFloat(KEY_WEIGHT, 75.0f).toDouble(),
       maxHr = prefs.getInt(KEY_MAX_HR, 190),
-      restingHr = prefs.getInt(KEY_RESTING_HR, 55),
-      lthr = prefs.getInt(KEY_LTHR, -1).takeIf { it > 0 },
       ergBiasPct = prefs.getInt(KEY_ERG_BIAS, 0),
-      selectedCoachProfileId = prefs.getString(KEY_COACH_PROFILE, "default") ?: "default",
-      coachEnabled = prefs.getBoolean(KEY_COACH_ENABLED, true),
       completionSoundEnabled = prefs.getBoolean(KEY_COMPLETION_SOUND_ENABLED, false),
       intervalsIcuAthleteId = prefs.getString(KEY_INTERVALS_ATHLETE_ID, "") ?: "",
       intervalsIcuApiKey = prefs.getString(KEY_INTERVALS_API_KEY, "") ?: "",
@@ -75,9 +67,18 @@ open class ProfileRepository(context: Context) {
       bikeWeightKg = prefs.getFloat(KEY_BIKE_WEIGHT, 8.0f).toDouble(),
       rollingResistanceCrr = prefs.getFloat(KEY_CRR, 0.005f).toDouble(),
       dragAreaCda = prefs.getFloat(KEY_CDA, 0.32f).toDouble(),
-      trainerDifficultyPct = prefs.getInt(KEY_TRAINER_DIFFICULTY, 100)
-    )
+    ))
   }
+
+  private fun validate(profile: UserProfile): UserProfile = profile.copy(
+    ftp = profile.ftp.coerceIn(1, 2000),
+    weightKg = profile.weightKg.takeIf { it.isFinite() && it > 0 } ?: 75.0,
+    maxHr = profile.maxHr.coerceIn(1, 250),
+    ergBiasPct = profile.ergBiasPct.coerceIn(-20, 20),
+    bikeWeightKg = profile.bikeWeightKg.takeIf { it.isFinite() }?.coerceIn(5.0, 15.0) ?: 8.0,
+    rollingResistanceCrr = profile.rollingResistanceCrr.takeIf { it.isFinite() }?.coerceIn(0.002, 0.010) ?: 0.005,
+    dragAreaCda = profile.dragAreaCda.takeIf { it.isFinite() }?.coerceIn(0.15, 0.60) ?: 0.32
+  )
 
   private fun save(profile: UserProfile) {
     prefs.edit()
@@ -85,11 +86,7 @@ open class ProfileRepository(context: Context) {
       .putInt(KEY_FTP, profile.ftp)
       .putFloat(KEY_WEIGHT, profile.weightKg.toFloat())
       .putInt(KEY_MAX_HR, profile.maxHr)
-      .putInt(KEY_RESTING_HR, profile.restingHr)
-      .putInt(KEY_LTHR, profile.lthr ?: -1)
       .putInt(KEY_ERG_BIAS, profile.ergBiasPct)
-      .putString(KEY_COACH_PROFILE, profile.selectedCoachProfileId)
-      .putBoolean(KEY_COACH_ENABLED, profile.coachEnabled)
       .putBoolean(KEY_COMPLETION_SOUND_ENABLED, profile.completionSoundEnabled)
       .putString(KEY_INTERVALS_ATHLETE_ID, profile.intervalsIcuAthleteId)
       .putString(KEY_INTERVALS_API_KEY, profile.intervalsIcuApiKey)
@@ -97,7 +94,6 @@ open class ProfileRepository(context: Context) {
       .putFloat(KEY_BIKE_WEIGHT, profile.bikeWeightKg.toFloat())
       .putFloat(KEY_CRR, profile.rollingResistanceCrr.toFloat())
       .putFloat(KEY_CDA, profile.dragAreaCda.toFloat())
-      .putInt(KEY_TRAINER_DIFFICULTY, profile.trainerDifficultyPct)
       .apply()
   }
 
@@ -106,11 +102,7 @@ open class ProfileRepository(context: Context) {
     private const val KEY_FTP = "ftp"
     private const val KEY_WEIGHT = "weight_kg"
     private const val KEY_MAX_HR = "max_hr"
-    private const val KEY_RESTING_HR = "resting_hr"
-    private const val KEY_LTHR = "lthr"
     private const val KEY_ERG_BIAS = "erg_bias"
-    private const val KEY_COACH_PROFILE = "coach_profile"
-    private const val KEY_COACH_ENABLED = "coach_enabled"
     private const val KEY_COMPLETION_SOUND_ENABLED = "completion_sound_enabled"
     private const val KEY_NAME = "name"
     private const val KEY_INTERVALS_ATHLETE_ID = "intervals_icu_athlete_id"
@@ -119,6 +111,5 @@ open class ProfileRepository(context: Context) {
     private const val KEY_BIKE_WEIGHT = "bike_weight_kg"
     private const val KEY_CRR = "rolling_resistance_crr"
     private const val KEY_CDA = "drag_area_cda"
-    private const val KEY_TRAINER_DIFFICULTY = "trainer_difficulty_pct"
   }
 }

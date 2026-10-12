@@ -92,7 +92,10 @@ fun WorkoutLibraryScreen(
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val context = LocalContext.current
   val snackbarHostState = remember { SnackbarHostState() }
-  val ftp = remember { context.trainerLoopApp.profileRepository.getProfileSync().ftp }
+  val profile by context.trainerLoopApp.profileRepository.profile.collectAsStateWithLifecycle(
+    initialValue = context.trainerLoopApp.profileRepository.getProfileSync()
+  )
+  val ftp = profile.ftp
 
   LaunchedEffect(uiState.error) {
     uiState.error?.let {
@@ -112,6 +115,23 @@ fun WorkoutLibraryScreen(
     uri?.let(viewModel::importWorkout)
   }
 
+  WorkoutLibraryContent(
+    uiState = uiState, ftp = ftp, viewModel = viewModel,
+    onWorkoutSelected = onWorkoutSelected, onStartRampTest = onStartRampTest,
+    onImport = { importLauncher.launch(arrayOf("*/*")) }, snackbarHostState = snackbarHostState
+  )
+}
+
+@Composable
+internal fun WorkoutLibraryContent(
+  uiState: LibraryUiState,
+  ftp: Int,
+  viewModel: WorkoutLibraryViewModel,
+  onWorkoutSelected: (Workout) -> Unit,
+  onStartRampTest: () -> Unit,
+  onImport: () -> Unit,
+  snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
+) {
   Scaffold(
     contentWindowInsets = WindowInsets(0),
     topBar = {
@@ -129,7 +149,7 @@ fun WorkoutLibraryScreen(
         },
         secondAction = {
           IconButton(
-            onClick = { importLauncher.launch(arrayOf("*/*")) },
+            onClick = onImport,
             modifier = Modifier.size(48.dp)
           ) {
             Icon(Icons.Outlined.UploadFile, contentDescription = "Import workout file")
@@ -196,6 +216,12 @@ fun WorkoutLibraryScreen(
         item(key = "ftp-ramp-test-card") {
           RampTestCard(onClick = onStartRampTest)
         }
+        if (uiState.filteredWorkouts.isEmpty() && !uiState.isLoading) {
+          item(key = "empty-workouts") {
+            Text("No workouts match your filters. Try another category or search.",
+              style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+          }
+        }
         items(uiState.filteredWorkouts, key = { it.workout.id }) { item ->
           WorkoutCard(
             item = item,
@@ -257,8 +283,8 @@ private fun RampTestCard(onClick: () -> Unit) {
       .heightIn(min = 48.dp)
       .pressable(interactionSource),
     interactionSource = interactionSource,
-    shape = RoundedCornerShape(16.dp),
-    colors = CardDefaults.cardColors(containerColor = semantic.coach)
+    shape = MaterialTheme.shapes.medium,
+    colors = CardDefaults.cardColors(containerColor = semantic.assessment)
   ) {
     Row(
       modifier = Modifier.padding(Spacing.cardPadding),
@@ -267,7 +293,7 @@ private fun RampTestCard(onClick: () -> Unit) {
       Icon(
         Icons.Outlined.MonitorHeart,
         contentDescription = null,
-        tint = semantic.onCoach,
+        tint = semantic.onAssessment,
         modifier = Modifier.size(28.dp)
       )
       Spacer(modifier = Modifier.width(Spacing.md))
@@ -276,17 +302,17 @@ private fun RampTestCard(onClick: () -> Unit) {
           "FTP Ramp Test",
           style = MaterialTheme.typography.titleMedium,
           fontWeight = FontWeight.SemiBold,
-          color = semantic.onCoach
+          color = semantic.onAssessment
         )
         Text(
           "Assessment · Estimate your FTP",
           style = MaterialTheme.typography.bodySmall,
-          color = semantic.onCoach,
+          color = semantic.onAssessment,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis
         )
       }
-      Icon(Icons.Default.ChevronRight, contentDescription = null, tint = semantic.onCoach)
+      Icon(Icons.Default.ChevronRight, contentDescription = null, tint = semantic.onAssessment)
     }
   }
 }

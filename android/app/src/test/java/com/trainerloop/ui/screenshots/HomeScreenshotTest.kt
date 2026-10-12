@@ -62,8 +62,9 @@ class HomeScreenshotTest {
               trainerBattery = 85, isHrConnected = true, latestHrBpm = 124,
               plannedName = workout.name, plannedWorkout = workout
             ),
+            today = java.time.LocalDate.of(2026, 10, 11),
             onNavigateToDevices = {}, onNavigateToWorkouts = {},
-            onNavigateToBuilder = {}, onStartFreeRide = {}, onGpxRoutes = {},
+            onChooseWorkout = {},
             onNavigateToProfile = {}, onStartPlanned = {}
           )
         }

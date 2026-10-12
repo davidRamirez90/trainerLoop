@@ -6,7 +6,6 @@ import com.trainerloop.ui.devices.DevicesViewModel
 import com.trainerloop.ui.history.HistoryViewModel
 import com.trainerloop.ui.home.HomeViewModel
 import com.trainerloop.ui.library.WorkoutLibraryViewModel
-import com.trainerloop.ui.routes.RoutesViewModel
 import com.trainerloop.ui.settings.SettingsViewModel
 import org.junit.Assert.assertNotNull
 import org.junit.Test
@@ -32,7 +31,6 @@ class ViewModelFactoryContractTest {
       DevicesViewModel::class.java,
       HistoryViewModel::class.java,
       HomeViewModel::class.java,
-      RoutesViewModel::class.java,
       SettingsViewModel::class.java,
       WorkoutLibraryViewModel::class.java
     )

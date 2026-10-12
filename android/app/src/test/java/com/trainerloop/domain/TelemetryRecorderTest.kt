@@ -26,6 +26,45 @@ import org.junit.Test
 class TelemetryRecorderTest {
 
   @Test
+  fun `seeking changes chart position without inflating recorded riding time`() = runTest {
+    val dispatcher = StandardTestDispatcher(testScheduler)
+    val clock = WorkoutClock(shortWorkout(durationSec = 600), dispatcher)
+    val recorder = TelemetryRecorder(
+      clock,
+      TelemetryRecorder.DataProvider(
+        MutableStateFlow(stamp(bikeData(powerWatts = 200))),
+        MutableStateFlow(stamp(150))
+      ),
+      dispatcher,
+      now = { 0L }
+    )
+    recorder.startCollecting()
+    clock.start()
+    runCurrent()
+    advanceTimeBy(2_000)
+    runCurrent()
+    clock.seek(300)
+    runCurrent()
+    advanceTimeBy(2_000)
+    runCurrent()
+    clock.pause()
+    runCurrent()
+    advanceTimeBy(5_000)
+    runCurrent()
+    clock.seek(100)
+    clock.resume()
+    runCurrent()
+    advanceTimeBy(1_000)
+    runCurrent()
+    recorder.flush()
+
+    assertEquals(listOf(1, 2, 3, 4, 5), recorder.samples.value.map { it.timeSec })
+    assertEquals(listOf(1, 2, 301, 302, 101), recorder.samples.value.map { it.workoutTimeSec })
+    recorder.stop()
+    clock.close()
+  }
+
+  @Test
   fun `samples snapshot refreshes every 5 ticks and flush publishes immediately`() = runTest {
     val testDispatcher = StandardTestDispatcher(testScheduler)
     val clock = WorkoutClock(shortWorkout(durationSec = 5), testDispatcher)

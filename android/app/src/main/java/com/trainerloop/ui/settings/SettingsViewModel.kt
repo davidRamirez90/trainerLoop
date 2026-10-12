@@ -15,12 +15,7 @@ data class SettingsUiState(
   val ftp: String = "250",
   val weightKg: String = "75.0",
   val maxHr: String = "190",
-  val restingHr: String = "55",
-  /** Blank = unset; the coach then estimates LTHR from max HR. */
-  val lthr: String = "",
   val ergBias: String = "0",
-  val selectedCoach: String = "default",
-  val coachEnabled: Boolean = true,
   val completionSoundEnabled: Boolean = false,
   val intervalsAthleteId: String = "",
   val intervalsApiKey: String = "",
@@ -28,7 +23,6 @@ data class SettingsUiState(
   val bikeWeightKg: String = "8.0",
   val crr: String = "0.005",
   val cda: String = "0.32",
-  val trainerDifficultyPct: Int = 100,
   val isSaved: Boolean = false
 )
 
@@ -48,11 +42,7 @@ class SettingsViewModel @JvmOverloads constructor(
       ftp = profile.ftp.toString(),
       weightKg = profile.weightKg.toString(),
       maxHr = profile.maxHr.toString(),
-      restingHr = profile.restingHr.toString(),
-      lthr = profile.lthr?.toString() ?: "",
       ergBias = profile.ergBiasPct.toString(),
-      selectedCoach = profile.selectedCoachProfileId,
-      coachEnabled = profile.coachEnabled,
       completionSoundEnabled = profile.completionSoundEnabled,
       intervalsAthleteId = profile.intervalsIcuAthleteId,
       intervalsApiKey = profile.intervalsIcuApiKey,
@@ -60,7 +50,6 @@ class SettingsViewModel @JvmOverloads constructor(
       bikeWeightKg = profile.bikeWeightKg.toString(),
       crr = profile.rollingResistanceCrr.toString(),
       cda = profile.dragAreaCda.toString(),
-      trainerDifficultyPct = profile.trainerDifficultyPct
     )
   }
 
@@ -80,28 +69,12 @@ class SettingsViewModel @JvmOverloads constructor(
     _uiState.value = _uiState.value.copy(maxHr = value, isSaved = false)
   }
 
-  fun updateRestingHr(value: String) {
-    _uiState.value = _uiState.value.copy(restingHr = value, isSaved = false)
-  }
-
-  fun updateLthr(value: String) {
-    _uiState.value = _uiState.value.copy(lthr = value, isSaved = false)
-  }
-
   fun updateErgBias(value: String) {
     _uiState.value = _uiState.value.copy(ergBias = value, isSaved = false)
   }
 
-  fun updateCoachEnabled(value: Boolean) {
-    _uiState.value = _uiState.value.copy(coachEnabled = value, isSaved = false)
-  }
-
   fun updateCompletionSoundEnabled(value: Boolean) {
     _uiState.value = _uiState.value.copy(completionSoundEnabled = value, isSaved = false)
-  }
-
-  fun updateSelectedCoach(value: String) {
-    _uiState.value = _uiState.value.copy(selectedCoach = value, isSaved = false)
   }
 
   fun updateIntervalsAthleteId(value: String) {
@@ -128,10 +101,6 @@ class SettingsViewModel @JvmOverloads constructor(
     _uiState.value = _uiState.value.copy(cda = value, isSaved = false)
   }
 
-  fun updateTrainerDifficulty(value: Int) {
-    _uiState.value = _uiState.value.copy(trainerDifficultyPct = value, isSaved = false)
-  }
-
   fun resetPhysicsDefaults() {
     _uiState.value = _uiState.value.copy(
       bikeWeightKg = "8.0", crr = "0.005", cda = "0.32", isSaved = false
@@ -151,11 +120,7 @@ class SettingsViewModel @JvmOverloads constructor(
           ftp = state.ftp.toIntOrNull() ?: it.ftp,
           weightKg = state.weightKg.toDoubleOrNull() ?: it.weightKg,
           maxHr = state.maxHr.toIntOrNull() ?: it.maxHr,
-          restingHr = state.restingHr.toIntOrNull() ?: it.restingHr,
-          lthr = state.lthr.toIntOrNull()?.takeIf { v -> v > 0 },
           ergBiasPct = state.ergBias.toIntOrNull() ?: it.ergBiasPct,
-          selectedCoachProfileId = state.selectedCoach,
-          coachEnabled = state.coachEnabled,
           completionSoundEnabled = state.completionSoundEnabled,
           intervalsIcuAthleteId = state.intervalsAthleteId.trim(),
           intervalsIcuApiKey = state.intervalsApiKey.trim(),
@@ -166,7 +131,6 @@ class SettingsViewModel @JvmOverloads constructor(
             .coerceIn(0.002, 0.010),
           dragAreaCda = (state.cda.toDoubleOrNull() ?: it.dragAreaCda)
             .coerceIn(0.15, 0.60),
-          trainerDifficultyPct = state.trainerDifficultyPct.coerceIn(0, 100)
         )
       }
       _uiState.value = _uiState.value.copy(isSaved = true)

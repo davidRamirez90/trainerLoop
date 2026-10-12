@@ -72,6 +72,11 @@ fun HistoryScreen(
   viewModel: HistoryViewModel = viewModel()
 ) {
   val sessions by viewModel.sessions.collectAsStateWithLifecycle()
+  HistoryScreenContent(sessions, onSessionClick)
+}
+
+@Composable
+internal fun HistoryScreenContent(sessions: List<SessionSummary>, onSessionClick: (String) -> Unit, today: LocalDate = LocalDate.now()) {
   val defaultMotionSpec = reducedMotionAware(MotionSpec.default)
 
   Scaffold(
@@ -107,8 +112,8 @@ fun HistoryScreen(
             .padding(horizontal = Spacing.screenMargin),
           verticalArrangement = Arrangement.spacedBy(Spacing.sectionGap)
         ) {
-          item { SectionHeader(title = "Last 6 weeks") }
-          item { WeeklyLoadChart(sessions) }
+          item { SectionHeader(title = "Ride time · Last 6 weeks") }
+          item { WeeklyLoadChart(sessions, today) }
           items(sessions, key = { it.id }) { session ->
             SessionCard(session, onClick = { onSessionClick(session.id) })
           }
@@ -192,8 +197,7 @@ private fun SessionCard(session: SessionSummary, onClick: () -> Unit) {
 }
 
 @Composable
-private fun WeeklyLoadChart(sessions: List<SessionSummary>) {
-  val today = remember { LocalDate.now() }
+private fun WeeklyLoadChart(sessions: List<SessionSummary>, today: LocalDate) {
   val loads = remember(sessions, today) { weeklyLoads(sessions, today) }
   val maxSeconds = loads.maxOfOrNull { it.totalSec } ?: 0
   var animateBars by remember { mutableStateOf(false) }

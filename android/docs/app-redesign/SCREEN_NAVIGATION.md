@@ -1,80 +1,34 @@
-# Trainer Loop screen navigation
+# Current TrainerLoop navigation
 
-## Primary navigation
+Updated October 2026. Persistent tabs: Today (Home route), Workouts, History. Profile is a detail destination opened from the Today avatar.
 
-The persistent bottom navigation contains four destinations:
-
-```text
-Home <-> Workouts <-> History <-> Profile
-```
-
-Each tab preserves its own navigation state. Home is the root destination.
-
-## Home relationships
+[Interactive HTML screen and flow report](../../../docs/reports/app-flow-report.html) maps the nine navigation destinations and supporting views,
+with entry actions, return paths, player states, and completion decisions.
+The [Focus migration gallery](../../../docs/design/focus-migration/index.html) shows the migrated screens.
+Current renders and the emulator-free capture workflow are documented in
+[the Compose screenshot guide](../../COMPOSE_SCREENSHOTS.md).
 
 ```text
 Home
-├── Manage connections -> Devices sheet
-├── Start Free Ride -> Workout Player -> Workout Complete
-├── Today's Plan -> Workout Detail -> Workout Player -> Workout Complete
-├── Workout Builder -> Workout Builder
-└── GPX Routes -> Routes Library
-```
+├── Choose workout / Choose a different workout -> Workouts
+├── Last ride -> Session Detail / View history -> History
+├── Manage connections -> Devices dialog
+├── Today's Plan / Open workout -> Workout Player -> Workout Complete
+└── Profile avatar -> Profile -> Back to Today
 
-The Home connection card reflects trainer and heart-rate device state. The same state is managed from the Devices sheet and is consumed by the workout player.
+Workouts
+├── Workout card -> Workout Preview -> Workout Player -> Workout Complete
+├── FTP Ramp Test -> Workout Player -> Workout Complete
+├── Sync today's workouts from intervals.icu
+└── Import workout -> Android file picker
 
-## Workout relationships
-
-```text
-Workouts Library
-├── Workout card -> Workout Detail
-│   └── Start Workout -> Workout Player
-├── FTP Ramp Test -> Workout Player
-├── Sync -> intervals.icu import/sync state
-├── Import workout file -> Android file picker/import flow
-└── Workout Builder -> save -> Workouts Library
-```
-
-The Workout Detail screen is a read-only preview of duration, intensity, TSS, description, and intervals. The player owns live telemetry, coaching, controls, and completion routing.
-
-## Route relationships
-
-```text
-Home -> GPX Routes -> Route Detail -> Free Ride -> Workout Complete
-```
-
-Route Detail supplies the elevation profile and route metadata. Free Ride uses the selected route and the athlete/simulation settings from Profile.
-
-## History relationships
-
-```text
 History -> Session Detail
+Profile -> Power Zones / Heart Rate Zones / About dialogs
+Devices -> Scan / Connect / Disconnect trainer and HR sensor
 ```
 
-Workout Player and Free Ride persist completed session data. History reads those records and opens Session Detail for a selected session.
-
-## Profile relationships
-
-```text
-Profile
-├── Athlete metrics -> FTP / weight used by workout calculations
-├── Power Zones -> Power Zones dialog
-├── Heart Rate -> Heart Rate Zones dialog
-├── Coaching -> Coach Profile dialog and coaching behavior in Player
-├── Simulation -> advanced physics controls used by virtual rides
-├── Connections -> intervals.icu credentials used by sync/import
-└── App -> About dialog
-```
-
-The API key remains masked in the captured documentation set. The visible-key variant was intentionally excluded.
-
-## Device relationships
-
-```text
-Devices
-├── Scan -> discovered Bluetooth devices
-├── Connect -> connected trainer / heart-rate state
-└── Device details -> capabilities and connection controls
-```
-
-The connection state appears on Home and is consumed by the Workout Player for trainer control and metrics availability.
+Player controls: start/pause/resume/stop, skip, ERG toggle, intensity adjustment
+and reset, +30s recovery. Completion saves/discards/shares FIT and can accept FTP.
+There are no builder, standalone free-ride, GPX-route, or coach destinations.
+The workout player retains optional generated virtual terrain overlays and interval
+announcements. Legacy saved sessions remain accessible through History.

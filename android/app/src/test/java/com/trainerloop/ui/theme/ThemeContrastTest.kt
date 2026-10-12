@@ -91,8 +91,10 @@ class ThemeContrastTest {
 
   private fun assertSemanticContrast(name: String, colors: TrainerLoopColors) {
     val pairs = listOf(
+      "onHeroSurface/heroSurface" to (colors.onHeroSurface to colors.heroSurface),
+      "heroSecondary/heroSurface" to (colors.heroSecondary to colors.heroSurface),
       "onReady/ready" to (colors.onReady to colors.ready),
-      "onCoach/coach" to (colors.onCoach to colors.coach),
+      "onAssessment/assessment" to (colors.onAssessment to colors.assessment),
       "onConnected/connected" to (colors.onConnected to colors.connected),
       "onWarning/warning" to (colors.onWarning to colors.warning),
       "onStale/stale" to (colors.onStale to colors.stale),

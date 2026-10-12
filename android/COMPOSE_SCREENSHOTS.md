@@ -3,8 +3,10 @@
 The mandatory development pipeline and requirements by task type are defined in
 [root AGENTS.md](../AGENTS.md). This guide documents the renderer and artifacts.
 
-Render the **production Home screen content** with fixed representative state,
-TrainerLoopTheme, Material 3, and a real interval chart. No emulator, device, BLE
+Render **production Compose content** with fixed representative state,
+TrainerLoopTheme, Material 3, and actual training charts. The Focus migration
+fixtures cover retained destinations, dialogs, empty/loading/error states, dark
+mode, landscape and enlarged text. See [the native gallery](../docs/design/focus-migration/index.html). No emulator, device, BLE
 manager, database, or remote service is started. The Robolectric application is
 plain `android.app.Application`, deliberately avoiding TrainerLoopApplication.
 
@@ -41,7 +43,8 @@ record to make an unexplained verification failure disappear.
 
 ## Locate and inspect
 
-- References: `android/app/src/test/screenshots/home-planned-{light,dark}.png`.
+- References: `android/app/src/test/screenshots/home-planned-{light,dark}.png`,
+  `focus-*.png`, and the separately retained `proposal-*.png` design explorations.
 - Comparison images: alongside references as `*_actual.png` and `*_compare.png`
   (Git ignored). Roborazzi uses the configured `src/test/screenshots` output directory.
 - Roborazzi report: `android/app/build/reports/roborazzi/index.html`.
@@ -85,7 +88,7 @@ Platform/OEM fonts, GPU effects, system insets, navigation, input, animations,
 and hardware behavior need separate coverage. Keep baselines on the same pinned
 SDK/tool versions and host platform. This task does not test BLE or hardware.
 
-## Proof-of-concept results
+## Original proof-of-concept results
 
 In Codex Cloud on Linux, both 1233 × 2673 PNGs rendered without an emulator and
 were opened with `view_image` before and after the production edit. The fixed
@@ -150,3 +153,34 @@ cards were inspected. Their SHA-256 hashes match the prior references. This
 workflow task changed no production UI. The debug APK, PNGs, and report were
 checked to exist. Shell syntax, invalid-mode handling, Gradle failure propagation,
 and `git diff --check` passed.
+
+## Integration with the scope cleanup (11 October 2026)
+
+The screenshot workflow was recovered from remote `work` commit `f622726`;
+the local branch named `work` had initially been created from `main` at `ebff24f`
+and did not contain that commit. Fetching the remote branch revealed the existing
+Roborazzi setup. Its renderer, script, dependencies and Home fixture are reused.
+The fixture now calls the cleaned-up production Home content with Choose Workout;
+removed Free Ride, Builder and GPX callbacks are omitted. Existing runtime state
+collection and lifecycle refresh remain in the Home route. The original
+proof-of-concept results above describe the earlier app scope and baselines.
+
+Current captures use synthetic rider, planned-workout and connected-device state.
+They render the production layout without a running Android device, database,
+network integration or BLE session, and exclude the app navigation/system bars.
+
+The cleaned-up Home was rendered and visually inspected in both themes. The
+comparison showed the expected Choose Workout replacement and removal of the
+retired Explore cards. Prior references are retained in
+`visual-verification/home-before-scope-cleanup-{light,dark}.png`. The inspected
+current PNGs were recorded as references; cached recording took 27 s and
+verification passed in 26 s. Both current references exactly match the inspected
+actual PNGs. These timings include Gradle startup and two screenshot tests.
+
+Final integration checks passed: `assembleDebug testDebugUnitTest lint`;
+213 tests, zero failures/errors/skips. Screenshot verification passed for both
+current references. Shell syntax and `git diff --check` also passed.
+
+The workout overflow popup has Compose visibility assertions for Duplicate/Delete.
+Its host PNG is excluded because the renderer cropped the wrong window. Native
+zone/About/stop dialogs render correctly and remain covered.

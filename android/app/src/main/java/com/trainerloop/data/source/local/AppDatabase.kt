@@ -7,6 +7,8 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
+// RouteEntity and old session columns preserve the v4 on-device schema and ride history.
+// New rides only use the sessions table.
 @Database(
     entities = [SessionEntity::class, RouteEntity::class],
     version = 4,
@@ -14,7 +16,6 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun sessionDao(): SessionDao
-    abstract fun routeDao(): RouteDao
 
     companion object {
         @Volatile

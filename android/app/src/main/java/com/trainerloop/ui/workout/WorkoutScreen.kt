@@ -28,10 +28,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -46,7 +44,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -80,14 +77,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.trainerloop.app.trainerLoopApp
 import com.trainerloop.app.WorkoutForegroundService
-import com.trainerloop.app.BuildConfig
+import com.trainerloop.data.model.TelemetrySample
 import com.trainerloop.data.model.Workout
 import com.trainerloop.domain.WorkoutMath
-import com.trainerloop.domain.telemetry.TelemetryScenario
 import com.trainerloop.ui.components.WorkoutChart
 import com.trainerloop.ui.components.workoutProfileSummary
 import com.trainerloop.ui.haptics.Haptics
@@ -118,7 +113,6 @@ import com.trainerloop.ui.theme.zoneColorSet
 import com.trainerloop.ui.theme.MotionSpec
 import com.trainerloop.ui.theme.reducedMotionAware
 import com.trainerloop.ui.theme.trainerLoopColors
-import com.trainerloop.ui.coach.CoachFeedbackArea
 import com.trainerloop.ui.workout.WorkoutStatsPager
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -144,16 +138,6 @@ fun WorkoutScreen(
     )
   }
   var completionCueConsumed by rememberSaveable { mutableStateOf(false) }
-  val currentPowerColor = zoneColorSet(uiState.currentPowerWatts, ftp).line
-  var showStopConfirm by remember { mutableStateOf(false) }
-  var showTelemetrySourcePicker by remember { mutableStateOf(false) }
-
-  fun requestStop() {
-    if (uiState.elapsedSec == 0) onExit() else showStopConfirm = true
-  }
-
-  BackHandler(enabled = uiState.elapsedSec > 0) { showStopConfirm = true }
-
   LaunchedEffect(finishData) {
     finishData?.let {
       viewModel.consumeFinishEvent()
@@ -179,9 +163,7 @@ fun WorkoutScreen(
   // Audible cue when the interval changes, so you don't need to watch the
   // screen. Skips the very first segment (index 0) so it doesn't fire on open.
   val tts = remember {
-    var engine: android.speech.tts.TextToSpeech? = null
-    engine = android.speech.tts.TextToSpeech(context) { /* status ignored; speak() no-ops if not ready */ }
-    engine
+    android.speech.tts.TextToSpeech(context) { /* speak() no-ops if not ready */ }
   }
   DisposableEffect(Unit) {
     onDispose {
@@ -206,25 +188,6 @@ fun WorkoutScreen(
     if (!uiState.isRunning) return@LaunchedEffect
     val remainingSec = uiState.segmentEndSec - uiState.elapsedSec
     if (remainingSec in 1..5) Haptics.countdownTick(view)
-  }
-
-  // Speak urgent coach feedback (safety / fatigue / sensor tiers) so it lands
-  // eyes-free mid-interval; lower tiers stay visual-only.
-  LaunchedEffect(uiState.liveFeedback?.id) {
-    val feedback = uiState.liveFeedback ?: return@LaunchedEffect
-    val spokenCategories = setOf(
-      com.trainerloop.domain.coach.FeedbackCategory.SAFETY,
-      com.trainerloop.domain.coach.FeedbackCategory.DATA_QUALITY,
-      com.trainerloop.domain.coach.FeedbackCategory.FATIGUE_MANAGEMENT
-    )
-    if (feedback.category in spokenCategories) {
-      tts.speak(
-        feedback.message,
-        android.speech.tts.TextToSpeech.QUEUE_FLUSH,
-        null,
-        "coach-${feedback.id}"
-      )
-    }
   }
 
   // Service lives while a session exists (running or paused); paused rides keep
@@ -268,52 +231,62 @@ fun WorkoutScreen(
     }
   }
 
+  WorkoutScreenContent(
+    workout = workout, uiState = uiState, ftp = ftp, onExit = onExit,
+    actions = WorkoutPlayerActions(
+      start = viewModel::start, pause = viewModel::pause, resume = viewModel::resume,
+      stop = viewModel::stop, skipSegment = viewModel::skipSegment,
+      fineIntensityDown = viewModel::fineIntensityDown, fineIntensityUp = viewModel::fineIntensityUp,
+      toggleErg = viewModel::toggleErg, extendCurrentRecovery = viewModel::extendCurrentRecovery,
+      maybeEmitFinish = viewModel::maybeEmitFinish
+    )
+  )
+}
+
+internal data class WorkoutPlayerActions(
+  val start: () -> Unit = {}, val pause: () -> Unit = {}, val resume: () -> Unit = {},
+  val stop: () -> Unit = {}, val skipSegment: () -> Unit = {},
+  val fineIntensityDown: () -> Unit = {}, val fineIntensityUp: () -> Unit = {},
+  val toggleErg: () -> Unit = {}, val extendCurrentRecovery: () -> Unit = {},
+  val maybeEmitFinish: () -> Unit = {}
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun WorkoutScreenContent(
+  workout: Workout,
+  uiState: WorkoutUiState,
+  ftp: Int,
+  onExit: () -> Unit,
+  actions: WorkoutPlayerActions
+) {
+  val currentPowerColor = zoneColorSet(uiState.currentPowerWatts, ftp).line
+  var showStopConfirm by remember { mutableStateOf(false) }
+  fun requestStop() {
+    if (uiState.elapsedSec == 0) onExit() else showStopConfirm = true
+  }
+  BackHandler(enabled = uiState.elapsedSec > 0) { showStopConfirm = true }
   val isLandscape =
     LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
   if (isLandscape) {
-    Box(modifier = Modifier.fillMaxSize()) {
-      LandscapeWorkout(
-        uiState = uiState,
-        ftp = ftp,
-        powerColor = currentPowerColor,
-        onPlayPause = {
-          when {
-            uiState.isRunning -> viewModel.pause()
-            uiState.isComplete -> viewModel.maybeEmitFinish()
-            else -> if (uiState.elapsedSec == 0) viewModel.start() else viewModel.resume()
-          }
-        },
-        onStop = { requestStop() }
-      )
-      if (BuildConfig.DEBUG && uiState.elapsedSec == 0 && !uiState.isRunning) {
-        FilledTonalButton(
-          onClick = { showTelemetrySourcePicker = true },
-          modifier = Modifier
-            .align(Alignment.TopCenter)
-            .padding(top = Spacing.sm)
-        ) {
-          Text(
-            uiState.telemetryScenario?.let { "Debug: ${it.label}" }
-              ?: "Debug: Bluetooth"
-          )
+    LandscapeWorkout(
+      uiState = uiState,
+      ftp = ftp,
+      powerColor = currentPowerColor,
+      onPlayPause = {
+        when {
+          uiState.isRunning -> actions.pause()
+          uiState.isComplete -> actions.maybeEmitFinish()
+          else -> if (uiState.elapsedSec == 0) actions.start() else actions.resume()
         }
-      }
-    }
+      },
+      onStop = { requestStop() }
+    )
     if (showStopConfirm) {
       StopConfirmDialog(
         onDismiss = { showStopConfirm = false },
-        onConfirm = { showStopConfirm = false; viewModel.stop() }
-      )
-    }
-    if (showTelemetrySourcePicker) {
-      TelemetrySourceDialog(
-        selected = uiState.telemetryScenario,
-        onSelect = {
-          viewModel.setTelemetryScenario(it)
-          showTelemetrySourcePicker = false
-        },
-        onDismiss = { showTelemetrySourcePicker = false }
+        onConfirm = { showStopConfirm = false; actions.stop() }
       )
     }
     return
@@ -337,165 +310,133 @@ fun WorkoutScreen(
           .padding(horizontal = Spacing.lg)
           .padding(bottom = PlayerControlsSheetPeekHeight)
       ) {
-      // Reading hierarchy: interval context, dominant power, then secondary metrics.
-      val currentSegment = uiState.segments.getOrNull(uiState.segmentIndex)
-      val sessionHasStarted = uiState.isRunning || uiState.elapsedSec > 0
-      IntervalContextLine(
-        label = currentSegment?.label ?: currentSegment?.phase?.name ?: "Interval",
-        position = "${uiState.segmentIndex + 1}/${uiState.segments.size}",
-        remaining = formatDuration(
-          (uiState.segmentEndSec - uiState.elapsedSec).coerceAtLeast(0)
+        // Reading hierarchy: interval context, dominant power, then secondary metrics.
+        val currentSegment = uiState.segments.getOrNull(uiState.segmentIndex)
+        val sessionHasStarted = uiState.isRunning || uiState.elapsedSec > 0
+        IntervalContextLine(
+          label = currentSegment?.label ?: currentSegment?.phase?.name ?: "Interval",
+          position = "${uiState.segmentIndex + 1}/${uiState.segments.size}",
+          remaining = formatDuration(
+            (uiState.segmentEndSec - uiState.elapsedSec).coerceAtLeast(0)
+          )
         )
-      )
 
-      if (BuildConfig.DEBUG && !sessionHasStarted) {
-        Spacer(modifier = Modifier.height(Spacing.sm))
-        FilledTonalButton(
-          onClick = { showTelemetrySourcePicker = true },
+        ConnectionStatusRow(
+          visible = sessionHasStarted && uiState.sensorDropout,
+          modifier = Modifier.padding(top = Spacing.xs)
+        )
+
+        Spacer(modifier = Modifier.height(Spacing.lg))
+
+        PowerHero(
+          powerWatts = uiState.currentPowerWatts,
+          powerColor = currentPowerColor,
+          sessionHasStarted = sessionHasStarted,
+          targetRange = uiState.targetRange,
+          inZoneSec = uiState.inZoneSec,
+          segmentElapsedSec = uiState.elapsedInSegmentSec.coerceAtLeast(1),
+          progressColor = zoneColorSet(
+            targetWatts = (uiState.targetRange.low + uiState.targetRange.high) / 2,
+            ftp = ftp
+          ).fill
+        )
+
+        Spacer(modifier = Modifier.height(Spacing.lg))
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
+          MetricTile(
+            label = "HR",
+            value = uiState.currentHrBpm.toString(),
+            unit = "bpm",
+            state = telemetryTileState(uiState.currentHrBpm, uiState.sensorDropout),
+            modifier = Modifier.weight(1f)
+          )
+          MetricTile(
+            label = "Cadence",
+            value = uiState.currentCadenceRpm.toString(),
+            unit = "rpm",
+            state = telemetryTileState(uiState.currentCadenceRpm, uiState.sensorDropout),
+            modifier = Modifier.weight(1f)
+          )
+        }
+
+        uiState.currentVirtualSpeedKph?.let { speedKph ->
+          Spacer(modifier = Modifier.height(8.dp))
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+          ) {
+            MetricTile(
+              label = "Speed",
+              value = "%.1f".format(speedKph),
+              unit = "km/h",
+              modifier = Modifier.weight(1f)
+            )
+            MetricTile(
+              label = "Grade",
+              value = "%.1f".format(uiState.currentGradePercent ?: 0.0),
+              unit = "%",
+              modifier = Modifier.weight(1f)
+            )
+            MetricTile(
+              label = "Distance",
+              value = "%.1f".format((uiState.virtualDistanceM ?: 0.0) / 1000.0),
+              unit = "km",
+              modifier = Modifier.weight(1f)
+            )
+          }
+        }
+
+        Spacer(modifier = Modifier.height(Spacing.xl))
+
+        // Chart section with tabs
+        WorkoutStatsPager(
+          powerSamples = uiState.samples,
           modifier = Modifier.fillMaxWidth()
         ) {
           Text(
-            uiState.telemetryScenario?.let { "Debug telemetry: ${it.label}" }
-              ?: "Debug telemetry: Bluetooth"
+            text = currentSegment?.label ?: currentSegment?.phase?.name ?: "",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
           )
-        }
-      } else {
-        uiState.telemetryScenario?.let { scenario ->
           Text(
-            text = "SIMULATED · ${scenario.label}",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.tertiary,
-            modifier = Modifier.padding(top = Spacing.xs)
+            text = "Segment ${uiState.segmentIndex + 1}/${uiState.segments.size}",
+            style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
           )
+
+          Spacer(modifier = Modifier.height(8.dp))
+
+          WorkoutChart(
+            segments = uiState.segments,
+            samples = uiState.samples,
+            elapsedSec = uiState.elapsedSec,
+            ftp = ftp,
+            modifier = Modifier.fillMaxWidth(),
+            elevationProfile = uiState.elevationProfile
+          )
+
+          Spacer(modifier = Modifier.height(8.dp))
+
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+          ) {
+            FooterStat("Elapsed", formatDuration(uiState.elapsedSec))
+            FooterStat(
+              "Remaining",
+              formatDuration((WorkoutMath.totalDurationSec(uiState.segments) - uiState.elapsedSec).coerceAtLeast(0))
+            )
+            FooterStat("Total", formatDuration(WorkoutMath.totalDurationSec(uiState.segments)))
+          }
         }
-      }
 
-      ConnectionStatusRow(
-        visible = sessionHasStarted &&
-          uiState.sensorDropout &&
-          uiState.telemetryScenario != TelemetryScenario.SENSOR_DROPOUT,
-        modifier = Modifier.padding(top = Spacing.xs)
-      )
-
-      Spacer(modifier = Modifier.height(Spacing.lg))
-
-      PowerHero(
-        powerWatts = uiState.currentPowerWatts,
-        powerColor = currentPowerColor,
-        sessionHasStarted = sessionHasStarted,
-        targetRange = uiState.targetRange,
-        inZoneSec = uiState.inZoneSec,
-        segmentElapsedSec = uiState.elapsedInSegmentSec.coerceAtLeast(1),
-        progressColor = zoneColorSet(
-          targetWatts = (uiState.targetRange.low + uiState.targetRange.high) / 2,
-          ftp = ftp
-        ).fill
-      )
-
-      Spacer(modifier = Modifier.height(Spacing.lg))
-
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-      ) {
-        MetricTile(
-          label = "HR",
-          value = uiState.currentHrBpm.toString(),
-          unit = "bpm",
-          state = telemetryTileState(uiState.currentHrBpm, uiState.sensorDropout),
-          modifier = Modifier.weight(1f)
-        )
-        MetricTile(
-          label = "Cadence",
-          value = uiState.currentCadenceRpm.toString(),
-          unit = "rpm",
-          state = telemetryTileState(uiState.currentCadenceRpm, uiState.sensorDropout),
-          modifier = Modifier.weight(1f)
-        )
-      }
-
-      uiState.currentVirtualSpeedKph?.let { speedKph ->
-        Spacer(modifier = Modifier.height(8.dp))
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-          MetricTile(
-            label = "Speed",
-            value = "%.1f".format(speedKph),
-            unit = "km/h",
-            modifier = Modifier.weight(1f)
-          )
-          MetricTile(
-            label = "Grade",
-            value = "%.1f".format(uiState.currentGradePercent ?: 0.0),
-            unit = "%",
-            modifier = Modifier.weight(1f)
-          )
-          MetricTile(
-            label = "Distance",
-            value = "%.1f".format((uiState.virtualDistanceM ?: 0.0) / 1000.0),
-            unit = "km",
-            modifier = Modifier.weight(1f)
-          )
-        }
-      }
-
-      Spacer(modifier = Modifier.height(Spacing.xl))
-
-      // Chart section with tabs
-      WorkoutStatsPager(
-        powerSamples = uiState.samples,
-        modifier = Modifier.fillMaxWidth()
-      ) {
-        val currentSegment = uiState.segments.getOrNull(uiState.segmentIndex)
-        Text(
-          text = currentSegment?.label ?: currentSegment?.phase?.name ?: "",
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold
-        )
-        Text(
-          text = "Segment ${uiState.segmentIndex + 1}/${uiState.segments.size}",
-          style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Spacer(modifier = Modifier.weight(1f))
 
         Spacer(modifier = Modifier.height(8.dp))
-
-        WorkoutChart(
-          segments = uiState.segments,
-          samples = uiState.samples,
-          elapsedSec = uiState.elapsedSec,
-          ftp = ftp,
-          modifier = Modifier.fillMaxWidth(),
-          elevationProfile = uiState.elevationProfile
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-          FooterStat("Elapsed", formatDuration(uiState.elapsedSec))
-          FooterStat(
-            "Remaining",
-            formatDuration((WorkoutMath.totalDurationSec(uiState.segments) - uiState.elapsedSec).coerceAtLeast(0))
-          )
-          FooterStat("Total", formatDuration(WorkoutMath.totalDurationSec(uiState.segments)))
-        }
-      }
-
-      Spacer(modifier = Modifier.weight(1f))
-
-      CoachFeedbackArea(
-        pendingSuggestion = uiState.pendingSuggestion,
-        liveFeedback = uiState.liveFeedback,
-        onAcceptSuggestion = viewModel::acceptSuggestion,
-        onRejectSuggestion = viewModel::rejectSuggestion
-      )
-
-      Spacer(modifier = Modifier.height(Spacing.sm))
       }
 
       PlayerControlsSheet(
@@ -511,28 +452,28 @@ fun WorkoutScreen(
           com.trainerloop.data.model.SegmentPhase.RECOVERY,
         onPlayPause = {
           if (uiState.isRunning) {
-            viewModel.pause()
+            actions.pause()
           } else {
             val resumable = uiState.elapsedSec > 0 && !uiState.isComplete
-            if (resumable) viewModel.resume() else viewModel.start()
+            if (resumable) actions.resume() else actions.start()
           }
         },
-        onSkip = { viewModel.skipSegment() },
+        onSkip = { actions.skipSegment() },
         onStop = { requestStop() },
-        onBiasDown = { viewModel.fineIntensityDown() },
-        onBiasUp = { viewModel.fineIntensityUp() },
+        onBiasDown = { actions.fineIntensityDown() },
+        onBiasUp = { actions.fineIntensityUp() },
         onBiasReset = {
           repeat(kotlin.math.abs(uiState.intensityOffsetPct)) {
             if (uiState.intensityOffsetPct > 0) {
-              viewModel.fineIntensityDown()
+              actions.fineIntensityDown()
             } else {
-              viewModel.fineIntensityUp()
+              actions.fineIntensityUp()
             }
           }
         },
-        onToggleErg = { viewModel.toggleErg() },
-        onExtendRecovery = { viewModel.extendCurrentRecovery() },
-        onFinish = { viewModel.maybeEmitFinish() }
+        onToggleErg = { actions.toggleErg() },
+        onExtendRecovery = { actions.extendCurrentRecovery() },
+        onFinish = { actions.maybeEmitFinish() }
       )
     }
   }
@@ -540,89 +481,8 @@ fun WorkoutScreen(
   if (showStopConfirm) {
     StopConfirmDialog(
       onDismiss = { showStopConfirm = false },
-      onConfirm = { showStopConfirm = false; viewModel.stop() }
+      onConfirm = { showStopConfirm = false; actions.stop() }
     )
-  }
-
-  if (showTelemetrySourcePicker) {
-    TelemetrySourceDialog(
-      selected = uiState.telemetryScenario,
-      onSelect = {
-        viewModel.setTelemetryScenario(it)
-        showTelemetrySourcePicker = false
-      },
-      onDismiss = { showTelemetrySourcePicker = false }
-    )
-  }
-}
-
-@Composable
-private fun TelemetrySourceDialog(
-  selected: TelemetryScenario?,
-  onSelect: (TelemetryScenario?) -> Unit,
-  onDismiss: () -> Unit
-) {
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = { Text("Debug telemetry source") },
-    text = {
-      Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        Text(
-          "Choose before starting. Simulated samples use the normal workout, coach, and save pipeline.",
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        TelemetrySourceOption(
-          title = "Bluetooth",
-          description = "Use connected trainer and heart-rate sensors.",
-          selected = selected == null,
-          onClick = { onSelect(null) }
-        )
-        TelemetryScenario.entries.forEach { scenario ->
-          TelemetrySourceOption(
-            title = scenario.label,
-            description = scenario.description,
-            selected = selected == scenario,
-            onClick = { onSelect(scenario) }
-          )
-        }
-      }
-    },
-    confirmButton = {
-      TextButton(onClick = onDismiss) { Text("Cancel") }
-    }
-  )
-}
-
-@Composable
-private fun TelemetrySourceOption(
-  title: String,
-  description: String,
-  selected: Boolean,
-  onClick: () -> Unit
-) {
-  TextButton(
-    onClick = onClick,
-    modifier = Modifier.fillMaxWidth(),
-    colors = ButtonDefaults.textButtonColors(
-      contentColor = if (selected) {
-        MaterialTheme.colorScheme.primary
-      } else {
-        MaterialTheme.colorScheme.onSurface
-      }
-    )
-  ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-      Text(
-        text = if (selected) "✓ $title" else title,
-        style = MaterialTheme.typography.titleSmall
-      )
-      Text(
-        text = description,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-      )
-    }
   }
 }
 
@@ -631,7 +491,7 @@ private fun StopConfirmDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
   AlertDialog(
     onDismissRequest = onDismiss,
     title = { Text("End workout?") },
-    text = { Text("Your ride will be saved.") },
+    text = { Text("You can review and save your ride next.") },
     confirmButton = {
       TextButton(
         onClick = onConfirm,
@@ -1153,21 +1013,26 @@ private fun ImmersiveWorkoutChart(
         )
 
         if (samples.size >= 2) {
-          var hrPath: Path? = null
+          val hrPath = Path()
+          var previous: TelemetrySample? = null
           samples.forEach { s ->
-            if (s.hrBpm <= 0) hrPath = null
-            else {
-              val p = Offset(xForTime(s.timeSec), yForHr(s.hrBpm))
-              val cur = hrPath
-              if (cur == null) hrPath = Path().apply { moveTo(p.x, p.y) }
-              else cur.lineTo(p.x, p.y)
+            if (s.hrBpm > 0) {
+              val p = Offset(xForTime(s.workoutTimeSec), yForHr(s.hrBpm))
+              if (previous?.hrBpm?.let { it > 0 } == true &&
+                s.workoutTimeSec == previous!!.workoutTimeSec + 1) hrPath.lineTo(p.x, p.y)
+              else hrPath.moveTo(p.x, p.y)
             }
+            previous = s
           }
-          hrPath?.let { drawPath(it, hrLineColor, style = Stroke(width = 2.dp.toPx())) }
+          drawPath(hrPath, hrLineColor, style = Stroke(width = 2.dp.toPx()))
 
           val power = Path()
-          samples.firstOrNull()?.let { power.moveTo(xForTime(it.timeSec), yForPower(it.powerWatts)) }
-          samples.drop(1).forEach { power.lineTo(xForTime(it.timeSec), yForPower(it.powerWatts)) }
+          samples.forEachIndexed { index, s ->
+            val x = xForTime(s.workoutTimeSec)
+            val y = yForPower(s.powerWatts)
+            if (index > 0 && s.workoutTimeSec == samples[index - 1].workoutTimeSec + 1) power.lineTo(x, y)
+            else power.moveTo(x, y)
+          }
           drawPath(power, powerLineColor, style = Stroke(width = 2.5.dp.toPx()))
         }
 

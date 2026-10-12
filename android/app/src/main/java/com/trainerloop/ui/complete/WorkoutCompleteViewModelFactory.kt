@@ -12,9 +12,6 @@ class WorkoutCompleteViewModelFactory(
   private val workoutName: String,
   private val samples: List<TelemetrySample>,
   private val startTimeMs: Long,
-  private val coachJson: String = "",
-  private val sessionType: String = "WORKOUT",
-  private val routeId: String? = null,
   private val completed: Boolean = false
 ) : ViewModelProvider.Factory {
 
@@ -28,9 +25,6 @@ class WorkoutCompleteViewModelFactory(
         workoutName = workoutName,
         samples = samples,
         startTimeMs = startTimeMs,
-        coachJson = coachJson,
-        sessionType = sessionType,
-        routeId = routeId,
         completed = completed
       ) as T
     }

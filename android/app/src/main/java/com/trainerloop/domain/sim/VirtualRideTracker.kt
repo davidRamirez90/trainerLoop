@@ -1,9 +1,9 @@
 package com.trainerloop.domain.sim
 
 /**
- * Integrates virtual speed into distance/altitude, one workout-second at a
+ * Integrates virtual speed into distance/altitude, one riding-second at a
  * time. Stateful and owned by the ViewModel so it survives recorder swaps.
- * Ticks are keyed by workout time: repeats for the same second are no-ops,
+ * Ticks are keyed by actual riding time: repeats for the same second are no-ops,
  * and dt is capped at 1 s so seeks don't teleport the rider.
  */
 class VirtualRideTracker(
@@ -11,8 +11,8 @@ class VirtualRideTracker(
   private val params: PhysicsParams
 ) : SampleStamper {
 
-  override fun stamp(timeSec: Int, powerWatts: Int, cadenceRpm: Int, dropout: Boolean): VirtualStamp =
-    onTick(timeSec, powerWatts, dropout).let {
+  override fun stamp(timeSec: Int, powerWatts: Int, cadenceRpm: Int, dropout: Boolean, planTimeSec: Int): VirtualStamp =
+    onTick(timeSec, powerWatts, dropout, planTimeSec).let {
       VirtualStamp(it.speedKph, it.distanceM, it.altitudeM, it.gradePercent)
     }
 
@@ -29,10 +29,10 @@ class VirtualRideTracker(
   private var lastSpeedMps = 0.0
 
   @Synchronized
-  fun onTick(timeSec: Int, powerWatts: Int, dropout: Boolean): VirtualPoint {
-    val grade = route.gradeAt(timeSec)
+  fun onTick(timeSec: Int, powerWatts: Int, dropout: Boolean, planTimeSec: Int = timeSec): VirtualPoint {
+    val grade = route.gradeAt(planTimeSec)
     val v = if (dropout) lastSpeedMps else VirtualSpeed.speedMps(powerWatts, grade, params)
-    // ponytail: dt capped at 1 s — a seek skips route, not rides it
+    // At most one riding second per tick, regardless of plan skips.
     val dt = (timeSec - lastTimeSec).coerceIn(0, 1)
     if (dt > 0) {
       distanceM += v * dt

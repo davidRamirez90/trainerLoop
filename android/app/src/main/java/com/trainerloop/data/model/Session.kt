@@ -21,7 +21,7 @@ data class SessionSummary(
 
 /**
  * Full session data used when persisting a session. The samples and
- * coach events are passed as already-serialized JSON strings so the
+ * legacy coach events are retained as serialized JSON for compatibility so the
  * repository does not need to depend on kotlinx-serialization directly.
  */
 data class SessionData(
@@ -32,6 +32,7 @@ data class SessionData(
     val endedAt: String?,
     val durationSec: Int,
     val samplesJson: String,
+    /** Legacy coaching payload; new rides store an empty string. */
     val coachEventsJson: String,
     val completed: Boolean,
     val avgPower: Int,
@@ -41,6 +42,6 @@ data class SessionData(
     val icuSyncedAt: String? = null,
     /** "WORKOUT" or "FREE_RIDE". */
     val sessionType: String = "WORKOUT",
-    /** RouteEntity id for free rides; null for workouts. */
+    /** Legacy route reference retained for existing sessions; new workouts use null. */
     val routeId: String? = null
 )

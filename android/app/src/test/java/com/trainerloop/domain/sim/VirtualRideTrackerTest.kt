@@ -11,6 +11,18 @@ class VirtualRideTrackerTest {
   private fun flatRoute() = RouteProfile(DoubleArray(600), DoubleArray(600))
 
   @Test
+  fun `plan skips change gradient while distance follows actual riding time`() {
+    val route = RouteProfile(DoubleArray(600) { if (it >= 300) 5.0 else 0.0 }, DoubleArray(600))
+    val tracker = VirtualRideTracker(route, params)
+    val before = tracker.onTick(2, 250, dropout = false, planTimeSec = 2)
+    val skipped = tracker.onTick(2, 250, dropout = false, planTimeSec = 300)
+    assertEquals(before.distanceM, skipped.distanceM, 1e-9)
+    assertEquals(5.0, skipped.gradePercent, 1e-9)
+    val ridden = tracker.onTick(3, 250, dropout = false, planTimeSec = 301)
+    assertEquals(VirtualSpeed.speedMps(250, 5.0, params), ridden.distanceM - skipped.distanceM, 1e-9)
+  }
+
+  @Test
   fun `distance accumulates at physics speed`() {
     val tracker = VirtualRideTracker(flatRoute(), params)
     var last = tracker.onTick(0, 250, dropout = false)

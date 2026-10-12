@@ -7,9 +7,9 @@ completion. Compilation or passing screenshot tests alone is insufficient.**
 ## Project structure
 
 - `android/` is the Android Gradle project; the application module is `android/app`.
-- `android/app/src/main/java/com/trainerloop/domain/` contains the pure-Kotlin core (coaching, parsing, FIT, and ride simulation).
+- `android/app/src/main/java/com/trainerloop/domain/` contains the pure-Kotlin core (workouts, parsing, FIT, and workout-route simulation).
 - `android/app/src/main/java/com/trainerloop/ui/` contains the Jetpack Compose UI and ViewModels; `data/` contains models, repositories, and Room/remote sources.
-- `android/README.md` documents the app architecture, setup, and useful commands. Product and implementation notes live in `docs/plans/`.
+- `android/README.md` documents the app architecture, setup, and useful commands. Current product scope is documented in `android/README.md` and `android/ROADMAP.md`; `docs/plans/` contains historical implementation notes.
 
 ## Build and test
 
@@ -106,9 +106,10 @@ verify. Do not overwrite baselines merely to hide regression failures. A new
 reference may be accepted within the user's authorized UI task; this workflow
 adds no separate permission requirement.
 
-Current coverage is production `HomeScreenContent` with a planned interval workout
-in light/dark themes, via `HomeScreenshotTest`. Extend fixtures only for affected
-screens/states. Use deterministic workouts, activity metrics, empty/populated
+Current coverage includes Home light/dark via `HomeScreenshotTest`, proposals via
+`HomeProposalScreenshotTest`, and the retained Focus destinations and supporting
+states via `FocusMigrationScreenshotTest`. See `docs/design/focus-migration` for
+the production gallery. Extend fixtures only for affected screens/states. Use deterministic workouts, activity metrics, empty/populated
 history, loading/errors, or other app-specific data as relevant. Avoid real user
 data, accounts, network services, and live BLE. Keep service-owning routes intact;
 where necessary extract state-driven content used by both production and tests.

@@ -1,8 +1,10 @@
 # TrainerLoop
 
 TrainerLoop is a native Android app that turns a Bluetooth smart trainer into an
-indoor-cycling computer. It supports structured workouts, GPX-based virtual
-rides, free rides, live coaching, FIT recording, and intervals.icu sync.
+indoor-cycling computer. It supports structured ERG workouts, an FTP ramp test, FIT recording, and
+intervals.icu sync. A virtual route overlay during workouts remains optional.
+Workout building, standalone free riding, GPX routes, and live coaching were
+removed in the October 2026 scope cleanup.
 
 The earlier React/Vite proof of concept has been retired. Android is the only
 supported application.

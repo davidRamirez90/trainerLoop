@@ -84,7 +84,7 @@ private fun HomeReadyReference() {
           Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("YOUR TRAINER IS READY", style = MaterialTheme.typography.labelMedium)
             Text("Turn today into a good ride.", style = MaterialTheme.typography.headlineLarge)
-            Text("No workout needed. Settle in and ride by feel.", style = MaterialTheme.typography.bodyMedium)
+            Text("Choose a structured workout and follow your training plan.", style = MaterialTheme.typography.bodyMedium)
           }
           Button(
             onClick = {},
@@ -95,7 +95,7 @@ private fun HomeReadyReference() {
           ) {
             Icon(Icons.Default.PlayArrow, contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text("Start Free Ride")
+            Text("Choose Workout")
           }
         }
       }
@@ -106,7 +106,7 @@ private fun HomeReadyReference() {
       Text("Explore", style = MaterialTheme.typography.titleLarge)
       Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         UtilityCard("Workout library", "Find your next session", Modifier.weight(1f))
-        UtilityCard("Routes", "Ride somewhere new", Modifier.weight(1f))
+        UtilityCard("History", "Review your training", Modifier.weight(1f))
       }
     }
   }
@@ -225,7 +225,7 @@ private fun LibraryReference() {
         FilterChip(selected = false, onClick = {}, label = { Text("Intervals") })
       }
       Card(
-        colors = CardDefaults.cardColors(containerColor = colors.coach, contentColor = colors.onCoach),
+        colors = CardDefaults.cardColors(containerColor = colors.assessment, contentColor = colors.onAssessment),
         shape = RoundedCornerShape(18.dp)
       ) {
         Row(

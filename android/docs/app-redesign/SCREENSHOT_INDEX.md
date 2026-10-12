@@ -1,3 +1,5 @@
+> Historical reference. Current scope is documented in [Android README](../../README.md). Workout builder, standalone free ride, GPX riding, and live coaching were removed in October 2026; screenshots and plans may show retired features.
+
 # Trainer Loop screenshot index
 
 Captured from the USB-connected Android device on 2026-07-14. The API-key-visible capture was intentionally skipped at the user's request.

@@ -1,3 +1,5 @@
+> Historical reference. Current scope is documented in [Android README](../../android/README.md). Workout builder, standalone free ride, GPX riding, and live coaching were removed in October 2026; screenshots and plans may show retired features.
+
 # Android Migration — Telemetry, Live Chart, and Session Export Implementation Plan
 
 > **REQUIRED SUB-SKILL:** Use the `executing-plans` skill to implement this plan task-by-task.

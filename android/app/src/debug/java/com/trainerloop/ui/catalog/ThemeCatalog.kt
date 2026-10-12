@@ -90,8 +90,8 @@ fun ThemeCatalogScreen() {
   val semanticColors = listOf(
     CatalogColor("ready", semantic.ready),
     CatalogColor("onReady", semantic.onReady),
-    CatalogColor("coach", semantic.coach),
-    CatalogColor("onCoach", semantic.onCoach),
+    CatalogColor("assessment", semantic.assessment),
+    CatalogColor("onAssessment", semantic.onAssessment),
     CatalogColor("connected", semantic.connected),
     CatalogColor("onConnected", semantic.onConnected),
     CatalogColor("warning", semantic.warning),
