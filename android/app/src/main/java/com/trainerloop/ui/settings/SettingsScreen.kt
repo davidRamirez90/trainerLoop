@@ -56,6 +56,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -108,7 +110,7 @@ fun SettingsScreen(
   androidx.compose.material3.Scaffold(
     contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
     topBar = { com.trainerloop.ui.components.TrainerLoopTopBar(
-      title = "Profile", onBack = onBack, windowInsets = androidx.compose.foundation.layout.WindowInsets(0)) }
+      title = "Settings", onBack = onBack, windowInsets = androidx.compose.foundation.layout.WindowInsets(0)) }
   ) { screenPadding ->
     Column(
       modifier = Modifier
@@ -214,9 +216,9 @@ fun SettingsScreen(
             verticalAlignment = Alignment.CenterVertically
           ) {
             Column(modifier = Modifier.weight(1f)) {
-              Text("Simulated route + speed", style = MaterialTheme.typography.bodyMedium)
+              Text("Virtual ride", style = MaterialTheme.typography.bodyMedium)
               Text(
-                "Terrain overlay and physics-based speed during workouts",
+                "See a virtual route and estimated outdoor speed during workouts.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
               )
@@ -228,8 +230,22 @@ fun SettingsScreen(
           }
 
           var advancedExpanded by remember { mutableStateOf(false) }
-          TextButton(onClick = { advancedExpanded = !advancedExpanded }) {
-            Text(if (advancedExpanded) "Hide advanced" else "Advanced")
+          Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+              Text("Advanced mode", style = MaterialTheme.typography.bodyMedium)
+              Text("Fine-tune the exact values", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            androidx.compose.material3.Switch(checked = advancedExpanded,
+              onCheckedChange = { advancedExpanded = it },
+              modifier = Modifier.semantics { contentDescription = "Advanced mode" })
+          }
+          if (!advancedExpanded) {
+            Text("Choose what your outdoor ride feels like. These settings affect estimated speed, not workout power.",
+              style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            SimulationPresetSlider("Bike type", uiState.bikeWeightKg, bikePresets, viewModel::updateBikeWeight)
+            SimulationPresetSlider("Road surface", uiState.crr, surfacePresets, viewModel::updateCrr)
+            SimulationPresetSlider("Riding position", uiState.cda, positionPresets, viewModel::updateCda)
           }
           AnimatedVisibility(
             visible = advancedExpanded,
@@ -365,7 +381,7 @@ fun SettingsScreen(
 }
 private enum class SettingsDialog { POWER_ZONES, HR_ZONES, ABOUT }
 
-private data class Zone(val name: String, val range: String)
+private data class Zone(val name: String, val range: String, val effort: String)
 
 // Power-zone boundaries match live charts and saved-session distributions.
 private fun powerZones(ftp: Int): List<Zone> {
@@ -379,7 +395,9 @@ private fun powerZones(ftp: Int): List<Zone> {
       upper < bounds[index] -> "—"
       else -> "${bounds[index]}–$upper W"
     }
-    Zone("Z${index + 1} $name", range)
+    Zone("Z${index + 1} $name", range,
+      listOf("Easy spinning", "Comfortable, steady effort", "Brisk, controlled effort",
+        "Hard, sustained effort", "Very hard intervals", "Short, intense bursts")[index])
   }
 }
 
@@ -387,11 +405,11 @@ private fun hrZones(maxHr: Int): List<Zone> {
   if (maxHr <= 0) return emptyList()
   fun pct(p: Int) = maxHr * p / 100
   return listOf(
-    Zone("Z1 Recovery", "0–${pct(60)} bpm"),
-    Zone("Z2 Endurance", "${pct(60)}–${pct(70)} bpm"),
-    Zone("Z3 Tempo", "${pct(70)}–${pct(80)} bpm"),
-    Zone("Z4 Threshold", "${pct(80)}–${pct(90)} bpm"),
-    Zone("Z5 Max", "${pct(90)}–$maxHr bpm")
+    Zone("Z1 Recovery", "0–${pct(60)} bpm", "Easy, relaxed effort"),
+    Zone("Z2 Endurance", "${pct(60)}–${pct(70)} bpm", "Comfortable, steady effort"),
+    Zone("Z3 Tempo", "${pct(70)}–${pct(80)} bpm", "Brisk, controlled effort"),
+    Zone("Z4 Threshold", "${pct(80)}–${pct(90)} bpm", "Hard, sustained effort"),
+    Zone("Z5 Max", "${pct(90)}–$maxHr bpm", "Very hard effort")
   )
 }
 
@@ -404,38 +422,54 @@ private fun ZonesDialog(
 ) {
   AlertDialog(
     onDismissRequest = onDismiss,
-    title = { Text(title) },
+    containerColor = MaterialTheme.colorScheme.background,
+    tonalElevation = 0.dp,
+    titleContentColor = MaterialTheme.colorScheme.onBackground,
+    textContentColor = MaterialTheme.colorScheme.onSurface,
+    title = { Text(title, style = MaterialTheme.typography.headlineMedium) },
     text = {
-      Column {
-        Text(
-          text = subtitle,
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(12.dp))
+      Column(Modifier.verticalScroll(rememberScrollState())) {
+        Text(subtitle, style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(Spacing.lg))
         if (zones.isEmpty()) {
           Text("Set your FTP / Max HR above to see zones.")
-        }
-        zones.forEach { zone ->
-          Row(
-            modifier = Modifier
-              .fillMaxWidth()
-              .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+        } else {
+          androidx.compose.material3.Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.fillMaxWidth()
           ) {
-            Text(zone.name, style = MaterialTheme.typography.bodyMedium)
-            Text(
-              zone.range,
-              style = MaterialTheme.typography.bodyMedium,
-              fontWeight = FontWeight.SemiBold
-            )
+            Column(Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.xs)) {
+              zones.forEachIndexed { index, zone ->
+                Row(Modifier.fillMaxWidth().padding(vertical = Spacing.md),
+                  horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                  verticalAlignment = Alignment.Top) {
+                  androidx.compose.material3.Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp)
+                  ) {
+                    Text(zone.name.substringBefore(" "), style = MaterialTheme.typography.labelMedium,
+                      color = MaterialTheme.colorScheme.primary,
+                      modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.sm))
+                  }
+                  Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    Text(zone.name.substringAfter(" "), style = MaterialTheme.typography.titleMedium,
+                      color = MaterialTheme.colorScheme.onSurface)
+                    Text(zone.range, style = MaterialTheme.typography.bodyMedium,
+                      fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                    Text(zone.effort, style = MaterialTheme.typography.bodySmall,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant)
+                  }
+                }
+                if (index < zones.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+              }
+            }
           }
         }
       }
     },
-    confirmButton = {
-      TextButton(onClick = onDismiss) { Text("Close") }
-    }
+    confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
   )
 }
 

@@ -1,9 +1,7 @@
 package com.trainerloop.ui.home
 
 import android.annotation.SuppressLint
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,15 +13,16 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,8 +31,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -124,16 +121,9 @@ internal fun HomeScreenContent(
           fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
         IconButton(
           onClick = onNavigateToProfile,
-          modifier = Modifier.size(48.dp).semantics { contentDescription = "Open profile" }
+          modifier = Modifier.size(48.dp)
         ) {
-          Surface(shape = CircleShape, color = MaterialTheme.colorScheme.background,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-            Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-              Text(uiState.riderName.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-                .take(2).map { it.first().uppercaseChar() }.joinToString("").ifBlank { "R" },
-                style = MaterialTheme.typography.titleMedium)
-            }
-          }
+          Icon(Icons.Default.Settings, contentDescription = "Open settings")
         }
       }
       Spacer(Modifier.height(Spacing.xl))

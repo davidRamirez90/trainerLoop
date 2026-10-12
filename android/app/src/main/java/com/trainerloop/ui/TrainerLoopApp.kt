@@ -46,6 +46,7 @@ import com.trainerloop.ui.history.HistoryScreen
 import com.trainerloop.ui.history.SessionDetailScreen
 import com.trainerloop.ui.home.HomeScreen
 import com.trainerloop.ui.library.WorkoutLibraryScreen
+import com.trainerloop.ui.navigation.navigateToTab
 import com.trainerloop.ui.navigation.Screen
 import com.trainerloop.ui.navigation.TabFadeThroughTransitions
 import com.trainerloop.ui.navigation.playerEnter
@@ -92,11 +93,7 @@ fun TrainerLoopApp(
     bottomBar = {
       if (showBottomBar) {
         com.trainerloop.ui.components.FocusNavigationBar(currentRoute) { route ->
-          navController.navigate(route) {
-            popUpTo(Screen.Home.route) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-          }
+          navController.navigateToTab(route)
         }
       }
     }
@@ -134,8 +131,8 @@ fun TrainerLoopApp(
         val context = LocalContext.current
         HomeScreen(
           onNavigateToDevices = { navController.navigate(Screen.Devices.route) },
-          onNavigateToWorkouts = { navController.navigate(Screen.Workouts.route) },
-          onNavigateToHistory = { navController.navigate(Screen.History.route) },
+          onNavigateToWorkouts = { navController.navigateToTab(Screen.Workouts.route) },
+          onNavigateToHistory = { navController.navigateToTab(Screen.History.route) },
           onSessionClick = { id -> navController.navigate(Screen.SessionDetail.createRoute(id)) },
           onNavigateToProfile = {
             navController.navigate(Screen.Profile.route) { launchSingleTop = true }
@@ -149,7 +146,7 @@ fun TrainerLoopApp(
               )
             )
           },
-          onChooseWorkout = { navController.navigate(Screen.Workouts.route) }
+          onChooseWorkout = { navController.navigateToTab(Screen.Workouts.route) }
         )
       }
 

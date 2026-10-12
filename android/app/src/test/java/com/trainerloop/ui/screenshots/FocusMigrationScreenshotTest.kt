@@ -17,6 +17,8 @@ import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -50,6 +52,8 @@ import com.trainerloop.ui.library.WorkoutLibraryViewModel
 import com.trainerloop.ui.library.WorkoutListItem
 import com.trainerloop.ui.navigation.Screen
 import com.trainerloop.ui.settings.SettingsScreen
+import com.trainerloop.ui.settings.nearestPreset
+import com.trainerloop.ui.settings.positionPresets
 import com.trainerloop.ui.settings.SettingsUiState
 import com.trainerloop.ui.settings.SettingsViewModel
 import com.trainerloop.ui.theme.LocalReducedMotion
@@ -66,9 +70,11 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import java.util.TimeZone
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -151,7 +157,7 @@ class FocusMigrationScreenshotTest {
     set(route = "home") { HomeContent(home.copy(plannedError = "Offline"),
       onProfile = { destination = "profile" }, onHistory = { destination = "history" },
       onSession = { destination = it }, onRetry = { destination = "retry" }) }
-    compose.onNodeWithContentDescription("Open profile").performClick()
+    compose.onNodeWithContentDescription("Open settings").performClick()
     assertEquals("profile", destination)
     compose.onNodeWithText("Retry plan").performClick()
     assertEquals("retry", destination)
@@ -238,16 +244,100 @@ class FocusMigrationScreenshotTest {
     val data = SessionData(session.id, session.workoutId, session.workoutName, session.startedAt,
       session.endedAt, session.durationSec, Json.encodeToString(ListSerializer(TelemetrySample.serializer()), samples),
       "", true, session.avgPower, session.maxPower, session.avgCadence, session.avgHr)
-    set { SessionDetailContent(SessionDetailUiState(session = data, icuConfigured = true), 250, {}, {}) }
-    shot("session-detail")
+    val previousTimeZone = TimeZone.getDefault()
+    try {
+      TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+      set { SessionDetailContent(SessionDetailUiState(session = data, icuConfigured = true), 250, {}, {}) }
+      shot("session-detail")
+    } finally {
+      TimeZone.setDefault(previousTimeZone)
+    }
   }
   private fun settings(dark: Boolean = false, dialog: String? = null) {
     val vm = mockk<SettingsViewModel>(relaxed = true)
     every { vm.uiState } returns MutableStateFlow(SettingsUiState(name = "Alex Morgan", weightKg = "72.5"))
     set(dark) { SettingsScreen(viewModel = vm) }
     if (dialog != null) compose.onNodeWithText(dialog).performScrollTo().performClick()
-    shot(dialog?.lowercase()?.replace(" ", "-") ?: if (dark) "profile-dark" else "profile-light")
+    shot(dialog?.lowercase()?.replace(" ", "-")?.let { if (dark) "$it-dark" else it } ?: if (dark) "profile-dark" else "profile-light")
   }
+  private fun simulation(
+    dark: Boolean = false,
+    advanced: Boolean = false,
+    fontScale: Float = 1f,
+    state: SettingsUiState = SettingsUiState(name = "Alex Morgan"),
+    name: String? = null
+  ) {
+    val vm = mockk<SettingsViewModel>(relaxed = true)
+    every { vm.uiState } returns MutableStateFlow(state)
+    set(dark, fontScale = fontScale) { SettingsScreen(viewModel = vm) }
+    compose.onNodeWithText("Simulation").performScrollTo()
+    if (advanced) compose.onNodeWithContentDescription("Advanced mode").performScrollTo().performClick()
+    compose.onNodeWithText(if (advanced) "Reset to defaults" else
+      positionPresets[nearestPreset(state.cda, positionPresets)].description).performScrollTo()
+    shot(name ?: if (fontScale > 1f) "simulation-large-text" else if (advanced) "simulation-advanced" else if (dark) "simulation-dark" else "simulation-simple")
+  }
+  @Test fun simulationPresetsUpdateExactValuesAndModesPreserveCustomValues() {
+    val vm = mockk<SettingsViewModel>(relaxed = true)
+    val state = MutableStateFlow(SettingsUiState(bikeWeightKg = "9.5", crr = "0.0065", cda = "0.37"))
+    every { vm.uiState } returns state
+    every { vm.updateBikeWeight(any()) } answers { state.value = state.value.copy(bikeWeightKg = firstArg()) }
+    every { vm.updateCrr(any()) } answers { state.value = state.value.copy(crr = firstArg()) }
+    every { vm.updateCda(any()) } answers { state.value = state.value.copy(cda = firstArg()) }
+    set { SettingsScreen(viewModel = vm) }
+    compose.onNodeWithContentDescription("Advanced mode").performScrollTo().performClick()
+    compose.onNodeWithContentDescription("Advanced mode").performClick()
+    assertEquals("9.5", state.value.bikeWeightKg)
+    assertEquals("0.0065", state.value.crr)
+    assertEquals("0.37", state.value.cda)
+    compose.onNodeWithContentDescription("Bike type").performScrollTo()
+      .performSemanticsAction(SemanticsActions.SetProgress) { it(0f) }
+    compose.onNodeWithContentDescription("Road surface").performScrollTo()
+      .performSemanticsAction(SemanticsActions.SetProgress) { it(6f) }
+    compose.onNodeWithContentDescription("Riding position").performScrollTo()
+      .performSemanticsAction(SemanticsActions.SetProgress) { it(0f) }
+    assertEquals("6.0", state.value.bikeWeightKg)
+    assertEquals("0.009", state.value.crr)
+    assertEquals("0.18", state.value.cda)
+    compose.onNodeWithContentDescription("Bike type").performScrollTo()
+      .performSemanticsAction(SemanticsActions.SetProgress) { it(3f) }
+    compose.onNodeWithContentDescription("Road surface").performScrollTo()
+      .performSemanticsAction(SemanticsActions.SetProgress) { it(5f) }
+    compose.onNodeWithContentDescription("Riding position").performScrollTo()
+      .performSemanticsAction(SemanticsActions.SetProgress) { it(4f) }
+    assertEquals("9.0", state.value.bikeWeightKg)
+    assertEquals("0.0075", state.value.crr)
+    assertEquals("0.37", state.value.cda)
+  }
+  @Test fun simulationSimple() = simulation()
+  @Test fun simulationDark() = simulation(dark = true)
+  @Test fun simulationAdvanced() = simulation(advanced = true)
+  @Test @Config(qualifiers = "en-rUS-w360dp-h800dp-xxhdpi") fun simulationLargeText() = simulation(fontScale = 1.5f)
+  @Test fun simulationIntermediate() = simulation(
+    state = SettingsUiState(bikeWeightKg = "9.0", crr = "0.004", cda = "0.27"),
+    name = "simulation-intermediate")
+
+  private fun largeTextZones(title: String, name: String, lastEffort: String) {
+    val vm = mockk<SettingsViewModel>(relaxed = true)
+    every { vm.uiState } returns MutableStateFlow(SettingsUiState())
+    try {
+      // Native dialogs get density from the window's Resources, not the parent composition.
+      RuntimeEnvironment.setFontScale(1.5f)
+      set(fontScale = 1.5f) { SettingsScreen(viewModel = vm) }
+      compose.onNodeWithText(title).performScrollTo().performClick()
+      shot(name)
+      compose.onNodeWithText(lastEffort).performScrollTo().assertIsDisplayed()
+      shot("$name-scrolled")
+      compose.onNodeWithText("Close").assertIsDisplayed().performClick()
+    } finally {
+      RuntimeEnvironment.setFontScale(1f)
+    }
+  }
+  @Test @Config(qualifiers = "en-rUS-w360dp-h800dp-xxhdpi") fun powerZonesLargeText() =
+    largeTextZones("Power Zones", "power-zones-large-text", "Short, intense bursts")
+  @Test @Config(qualifiers = "en-rUS-w360dp-h800dp-xxhdpi") fun hrZonesLargeText() =
+    largeTextZones("Heart Rate Zones", "heart-rate-zones-large-text", "Very hard effort")
+  @Test fun hrZonesDark() = settings(dark = true, dialog = "Heart Rate Zones")
+  @Test fun powerZonesDark() = settings(dark = true, dialog = "Power Zones")
   @Test fun profile() = settings()
   @Test fun profileDark() = settings(true)
   @Test fun powerZones() = settings(dialog = "Power Zones")

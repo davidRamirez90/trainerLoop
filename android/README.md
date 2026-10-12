@@ -6,8 +6,8 @@ intervals.icu is an optional external integration.
 
 ## Focus navigation
 
-Today, Workouts, and History are the three primary tabs. Open Profile from the
-Today avatar; its back action returns to Today. Devices remains a modal setup
+Today, Workouts, and History are the three primary tabs. Open Settings from the
+Today gear icon; its back action returns to Today. Devices remains a modal setup
 flow from Today. Opening a workout enters idle Player; Play starts recording.
 
 ## Current functionality
@@ -32,8 +32,10 @@ flow from Today. Opening a workout enters idle Player; Play starts recording.
   detection (sensor dropouts are excluded), estimate from 75% of best rolling
   one-minute power. Accept/discard FTP and optionally push it to intervals.icu.
 - Optional generated virtual route overlay during workouts: simulated speed,
-  distance, elevation and gradient. Profile controls rider/bike weight, rolling
-  resistance and aerodynamic drag. This overlay does not change ERG targets.
+  distance, elevation and gradient. Settings offers seven named levels each for
+  bike type, road surface and riding position, with exact bike weight,
+  rolling resistance and
+  aerodynamic drag in Advanced mode. This overlay does not change ERG targets.
 - Completion: ride statistics, telemetry chart, Save/Discard, FIT sharing. Save
   persists full telemetry locally and initiates upload if credentials are set.
 - History: saved sessions and sync/completion status; six-week **riding-duration**
@@ -41,9 +43,10 @@ flow from Today. Opening a workout enters idle Player; Play starts recording.
 - intervals.icu: today's workout preview/Open workout and library sync, FTP/weight
   sync, FIT upload on Save, manual upload for completed unsynced sessions, and
   optional FTP write-back after a ramp test. Sync covers today, not a week calendar.
-- Profile: rider name, FTP, weight, max HR/zone tables, default ERG bias, simulation
+- Settings: rider name, FTP, weight, max HR/zone tables, default ERG bias, simulation
   options, completion sound, integration credentials, and About/version. Power-zone
-  tables use the same six bands and exact watt boundaries as charts and history.
+  and heart-rate guides share the Focus paper/forest/sage design. Power zones
+  use the same six bands and exact watt boundaries as charts and history.
 
 ## Removed functionality and compatibility
 
