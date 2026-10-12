@@ -116,13 +116,14 @@ class TrainerLoopApplication : Application(), ManagerProvider {
 
   fun attachHr(device: BluetoothDevice) {
     val previousHr = _hrManager.value
-    val trainerDevice = _ftmsManager.value?.device
+    val ftms = _ftmsManager.value
+    val trainerDevice = ftms?.device
     val sharedTrainerLink = trainerConnection?.takeIf {
       trainerDevice?.address == device.address
     }
     _hrManager.value = if (sharedTrainerLink != null) {
       BleLog.d("attachHr: sharing trainer GATT link for ${device.address}")
-      HrManager(this, device, sharedTrainerLink)
+      HrManager(this, device, sharedTrainerLink, ftmsData = ftms?.data)
     } else {
       HrManager(this, device)
     }

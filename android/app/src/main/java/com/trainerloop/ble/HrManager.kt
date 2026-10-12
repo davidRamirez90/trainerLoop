@@ -3,6 +3,7 @@ package com.trainerloop.ble
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import com.trainerloop.ble.model.HeartRateMeasurementParser
+import com.trainerloop.ble.model.IndoorBikeData
 import com.trainerloop.ble.model.Stamped
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineDispatcher
@@ -18,12 +19,13 @@ class HrManager internal constructor(
   private val context: Context,
   val device: BluetoothDevice,
   private val sharedConnection: HeartRateBleConnection?,
+  private val ftmsData: StateFlow<Stamped<IndoorBikeData>?>? = null,
   dispatcher: CoroutineDispatcher = Dispatchers.Main
 ) {
   constructor(
     context: Context,
     device: BluetoothDevice
-  ) : this(context, device, null, Dispatchers.Main)
+  ) : this(context, device, null, dispatcher = Dispatchers.Main)
 
   private val scope = CoroutineScope(SupervisorJob() + dispatcher)
   private var connection: HeartRateBleConnection? = null
@@ -43,6 +45,20 @@ class HrManager internal constructor(
     )
     val conn = sharedConnection ?: BleConnection(context, device)
     connection = conn
+
+    if (ftmsData != null) {
+      scope.launch {
+        ftmsData.collect { stamped ->
+          _heartRate.value = stamped?.value?.heartRateBpm?.let { heartRate ->
+            Stamped(heartRate, stamped.atMs)
+          }
+        }
+      }
+      active = true
+      _isConnected.value = true
+      BleLog.d("HrManager.connect success via FTMS data")
+      return Result.success(Unit)
+    }
 
     if (ownsConnection) {
       conn.connect().getOrElse {
