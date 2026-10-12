@@ -84,7 +84,6 @@ fun HomeScreen(
 ) {
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val plannedReady by viewModel.plannedWorkoutReady.collectAsStateWithLifecycle()
-  val context = LocalContext.current
 
   LaunchedEffect(plannedReady) {
     plannedReady?.let {
@@ -93,6 +92,32 @@ fun HomeScreen(
     }
   }
 
+  HomeScreenContent(
+    uiState = uiState,
+    onNavigateToDevices = onNavigateToDevices,
+    onNavigateToWorkouts = onNavigateToWorkouts,
+    onNavigateToBuilder = onNavigateToBuilder,
+    onStartFreeRide = onStartFreeRide,
+    onGpxRoutes = onGpxRoutes,
+    onNavigateToProfile = onNavigateToProfile,
+    onStartPlanned = viewModel::startPlanned
+  )
+}
+
+/** The production Home layout, renderable with state without starting app services. */
+@SuppressLint("MissingPermission")
+@Composable
+internal fun HomeScreenContent(
+  uiState: HomeUiState,
+  onNavigateToDevices: () -> Unit,
+  onNavigateToWorkouts: () -> Unit,
+  onNavigateToBuilder: () -> Unit,
+  onStartFreeRide: () -> Unit,
+  onGpxRoutes: () -> Unit,
+  onNavigateToProfile: () -> Unit,
+  onStartPlanned: () -> Unit
+) {
+  val context = LocalContext.current
   val hasPlan = uiState.plannedName != null || uiState.plannedLoading || uiState.plannedError != null
   LazyColumn(
     modifier = Modifier
@@ -130,7 +155,7 @@ fun HomeScreen(
           ftp = uiState.ftp,
           loading = uiState.plannedLoading,
           error = uiState.plannedError,
-          onStart = viewModel::startPlanned
+          onStart = onStartPlanned
         )
       }
     }
@@ -205,6 +230,7 @@ private fun RiderHeader(name: String, ftp: Int, weightKg: Double, onClick: () ->
     Spacer(modifier = Modifier.width(Spacing.md))
     Column(modifier = Modifier.weight(1f)) {
       Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+      Spacer(modifier = Modifier.height(Spacing.xs))
       Text(
         text = "FTP $ftp · ${formatWeight(weightKg)} kg",
         style = NumericSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
